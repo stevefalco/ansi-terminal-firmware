@@ -1,0 +1,11 @@
+.*.sw?
+*~
+*.rpt
+db/
+incremental_db/
+output_files/
+simulation/
+timing/
+testbench/
+greybox_tmp
+*_sim/
