@@ -32,7 +32,7 @@ begin
 	drow: divider
 		port map
 		(
-			denom => "10100",
+			denom => "10100", -- 16
 			numer => rowNum,
 			quotient => quotient,
 			remain => remain

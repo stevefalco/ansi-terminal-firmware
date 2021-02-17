@@ -2,8 +2,8 @@ restart -f
 
 radix -hexadecimal
 
-configure wave -namecolwidth 335
-configure wave -valuecolwidth 300
+configure wave -namecolwidth 463
+configure wave -valuecolwidth 101
 configure wave -justifyvalue left
 configure wave -signalnamewidth 0
 configure wave -snapdistance 10
@@ -27,8 +27,10 @@ add wave /testbench/term/frameGen/hsync
 add wave /testbench/term/frameGen/vsync
 add wave -radix unsigned /testbench/term/columnAddress
 add wave -radix unsigned /testbench/term/rowAddress
-add wave -radix unsigned /testbench/term/frameRam/q_a
-add wave -radix hexadecimal /testbench/term/charRom/q
+add wave -radix unsigned /testbench/term/addressA
+add wave -radix ascii /testbench/term/frameChar
+add wave -radix unsigned /testbench/term/romAddr
+add wave -radix hexadecimal /testbench/term/scanChar
 add wave /testbench/term/pixel
 
 run 20ms

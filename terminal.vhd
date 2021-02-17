@@ -31,7 +31,7 @@ architecture a of terminal is
 
 	component char_rom
 		port (
-			address		: in std_logic_vector (11 downto 0);
+			address		: in std_logic_vector (10 downto 0);
 			clock		: in std_logic;
 			q		: out std_logic_vector (7 downto 0)
 		);
@@ -60,15 +60,6 @@ architecture a of terminal is
 		);
 	end component;
 
-	component row_mod_line
-		port (
-			rowNum		: in std_logic_vector (9 downto 0);
-			lineNum		: out std_logic_vector (4 downto 0);
-			moduloNum	: out std_logic_vector (4 downto 0);
-			valid		: out std_logic
-		);
-	end component;
-
 	type resetFSM_type is (
 		resetIdle_state,
 		resetActive_state,
@@ -93,16 +84,12 @@ architecture a of terminal is
 	signal wrenB			: std_logic;
 	signal qB			: std_logic_vector (7 downto 0);
 	
-	signal lineNum			: std_logic_vector (4 downto 0);
-	signal moduloNum		: std_logic_vector (4 downto 0);
-	signal lineValid		: std_logic;
-
-	signal char			: std_logic_vector (7 downto 0);
+	signal frameChar		: std_logic_vector (7 downto 0);
 	signal scanChar			: std_logic_vector (7 downto 0);
 
 	signal pixel			: std_logic;
 
-	signal romAddr			: std_logic_vector (11 downto 0);
+	signal romAddr			: std_logic_vector (10 downto 0);
 
 begin
 
@@ -158,7 +145,7 @@ begin
 	-- long, and waste 48 bytes x 24 lines or 1152 bytes.  Thus, we can
 	-- feed the column address right shifted by 3 directly into the low
 	-- 6 bits of the frame_ram address.
-	addressA <= "00000" & columnAddress(9 downto 3);
+	addressA <= rowAddress(8 downto 4) & columnAddress(9 downto 3);
 	frameRam: frame_ram
 		port map (
 			address_a => addressA,
@@ -168,19 +155,12 @@ begin
 			data_b => dataB,
 			wren_a => '0', -- not used
 			wren_b => wrenB,
-			q_a => char,
+			q_a => frameChar,
 			q_b => qB
 		);
 
-	getLine: row_mod_line
-		port map (
-			rowNum => rowAddress,
-			lineNum => lineNum,
-			moduloNum => moduloNum,
-			valid => lineValid
-		);
-
-	romAddr <= char(6 downto 0) & moduloNum;
+	-- We are using 7-bit ascii, hence we toss frameChar(7).
+	romAddr <= frameChar(6 downto 0) & rowAddress(3 downto 0);
 	charRom: char_rom
 		port map (
 			address => romAddr,
