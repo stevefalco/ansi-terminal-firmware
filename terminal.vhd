@@ -145,6 +145,9 @@ begin
 	-- long, and waste 48 bytes x 24 lines or 1152 bytes.  Thus, we can
 	-- feed the column address right shifted by 3 directly into the low
 	-- 6 bits of the frame_ram address.
+	--
+	-- There are 480 active rows, and that fits in 9 bits, hence we can
+	-- toss rowAddress(9).
 	addressA <= rowAddress(8 downto 4) & columnAddress(9 downto 3);
 	frameRam: frame_ram
 		port map (
