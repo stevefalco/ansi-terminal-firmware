@@ -7,13 +7,14 @@ entity terminal is
 	port (
 		CLK12M			: in std_logic;
 
-		-- The FPGA can drive 8 mA per pin.  We have a 75 ohm
+		-- The FPGA can drive 8 mA per pin.  The RGB pins drive a 75 ohm
 		-- load, and we need to get it to 0.7 volts for "white".
 		--
-		-- That requires around 9 mA, so we will parallel two
-		-- outputs, each with a separate series resistor.  We
-		-- could even get some greyscale output if desired, by
-		-- wiring an R-2R ladder.
+		-- That requires around 9 mA, which is a bit more than the FPGA
+		-- wants to provide.  We will parallel two outputs, each with a
+		-- separate series resistor.  We could even get some greyscale
+		-- output if desired, by wiring an R-2R ladder.  I've seen people
+		-- use 3 or 4 independent bits per color, but we don't need that.
 		PIXEL_R1		: out std_logic;
 		PIXEL_R2		: out std_logic;
 		PIXEL_G1		: out std_logic;
@@ -43,7 +44,8 @@ architecture a of terminal is
 			vSync		: out std_logic;
 			columnAddress	: out std_logic_vector (9 downto 0);
 			rowAddress	: out std_logic_vector (9 downto 0);
-			lineAddress	: out std_logic_vector (8 downto 0)
+			lineAddress	: out std_logic_vector (8 downto 0);
+			blanking	: out std_logic
 		);
 	end component;
 
@@ -88,9 +90,6 @@ architecture a of terminal is
 	signal clear			: std_logic;
 
 	signal dotClock			: std_logic;
-	signal columnAddress		: std_logic_vector (9 downto 0);
-	signal rowAddress		: std_logic_vector (9 downto 0);
-	signal lineAddress		: std_logic_vector (8 downto 0);
 
 	-- VGA
 	signal addressA			: std_logic_vector (10 downto 0);
@@ -101,10 +100,14 @@ architecture a of terminal is
 	signal wrenB			: std_logic;
 	signal qB			: std_logic_vector (7 downto 0);
 	
+	signal rowAddressD0		: std_logic_vector (9 downto 0);
+
+	signal lineAddressD0		: std_logic_vector (8 downto 0);
 	signal lineAddressD1		: std_logic_vector (8 downto 0);
 	signal lineAddressD2		: std_logic_vector (8 downto 0);
 	signal frameChar		: std_logic_vector (7 downto 0);
 
+	signal columnAddressD0		: std_logic_vector (9 downto 0);
 	signal columnAddressD1		: std_logic_vector (9 downto 0);
 	signal columnAddressD2		: std_logic_vector (9 downto 0);
 	signal columnAddressD3		: std_logic_vector (9 downto 0);
@@ -124,12 +127,22 @@ architecture a of terminal is
 	signal vSyncD3			: std_logic;
 	signal vSyncD4			: std_logic;
 	signal vSyncD5			: std_logic;
+
+	signal blankingD0		: std_logic;
+	signal blankingD1		: std_logic;
+	signal blankingD2		: std_logic;
+	signal blankingD3		: std_logic;
+	signal blankingD4		: std_logic;
+	signal blankingD5		: std_logic;
+
 	signal pixel			: std_logic;
+	signal pixelBlanked		: std_logic;
 
 	signal romAddr			: std_logic_vector (10 downto 0);
 
 begin
 
+	-- Create a 25.2 MHz dot clock from the 12 MHz oscillator.
 	dotClockGen: dot_clock
 		port map
 		(
@@ -164,43 +177,60 @@ begin
 		end if;
 	end process;
 
-	-- Generate timing and addresses from pixel clock.
+	-- Generate timing and addresses from the dot clock.  The row address
+	-- covers the whole frame (0 to 525).  The column address covers a whole
+	-- scan line (0 to 799).
+	--
+	-- Characters are 8 pels wide and 16 pels high, but each line of text is
+	-- 20 pels high, because we want 24 lines of text to fill the 480 visible
+	-- scan lines.  In other words, there are 4 blank scan lines between each
+	-- line of text.
+	--
+	-- The lineAddress signal just covers the active scan lines.  It does not
+	-- increment during the 4 blank scan lines between each line of text.
+       	-- That lets us do simple shifting to address the character ROM.
 	frameGen: frame_gen
 		port map (
 			clear => clear,
 			dotClock => dotClock,
 			hSync => hSyncD0,
 			vSync => vSyncD0,
-			columnAddress => columnAddress,
-			rowAddress => rowAddress,
-			lineAddress => lineAddress
+			columnAddress => columnAddressD0,
+			rowAddress => rowAddressD0,
+			lineAddress => lineAddressD0,
+			blanking => blankingD0
 		);
 
 	-- There are 80x24 = 1920 bytes of screen memory.
 	--
-	-- Columns run from 0 to 799, which shifts down 3
-	-- (divides by 8) to run from 0 to 99.  We map
-	-- anything 80 and above to 0.
+	-- columnAddress runs from 0 to 799, which shifts down 3 (divides by 8) to
+	-- run from 0 to 99.  We map anything 80 and above to 0 so as not to go out
+	-- of bounds on the ram address.
 	--
-	-- Lines run from 0 to 479, which shifts down 4
-	-- (divides by 16) to run from 0 to 29.  We map
-	-- anything 24 and above to 0.
+	-- lineAddress runs from 0 to 383, which shifts down 4 (divides by 16) to
+	-- run from 0 to 23.
 	genFrameAddressA: process(all)
 		variable colA	: unsigned (6 downto 0);
 		variable lineA	: unsigned (4 downto 0);
+		variable addr	: unsigned (11 downto 0);
 		variable addrA	: unsigned (10 downto 0);
 	begin
-		colA := unsigned(columnAddress(9 downto 3));
-		lineA := unsigned(lineAddress(8 downto 4));
+		colA := unsigned(columnAddressD0(9 downto 3));
+		lineA := unsigned(lineAddressD0(8 downto 4));
 
 		if(colA < 80) then
-			addrA := "0000" & colA;
+			-- lineA ranges from 0 to 23.  Multiplying by 80
+			-- ranges from 0 to 1840.  colA ranges from 0 to 79,
+			-- so the sum ranges from 0 to 1919, which only needs
+			-- 11 bits.
+			--
+			-- But, Quartus thinks addrA has to have 12 bits, so we
+			-- humor it, then toss the junk MSB...
+			addr := (to_unsigned(80, 7) * lineA) + colA;
+			addrA := addr(10 downto 0);
 		else
+			-- We are in the end-of-line blanking area, so map to 0.
 			addrA := to_unsigned(0, addrA'length);
-		end if;
-
-		if(lineA < 24) then
-			addrA := 80 * lineA + addrA;
 		end if;
 
 		addressA <= std_logic_vector(addrA);
@@ -228,7 +258,7 @@ begin
 	delayLineAddr: process(dotClock)
 	begin
 		if(rising_edge(dotClock)) then
-			lineAddressD1 <= lineAddress;
+			lineAddressD1 <= lineAddressD0;
 			lineAddressD2 <= lineAddressD1;
 		end if;
 	end process;
@@ -249,7 +279,7 @@ begin
 	delayColumnAddress: process(dotCLock)
 	begin
 		if(rising_edge(dotClock)) then
-			columnAddressD1 <= columnAddress;
+			columnAddressD1 <= columnAddressD0;
 			columnAddressD2 <= columnAddressD1;
 			columnAddressD3 <= columnAddressD2;
 			columnAddressD4 <= columnAddressD3;
@@ -269,7 +299,7 @@ begin
 			outBit => pixel
 		);
 
-	-- Delay sync pulses to line up with the pixel.
+	-- Delay sync pulses and blanking to line up with the pixel.
 	delaySync: process(dotCLock)
 	begin
 		if(rising_edge(dotClock)) then
@@ -284,18 +314,33 @@ begin
 			vSyncD3 <= vSyncD2;
 			vSyncD4 <= vSyncD3;
 			vSyncD5 <= vSyncD4;
+
+			blankingD1 <= blankingD0;
+			blankingD2 <= blankingD1;
+			blankingD3 <= blankingD2;
+			blankingD4 <= blankingD3;
+			blankingD5 <= blankingD4;
 		end if;
 	end process;
 
-	PIXEL_R1 <= pixel;
-	PIXEL_R2 <= pixel;
-	PIXEL_G1 <= pixel;
-	PIXEL_G2 <= pixel;
-	PIXEL_B1 <= pixel;
-	PIXEL_B2 <= pixel;
+	blankIt: process(all)
+	begin
+		if(not blankingD5) then
+			pixelBlanked <= pixel;
+		else
+			pixelBlanked <= '0';
+		end if;
+	end process;
 
-	HSYNC <= hSyncD4;
-	VSYNC <= vSyncD4;
+	PIXEL_R1 <= pixelBlanked;
+	PIXEL_R2 <= pixelBlanked;
+	PIXEL_G1 <= pixelBlanked;
+	PIXEL_G2 <= pixelBlanked;
+	PIXEL_B1 <= pixelBlanked;
+	PIXEL_B2 <= pixelBlanked;
+
+	HSYNC <= hSyncD5;
+	VSYNC <= vSyncD5;
 
 end a;
 

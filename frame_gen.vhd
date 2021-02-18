@@ -47,10 +47,12 @@ entity frame_gen is
 		mod20Max		: integer := 19; -- 0 to 19
 
 		-- One line of active video is 680 pels, 0 to 639
+		hFrontPorchStart	: integer := 640;
 		hSyncStart		: integer := (640 + 16); -- hsync starts after 16-pel front porch
 		hBackPorchStart		: integer := (640 + 16 + 96); -- hsync is 96 pels wide
 
 		-- One frame of active video is 480 lines, 0 to 479
+		vFrontPorchStart	: integer := 480;
 		vSyncStart		: integer := (480 + 10); -- vsync starts after 10-line front porch
 		vBackPorchStart		: integer := (480 + 10 + 2) -- vsync is 2 lines wide
 	);
@@ -62,7 +64,8 @@ entity frame_gen is
 		vSync			: out std_logic;
 		columnAddress		: out std_logic_vector (9 downto 0);
 		rowAddress		: out std_logic_vector (9 downto 0);
-		lineAddress		: out std_logic_vector (8 downto 0)
+		lineAddress		: out std_logic_vector (8 downto 0);
+		blanking		: out std_logic
 	);
 end frame_gen;
 
@@ -73,7 +76,7 @@ begin
 
 	variable columnCounter		: unsigned (9 downto 0); -- 0 to 799
 	variable rowCounter		: unsigned (9 downto 0); -- 0 to 524
-	variable lineCounter		: unsigned (8 downto 0); -- 0 to 479
+	variable lineCounter		: unsigned (8 downto 0); -- 0 to 383
 	variable mod20Counter		: unsigned (4 downto 0); -- 0 to 19
 
 	begin
@@ -100,7 +103,7 @@ begin
 						mod20Counter := "00000";
 					end if;
 
-					if(mod20Counter <= 15) then
+					if(mod20Counter < 16) then
 						if(rowCounter < lastVisibleRow) then
 							lineCounter := lineCounter + 1;
 						else
@@ -127,6 +130,12 @@ begin
 					vsync <= '0';
 				else
 					vsync <= '1';
+				end if;
+
+				if(columnCounter < hFrontPorchStart and mod20Counter < 16 and rowCounter < vFrontPorchStart) then
+					blanking <= '0';
+				else
+					blanking <= '1';
 				end if;
 			end if;
 

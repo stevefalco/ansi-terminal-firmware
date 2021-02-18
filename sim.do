@@ -26,14 +26,19 @@ add wave -radix unsigned /testbench/term/frameGen/frameProcess/rowCounter
 add wave -radix unsigned /testbench/term/frameGen/frameProcess/mod20Counter
 add wave /testbench/term/frameGen/hsync
 add wave /testbench/term/frameGen/vsync
-add wave -radix unsigned /testbench/term/columnAddress
-add wave -radix unsigned /testbench/term/rowAddress
-add wave -radix unsigned /testbench/term/lineAddress
+add wave /testbench/term/frameGen/blanking
+add wave -radix unsigned /testbench/term/rowAddressD0
+add wave -radix unsigned /testbench/term/lineAddressD0
+add wave -radix unsigned /testbench/term/lineAddressD2
+add wave -radix unsigned /testbench/term/columnAddressD0
+add wave -radix unsigned /testbench/term/columnAddressD4
 add wave -radix unsigned /testbench/term/addressA
 add wave -radix ascii /testbench/term/frameChar
 add wave -radix unsigned /testbench/term/romAddr
 add wave -radix hexadecimal /testbench/term/scanChar
 add wave /testbench/term/pixel
+add wave /testbench/term/blankingD5
+add wave /testbench/term/pixelBlanked
 add wave /testbench/term/hSyncD5
 add wave /testbench/term/vSyncD5
 
