@@ -40,8 +40,8 @@ architecture a of terminal is
 
 	component frame_ram
 		port (
-			address_a	: in std_logic_vector (11 downto 0);
-			address_b	: in std_logic_vector (11 downto 0);
+			address_a	: in std_logic_vector (10 downto 0);
+			address_b	: in std_logic_vector (10 downto 0);
 			clock		: in std_logic;
 			data_a		: in std_logic_vector (7 downto 0);
 			data_b		: in std_logic_vector (7 downto 0);
@@ -78,10 +78,10 @@ architecture a of terminal is
 	signal lineAddress		: std_logic_vector (8 downto 0);
 
 	-- VGA
-	signal addressA			: std_logic_vector (11 downto 0);
+	signal addressA			: std_logic_vector (10 downto 0);
 
 	-- CPU
-	signal addressB			: std_logic_vector (11 downto 0);
+	signal addressB			: std_logic_vector (10 downto 0);
 	signal dataB			: std_logic_vector (7 downto 0);
 	signal wrenB			: std_logic;
 	signal qB			: std_logic_vector (7 downto 0);
@@ -141,23 +141,25 @@ begin
 			lineAddress => lineAddress
 		);
 
-	-- Screen memory.  The A port is used to drive the VGA port.  The
-	-- B port is for CPU access.
+	-- There are 80x24 = 1920 bytes of screen memory.
 	--
-	-- To keep the addressing simple, we make each line 128 characters
-	-- long, and waste 48 bytes x 24 lines or 1152 bytes.  Thus, we can
-	-- feed the column address right shifted by 3 directly into the low
-	-- 6 bits of the frame_ram address.
+	-- Columns run from 0 to 799, which shifts down 3
+	-- (divides by 8) to run from 0 to 99.  We map
+	-- anything 80 and above to 0.
+	--
+	-- Lines run from 0 to 479, which shifts down 4
+	-- (divides by 16) to run from 0 to 29.  We map
+	-- anything 24 and above to 0.
 	genFrameAddressA: process(all)
 		variable colA	: unsigned (6 downto 0);
 		variable lineA	: unsigned (4 downto 0);
-		variable addrA	: unsigned (11 downto 0);
+		variable addrA	: unsigned (10 downto 0);
 	begin
 		colA := unsigned(columnAddress(9 downto 3));
 		lineA := unsigned(lineAddress(8 downto 4));
 
 		if(colA < 80) then
-			addrA := "00000" & colA;
+			addrA := "0000" & colA;
 		else
 			addrA := to_unsigned(0, addrA'length);
 		end if;
@@ -169,6 +171,8 @@ begin
 		addressA <= std_logic_vector(addrA);
 	end process;
 	
+	-- Screen memory.  The A port is used to drive the VGA port.  The
+	-- B port is for CPU access.
 	frameRam: frame_ram
 		port map (
 			address_a => addressA,

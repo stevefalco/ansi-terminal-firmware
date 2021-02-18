@@ -43,7 +43,7 @@ entity frame_gen is
 	generic (
 		columnMax		: integer := 799; -- 800 columns, 0 to 799
 		rowMax			: integer := 524; -- 525 rows, 0 to 524
-		lineMax			: integer := 479; -- 480 lines, 0 to 479
+		lastVisibleRow		: integer := 479; -- 480 visible rows, 0 to 479
 		mod20Max		: integer := 19; -- 0 to 19
 
 		-- One line of active video is 680 pels, 0 to 639
@@ -99,19 +99,19 @@ begin
 					else
 						mod20Counter := "00000";
 					end if;
+
+					if(mod20Counter <= 15) then
+						if(rowCounter < lastVisibleRow) then
+							lineCounter := lineCounter + 1;
+						else
+							lineCounter := to_unsigned(0, lineCounter'length);
+						end if;
+					end if;
 					
 					if(rowCounter < rowMax) then
 						rowCounter := rowCounter + 1;
 					else
 						rowCounter := to_unsigned(0, rowCounter'length);
-					end if;
-
-					if(mod20Counter <= 15) then
-						if(lineCounter < lineMax) then
-							lineCounter := lineCounter + 1;
-						else
-							lineCounter := to_unsigned(0, lineCounter'length);
-						end if;
 					end if;
 				end if;
 

@@ -23,6 +23,7 @@ add wave /testbench/term/CLK12M
 add wave /testbench/term/dotClock
 add wave -radix unsigned /testbench/term/frameGen/frameProcess/columnCounter
 add wave -radix unsigned /testbench/term/frameGen/frameProcess/rowCounter
+add wave -radix unsigned /testbench/term/frameGen/frameProcess/mod20Counter
 add wave /testbench/term/frameGen/hsync
 add wave /testbench/term/frameGen/vsync
 add wave -radix unsigned /testbench/term/columnAddress
