@@ -25,7 +25,8 @@ architecture a of terminal is
 			hSync		: out std_logic;
 			vSync		: out std_logic;
 			columnAddress	: out std_logic_vector (9 downto 0);
-			rowAddress	: out std_logic_vector (9 downto 0)
+			rowAddress	: out std_logic_vector (9 downto 0);
+			lineAddress	: out std_logic_vector (8 downto 0)
 		);
 	end component;
 
@@ -74,9 +75,11 @@ architecture a of terminal is
 	signal vSync			: std_logic;
 	signal columnAddress		: std_logic_vector (9 downto 0);
 	signal rowAddress		: std_logic_vector (9 downto 0);
+	signal lineAddress		: std_logic_vector (8 downto 0);
 
 	-- VGA
 	signal addressA			: std_logic_vector (11 downto 0);
+	signal addressAclipped		: std_logic_vector (11 downto 0);
 
 	-- CPU
 	signal addressB			: std_logic_vector (11 downto 0);
@@ -135,7 +138,8 @@ begin
 			hSync => hSync,
 			vSync => vSync,
 			columnAddress => columnAddress,
-			rowAddress => rowAddress
+			rowAddress => rowAddress,
+			lineAddress => lineAddress
 		);
 
 	-- Screen memory.  The A port is used to drive the VGA port.  The
@@ -145,13 +149,19 @@ begin
 	-- long, and waste 48 bytes x 24 lines or 1152 bytes.  Thus, we can
 	-- feed the column address right shifted by 3 directly into the low
 	-- 6 bits of the frame_ram address.
-	--
-	-- There are 480 active rows, and that fits in 9 bits, hence we can
-	-- toss rowAddress(9).
-	addressA <= rowAddress(8 downto 4) & columnAddress(9 downto 3);
+	genFrameAddressA: process(all)
+	begin
+		addressA <= lineAddress(8 downto 4) & columnAddress(9 downto 3);
+		if(unsigned(addressA) > 3072) then
+			addressAclipped <= (others => '0');
+		else
+			addressAclipped <= addressA;
+		end if;
+	end process;
+	
 	frameRam: frame_ram
 		port map (
-			address_a => addressA,
+			address_a => addressAclipped,
 			address_b => addressB,
 			clock => dotClock,
 			data_a => "00000000", -- not used
@@ -163,7 +173,7 @@ begin
 		);
 
 	-- We are using 7-bit ascii, hence we toss frameChar(7).
-	romAddr <= frameChar(6 downto 0) & rowAddress(3 downto 0);
+	romAddr <= frameChar(6 downto 0) & lineAddress(3 downto 0);
 	charRom: char_rom
 		port map (
 			address => romAddr,

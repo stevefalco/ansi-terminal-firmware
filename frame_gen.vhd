@@ -43,6 +43,8 @@ entity frame_gen is
 	generic (
 		columnMax		: integer := 799; -- 800 columns, 0 to 799
 		rowMax			: integer := 524; -- 525 rows, 0 to 524
+		lineMax			: integer := 479; -- 480 lines, 0 to 479
+		mod20Max		: integer := 19; -- 0 to 19
 
 		-- One line of active video is 680 pels, 0 to 639
 		hSyncStart		: integer := (640 + 16); -- hsync starts after 16-pel front porch
@@ -59,7 +61,8 @@ entity frame_gen is
 		hSync			: out std_logic;
 		vSync			: out std_logic;
 		columnAddress		: out std_logic_vector (9 downto 0);
-		rowAddress		: out std_logic_vector (9 downto 0)
+		rowAddress		: out std_logic_vector (9 downto 0);
+		lineAddress		: out std_logic_vector (8 downto 0)
 	);
 end frame_gen;
 
@@ -70,24 +73,45 @@ begin
 
 	variable columnCounter		: unsigned (9 downto 0); -- 0 to 799
 	variable rowCounter		: unsigned (9 downto 0); -- 0 to 524
+	variable lineCounter		: unsigned (8 downto 0); -- 0 to 479
+	variable mod20Counter		: unsigned (4 downto 0); -- 0 to 19
 
 	begin
 		if(rising_edge(dotClock)) then
 			if(clear = '1') then
 				columnCounter := to_unsigned(0, columnCounter'length);
 				rowCounter := to_unsigned(0, rowCounter'length);
+				lineCounter := to_unsigned(0, lineCounter'length);
+				mod20Counter := "00000";
 				hsync <= '1';
 				vsync <= '1';
 			else
 				if(columnCounter < columnMax) then
 					columnCounter := columnCounter + 1;
 				else
+					-- Completed a line.
 					columnCounter := to_unsigned(0, columnCounter'length);
 
+					-- Characters are 16 rows high, but we want a spacing
+					-- of 4 blank rows between lines of characters.
+					if(mod20Counter < mod20Max) then
+						mod20Counter := mod20Counter + 1;
+					else
+						mod20Counter := "00000";
+					end if;
+					
 					if(rowCounter < rowMax) then
 						rowCounter := rowCounter + 1;
 					else
 						rowCounter := to_unsigned(0, rowCounter'length);
+					end if;
+
+					if(mod20Counter <= 15) then
+						if(lineCounter < lineMax) then
+							lineCounter := lineCounter + 1;
+						else
+							lineCounter := to_unsigned(0, lineCounter'length);
+						end if;
 					end if;
 				end if;
 
@@ -108,6 +132,7 @@ begin
 
 			columnAddress <= std_logic_vector(columnCounter);
 			rowAddress <= std_logic_vector(rowCounter);
+			lineAddress <= std_logic_vector(lineCounter);
 		end if;
 	end process;
 end a;
