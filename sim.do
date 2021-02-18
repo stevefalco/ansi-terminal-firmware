@@ -34,5 +34,7 @@ add wave -radix ascii /testbench/term/frameChar
 add wave -radix unsigned /testbench/term/romAddr
 add wave -radix hexadecimal /testbench/term/scanChar
 add wave /testbench/term/pixel
+add wave /testbench/term/hSyncD5
+add wave /testbench/term/vSyncD5
 
 run 20ms

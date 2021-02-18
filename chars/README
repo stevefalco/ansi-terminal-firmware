@@ -1,0 +1,56 @@
+This process is awkward, but here is what I did:
+
+1) Create rawchars.xcf with each character on a separate line, in ascii
+order from char 32 (space) through 127 (del).  The image is wider than needed,
+because the gimp text tool doesn't like to be too constrained.
+
+I fiddled with the font size, until I got the characters to be 8 pels wide.
+While I didn't expect it, "w" was wider than "M"!
+
+I didn't trim the width at this point.
+
+2) I copied that to flattenedchars.xcf so I wouldn't have to start over if
+I saw something wrong.  Once flattened, you cannot go back to text edit mode.
+
+Flatten the image, but first set some cursors to remember how tall the
+textbox was.  Then, do a rectangular selection, exactly 8 pels wide, and
+trim the canvas to eliminate the slack.
+
+The characters seem to be biased to the right, so most have a white column on
+the left, but again, 'w' goes the whole way.  Thus, a string of 'w' characters
+won't have any space between them.  Export the result as flattenedchars.png.
+
+3) Check using "file" to be sure the png is 8 wide.  Then use the t.c
+program to crate chars.mif.  It turned out that the font is 8x17, but I
+reduced it to 8x16 to make the addressing nicer.  And the 17th line is
+always blank, so we don't need it.
+
+To get 24 lines in 480 rows, we want 8x20, so our vhdl will have to pad by
+4 lines at the bottom.
+
+This is also tricky, because most characters have one white row above the
+character, but a few of the accent characters use that row!  The SKIP
+parameter determines how much to throw away.  There is a little metadata
+at the beginning of the PNG file, which we also need to discard.  This could
+change in the future if Gimp changes its comment structure.
+
+Here is how the "sharp sign" (#) should come out:
+
+ 560 : 00000000; -- ........ #
+ 561 : 00000000; -- ........
+ 562 : 00010010; -- ...@..@.
+ 563 : 00010010; -- ...@..@.
+ 564 : 00010110; -- ...@.@@.
+ 565 : 01111111; -- .@@@@@@@
+ 566 : 00100100; -- ..@..@..
+ 567 : 00100100; -- ..@..@..
+ 568 : 11111110; -- @@@@@@@.
+ 569 : 00101000; -- ..@.@...
+ 570 : 01001000; -- .@..@...
+ 571 : 01001000; -- .@..@...
+ 572 : 00000000; -- ........
+ 573 : 00000000; -- ........
+ 574 : 00000000; -- ........
+ 575 : 00000000; -- ........
+
+I don't know how to type "DEL", so I made that one up by hand.

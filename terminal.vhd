@@ -5,7 +5,24 @@ use ieee.std_logic_unsigned.all;
 
 entity terminal is
 	port (
-		CLK12M			: in std_logic
+		CLK12M			: in std_logic;
+
+		-- The FPGA can drive 8 mA per pin.  We have a 75 ohm
+		-- load, and we need to get it to 0.7 volts for "white".
+		--
+		-- That requires around 9 mA, so we will parallel two
+		-- outputs, each with a separate series resistor.  We
+		-- could even get some greyscale output if desired, by
+		-- wiring an R-2R ladder.
+		PIXEL_R1		: out std_logic;
+		PIXEL_R2		: out std_logic;
+		PIXEL_G1		: out std_logic;
+		PIXEL_G2		: out std_logic;
+		PIXEL_B1		: out std_logic;
+		PIXEL_B2		: out std_logic;
+
+		HSYNC			: out std_logic;
+		VSYNC			: out std_logic
 	);
 end terminal;
 
@@ -71,8 +88,6 @@ architecture a of terminal is
 	signal clear			: std_logic;
 
 	signal dotClock			: std_logic;
-	signal hSync			: std_logic;
-	signal vSync			: std_logic;
 	signal columnAddress		: std_logic_vector (9 downto 0);
 	signal rowAddress		: std_logic_vector (9 downto 0);
 	signal lineAddress		: std_logic_vector (8 downto 0);
@@ -86,9 +101,29 @@ architecture a of terminal is
 	signal wrenB			: std_logic;
 	signal qB			: std_logic_vector (7 downto 0);
 	
+	signal lineAddressD1		: std_logic_vector (8 downto 0);
+	signal lineAddressD2		: std_logic_vector (8 downto 0);
 	signal frameChar		: std_logic_vector (7 downto 0);
+
+	signal columnAddressD1		: std_logic_vector (9 downto 0);
+	signal columnAddressD2		: std_logic_vector (9 downto 0);
+	signal columnAddressD3		: std_logic_vector (9 downto 0);
+	signal columnAddressD4		: std_logic_vector (9 downto 0);
 	signal scanChar			: std_logic_vector (7 downto 0);
 
+	signal hSyncD0			: std_logic;
+	signal hSyncD1			: std_logic;
+	signal hSyncD2			: std_logic;
+	signal hSyncD3			: std_logic;
+	signal hSyncD4			: std_logic;
+	signal hSyncD5			: std_logic;
+
+	signal vSyncD0			: std_logic;
+	signal vSyncD1			: std_logic;
+	signal vSyncD2			: std_logic;
+	signal vSyncD3			: std_logic;
+	signal vSyncD4			: std_logic;
+	signal vSyncD5			: std_logic;
 	signal pixel			: std_logic;
 
 	signal romAddr			: std_logic_vector (10 downto 0);
@@ -134,8 +169,8 @@ begin
 		port map (
 			clear => clear,
 			dotClock => dotClock,
-			hSync => hSync,
-			vSync => vSync,
+			hSync => hSyncD0,
+			vSync => vSyncD0,
 			columnAddress => columnAddress,
 			rowAddress => rowAddress,
 			lineAddress => lineAddress
@@ -173,6 +208,9 @@ begin
 	
 	-- Screen memory.  The A port is used to drive the VGA port.  The
 	-- B port is for CPU access.
+	--
+	-- Address and data are both registered, so frameChar is two clocks
+	-- behind addressA (and hence 2 behind lineAddress).
 	frameRam: frame_ram
 		port map (
 			address_a => addressA,
@@ -186,8 +224,20 @@ begin
 			q_b => qB
 		);
 
+	-- Line up lineAddress with frameChar.
+	delayLineAddr: process(dotClock)
+	begin
+		if(rising_edge(dotClock)) then
+			lineAddressD1 <= lineAddress;
+			lineAddressD2 <= lineAddressD1;
+		end if;
+	end process;
+
 	-- We are using 7-bit ascii, hence we toss frameChar(7).
-	romAddr <= frameChar(6 downto 0) & lineAddress(3 downto 0);
+	--
+	-- Address and data are both registered, so scanChar is two clocks
+	-- behind romAddr, or four clocks behind addressA.
+	romAddr <= frameChar(6 downto 0) & lineAddressD2(3 downto 0);
 	charRom: char_rom
 		port map (
 			address => romAddr,
@@ -195,14 +245,57 @@ begin
 			q => scanChar
 		);
 
+	-- Line up columnAddress with scanChar.
+	delayColumnAddress: process(dotCLock)
+	begin
+		if(rising_edge(dotClock)) then
+			columnAddressD1 <= columnAddress;
+			columnAddressD2 <= columnAddressD1;
+			columnAddressD3 <= columnAddressD2;
+			columnAddressD4 <= columnAddressD3;
+		end if;
+	end process;
+
 	-- The lower three bits of the columnAddress select the bit to be
 	-- displayed.
+	--
+	-- The output is registered, so pixel is one clock behind
+	-- scanChar, or 5 clocks behind addressA..
 	pelSelect: pel_select
 		port map (
 			clock => dotClock,
 			inByte => scanChar,
-			sel => columnAddress(2 downto 0),
+			sel => columnAddressD4(2 downto 0),
 			outBit => pixel
 		);
+
+	-- Delay sync pulses to line up with the pixel.
+	delaySync: process(dotCLock)
+	begin
+		if(rising_edge(dotClock)) then
+			hSyncD1 <= hSyncD0;
+			hSyncD2 <= hSyncD1;
+			hSyncD3 <= hSyncD2;
+			hSyncD4 <= hSyncD3;
+			hSyncD5 <= hSyncD4;
+
+			vSyncD1 <= vSyncD0;
+			vSyncD2 <= vSyncD1;
+			vSyncD3 <= vSyncD2;
+			vSyncD4 <= vSyncD3;
+			vSyncD5 <= vSyncD4;
+		end if;
+	end process;
+
+	PIXEL_R1 <= pixel;
+	PIXEL_R2 <= pixel;
+	PIXEL_G1 <= pixel;
+	PIXEL_G2 <= pixel;
+	PIXEL_B1 <= pixel;
+	PIXEL_B2 <= pixel;
+
+	HSYNC <= hSyncD4;
+	VSYNC <= vSyncD4;
+
 end a;
 
