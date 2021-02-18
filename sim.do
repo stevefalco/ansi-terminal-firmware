@@ -29,7 +29,6 @@ add wave -radix unsigned /testbench/term/columnAddress
 add wave -radix unsigned /testbench/term/rowAddress
 add wave -radix unsigned /testbench/term/lineAddress
 add wave -radix unsigned /testbench/term/addressA
-add wave -radix unsigned /testbench/term/addressAclipped
 add wave -radix ascii /testbench/term/frameChar
 add wave -radix unsigned /testbench/term/romAddr
 add wave -radix hexadecimal /testbench/term/scanChar

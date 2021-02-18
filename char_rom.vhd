@@ -138,7 +138,7 @@ END SYN;
 -- Retrieval info: CONNECT: q 0 0 8 0 @q_a 0 0 8 0
 -- Retrieval info: GEN_FILE: TYPE_NORMAL char_rom.vhd TRUE
 -- Retrieval info: GEN_FILE: TYPE_NORMAL char_rom.inc FALSE
--- Retrieval info: GEN_FILE: TYPE_NORMAL char_rom.cmp FALSE
+-- Retrieval info: GEN_FILE: TYPE_NORMAL char_rom.cmp TRUE
 -- Retrieval info: GEN_FILE: TYPE_NORMAL char_rom.bsf FALSE
 -- Retrieval info: GEN_FILE: TYPE_NORMAL char_rom_inst.vhd FALSE
 -- Retrieval info: LIB_FILE: altera_mf

@@ -79,7 +79,6 @@ architecture a of terminal is
 
 	-- VGA
 	signal addressA			: std_logic_vector (11 downto 0);
-	signal addressAclipped		: std_logic_vector (11 downto 0);
 
 	-- CPU
 	signal addressB			: std_logic_vector (11 downto 0);
@@ -150,18 +149,29 @@ begin
 	-- feed the column address right shifted by 3 directly into the low
 	-- 6 bits of the frame_ram address.
 	genFrameAddressA: process(all)
+		variable colA	: unsigned (6 downto 0);
+		variable lineA	: unsigned (4 downto 0);
+		variable addrA	: unsigned (11 downto 0);
 	begin
-		addressA <= lineAddress(8 downto 4) & columnAddress(9 downto 3);
-		if(unsigned(addressA) > 3072) then
-			addressAclipped <= (others => '0');
+		colA := unsigned(columnAddress(9 downto 3));
+		lineA := unsigned(lineAddress(8 downto 4));
+
+		if(colA < 80) then
+			addrA := "00000" & colA;
 		else
-			addressAclipped <= addressA;
+			addrA := to_unsigned(0, addrA'length);
 		end if;
+
+		if(lineA < 24) then
+			addrA := 80 * lineA + addrA;
+		end if;
+
+		addressA <= std_logic_vector(addrA);
 	end process;
 	
 	frameRam: frame_ram
 		port map (
-			address_a => addressAclipped,
+			address_a => addressA,
 			address_b => addressB,
 			clock => dotClock,
 			data_a => "00000000", -- not used
