@@ -42,4 +42,4 @@ add wave /testbench/term/pixelBlanked
 add wave /testbench/term/hSyncD5
 add wave /testbench/term/vSyncD5
 
-run 20ms
+run 40ms

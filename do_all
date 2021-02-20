@@ -1,0 +1,6 @@
+#!/bin/sh
+
+set -e
+
+./do_build
+./do_prog

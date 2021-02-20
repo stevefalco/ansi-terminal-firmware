@@ -19,14 +19,14 @@ begin
 	begin
 		if (rising_edge(clock)) then
 			case sel is
-				when "000" => outBit <= inByte(0);
-				when "001" => outBit <= inByte(1);
-				when "010" => outBit <= inByte(2);
-				when "011" => outBit <= inByte(3);
-				when "100" => outBit <= inByte(4);
-				when "101" => outBit <= inByte(5);
-				when "110" => outBit <= inByte(6);
-				when "111" => outBit <= inByte(7);
+				when "000" => outBit <= inByte(7);
+				when "001" => outBit <= inByte(6);
+				when "010" => outBit <= inByte(5);
+				when "011" => outBit <= inByte(4);
+				when "100" => outBit <= inByte(3);
+				when "101" => outBit <= inByte(2);
+				when "110" => outBit <= inByte(1);
+				when "111" => outBit <= inByte(0);
 
 				when others => outBit <= '0';
 			end case;

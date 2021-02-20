@@ -114,7 +114,13 @@ begin
 					if(rowCounter < rowMax) then
 						rowCounter := rowCounter + 1;
 					else
+						-- Top of frame.  Reset everything.
+						columnCounter := to_unsigned(0, columnCounter'length);
 						rowCounter := to_unsigned(0, rowCounter'length);
+						lineCounter := to_unsigned(0, lineCounter'length);
+						mod20Counter := "00000";
+						hsync <= '1';
+						vsync <= '1';
 					end if;
 				end if;
 

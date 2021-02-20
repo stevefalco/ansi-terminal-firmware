@@ -1,0 +1,43 @@
+#!/bin/bash
+
+set -e
+
+usage() {
+	echo "-d device (default is $U)" 1>&2
+	echo "-f file (default is $FILE)" 1>&2
+	echo "-h (this help message)" 1>&2
+}
+
+U="AR2E0ROO"
+FILE="terminal.cdf"
+
+while getopts "hd:f:" OPTION; do
+	case $OPTION in
+		d)
+			U="$OPTARG"
+			;;
+
+		f)
+			FILE="$OPTARG"
+			;;
+
+		h)
+			usage
+			exit 0
+			;;
+
+		*)
+			echo "" 1>&2
+			usage
+			exit 1
+			;;
+	esac
+done
+
+# Always run a conversion for safety, in case we compile via the gui.
+quartus_cpf --convert terminal.cof
+
+DEVICE="Arrow-USB-Blaster [$U]"
+quartus_pgm -c "$DEVICE" "$FILE"
+
+exit 0

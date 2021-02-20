@@ -1,0 +1,7 @@
+#!/bin/sh
+
+set -e
+
+quartus_sh --flow compile terminal
+
+exit 0
