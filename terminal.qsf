@@ -73,14 +73,6 @@ set_global_assignment -name EDA_DESIGN_INSTANCE_NAME NA -section_id testbench
 set_global_assignment -name EDA_TEST_BENCH_MODULE_NAME testbench -section_id testbench
 set_global_assignment -name EDA_TEST_BENCH_FILE testbench.vhd -section_id testbench
 
-set_global_assignment -name SDC_FILE terminal.sdc
-set_global_assignment -name VHDL_FILE testbench.vhd
-set_global_assignment -name VHDL_FILE terminal.vhd
-set_global_assignment -name VHDL_FILE frame_gen.vhd
-set_global_assignment -name VHDL_FILE pel_select.vhd
-set_global_assignment -name QIP_FILE dot_clock.qip
-set_global_assignment -name QIP_FILE char_rom.qip
-set_global_assignment -name QIP_FILE frame_ram.qip
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HSYNC
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to PIXEL_B1
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to PIXEL_B2
@@ -98,3 +90,59 @@ set_location_assignment PIN_P14 -to PIXEL_B1
 set_location_assignment PIN_R14 -to PIXEL_B2
 set_location_assignment PIN_N16 -to VSYNC
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
+set_global_assignment -name SOURCE_FILE z80Ram.cmp
+set_global_assignment -name SOURCE_FILE frame_ram.cmp
+set_global_assignment -name SOURCE_FILE char_rom.cmp
+set_global_assignment -name SOURCE_FILE dot_clock.cmp
+set_global_assignment -name SOURCE_FILE z80Rom.cmp
+set_global_assignment -name VHDL_FILE z80_bus.vhd
+set_global_assignment -name VHDL_FILE divider.vhd
+set_global_assignment -name VERILOG_FILE z80/z80_top_direct_n.v
+set_global_assignment -name VERILOG_FILE z80/sequencer.v
+set_global_assignment -name VERILOG_FILE z80/resets.v
+set_global_assignment -name VERILOG_FILE z80/reg_latch.v
+set_global_assignment -name VERILOG_FILE z80/reg_file.v
+set_global_assignment -name VERILOG_FILE z80/reg_control.v
+set_global_assignment -name VERILOG_FILE z80/pla_decode.v
+set_global_assignment -name VERILOG_FILE z80/pin_control.v
+set_global_assignment -name VERILOG_FILE z80/memory_ifc.v
+set_global_assignment -name VERILOG_FILE z80/ir.v
+set_global_assignment -name VERILOG_FILE z80/interrupts.v
+set_global_assignment -name VERILOG_FILE z80/inc_dec_2bit.v
+set_global_assignment -name VERILOG_FILE z80/inc_dec.v
+set_global_assignment -name VERILOG_FILE z80/execute.v
+set_global_assignment -name VERILOG_FILE z80/decode_state.v
+set_global_assignment -name VERILOG_FILE z80/data_switch_mask.v
+set_global_assignment -name VERILOG_FILE z80/data_switch.v
+set_global_assignment -name VERILOG_FILE z80/data_pins.v
+set_global_assignment -name VERILOG_FILE z80/control_pins_n.v
+set_global_assignment -name VERILOG_FILE z80/clk_delay.v
+set_global_assignment -name VERILOG_FILE z80/bus_switch.v
+set_global_assignment -name VERILOG_FILE z80/bus_control.v
+set_global_assignment -name VERILOG_FILE z80/alu_slice.v
+set_global_assignment -name VERILOG_FILE z80/alu_shifter_core.v
+set_global_assignment -name VERILOG_FILE z80/alu_select.v
+set_global_assignment -name VERILOG_FILE z80/alu_prep_daa.v
+set_global_assignment -name VERILOG_FILE z80/alu_mux_8.v
+set_global_assignment -name VERILOG_FILE z80/alu_mux_4.v
+set_global_assignment -name VERILOG_FILE z80/alu_mux_3z.v
+set_global_assignment -name VERILOG_FILE z80/alu_mux_2z.v
+set_global_assignment -name VERILOG_FILE z80/alu_mux_2.v
+set_global_assignment -name VERILOG_FILE z80/alu_flags.v
+set_global_assignment -name VERILOG_FILE z80/alu_core.v
+set_global_assignment -name VERILOG_FILE z80/alu_control.v
+set_global_assignment -name VERILOG_FILE z80/alu_bit_select.v
+set_global_assignment -name VERILOG_FILE z80/alu.v
+set_global_assignment -name VERILOG_FILE z80/address_pins.v
+set_global_assignment -name VERILOG_FILE z80/address_mux.v
+set_global_assignment -name VERILOG_FILE z80/address_latch.v
+set_global_assignment -name SDC_FILE terminal.sdc
+set_global_assignment -name VHDL_FILE testbench.vhd
+set_global_assignment -name VHDL_FILE terminal.vhd
+set_global_assignment -name VHDL_FILE frame_gen.vhd
+set_global_assignment -name VHDL_FILE pel_select.vhd
+set_global_assignment -name QIP_FILE dot_clock.qip
+set_global_assignment -name QIP_FILE char_rom.qip
+set_global_assignment -name QIP_FILE frame_ram.qip
+set_global_assignment -name QIP_FILE z80Ram.qip
+set_global_assignment -name QIP_FILE z80Rom.qip

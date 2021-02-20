@@ -80,6 +80,88 @@ architecture a of terminal is
 		);
 	end component;
 
+	component z80_top_direct_n
+		port (
+			nM1		: out std_logic;
+			nMREQ		: out std_logic;
+			nIORQ		: out std_logic;
+			nRD		: out std_logic;
+			nWR		: out std_logic;
+			nRFSH		: out std_logic;
+			nHALT		: out std_logic;
+			nBUSACK		: out std_logic;
+
+			nWAIT		: in std_logic;
+			nINT		: in std_logic;
+			nNMI		: in std_logic;
+			nRESET		: in std_logic;
+			nBUSRQ		: in std_logic;
+
+			CLK		: in std_logic;
+			A		: out std_logic_vector (15 downto 0);
+			D		: inout std_logic_vector (7 downto 0)
+		);
+	end component;
+
+	component z80Rom
+		port (
+			address		: in std_logic_vector (13 downto 0);
+			clock		: in std_logic;
+			q		: out std_logic_vector (7 downto 0)
+		);
+	end component;
+
+	component z80Ram
+		port (
+			address		: in std_logic_vector (13 downto 0);
+			clock		: in std_logic;
+			data		: in std_logic_vector (7 downto 0);
+			wren		: in std_logic;
+			q		: out std_logic_vector (7 downto 0)
+		);
+	end component;
+
+	component z80_bus
+		port (
+			-- CPU Interface.
+			cpuAddr		: in std_logic_vector (15 downto 0);
+			cpuData		: inout std_logic_vector (7 downto 0);
+			cpuRden		: in std_logic;
+			cpuWren		: in std_logic;
+
+			-- CPU ROM Interface
+			cpuRomQ		: in std_logic_vector (7 downto 0);
+
+			-- CPU RAM Interface
+			cpuRamWren	: out std_logic;
+			cpuRamQ		: in std_logic_vector (7 downto 0)
+
+			-- UART Interface
+
+			-- VIDEO RAM Interface
+		);
+	end component;
+
+	-- Z80 Interface.
+	signal nM1			: std_logic;
+	signal nMREQ			: std_logic;
+	signal nIORQ			: std_logic;
+	signal nRD			: std_logic;
+	signal nWR			: std_logic;
+	signal nRFSH			: std_logic;
+	signal nHALT			: std_logic;
+	signal nBUSACK			: std_logic;
+
+	signal cpuAddrBus		: std_logic_vector (15 downto 0);
+	signal cpuDataBus		: std_logic_vector (7 downto 0);
+
+	signal cpuBusClkOut		: std_logic;
+
+	signal cpuRomQ			: std_logic_vector (7 downto 0);
+
+	signal cpuRamWren		: std_logic;
+	signal cpuRamQ			: std_logic_vector (7 downto 0);
+
 	type resetFSM_type is (
 		resetIdle_state,
 		resetActive_state,
@@ -88,6 +170,7 @@ architecture a of terminal is
 
 	signal resetFSM			: resetFSM_type := resetIdle_state;
 	signal clear			: std_logic;
+	signal clearNot			: std_logic;
 
 	signal dotClock			: std_logic;
 
@@ -139,7 +222,6 @@ architecture a of terminal is
 	signal pixelBlanked		: std_logic;
 
 	signal romAddr			: std_logic_vector (10 downto 0);
-
 begin
 
 	-- Create a 25.2 MHz dot clock from the 12 MHz oscillator.
@@ -160,12 +242,14 @@ begin
 				when resetIdle_state =>
 					resetFSM <= resetActive_state;
 					clear <= '1';
+					clearNot <= '0';
 					
 				when resetActive_state =>
 					resetDuration := resetDuration + 1;
 					if (resetDuration = "1111") then
 						resetFSM <= resetComplete_state;
 						clear <= '0';
+						clearNot <= '1';
 					end if;
 
 				when resetComplete_state =>
@@ -176,6 +260,68 @@ begin
 			end case;
 		end if;
 	end process;
+
+	-- Z80 CPU
+	z80CPU: z80_top_direct_n
+		port map (
+			nM1 => nM1,
+			nMREQ => nMREQ,
+			nIORQ => nIORQ,
+			nRD => nRD,
+			nWR => nWR,
+			nRFSH => nRFSH,
+			nHALT => nHALT,
+			nBUSACK => nBUSACK,
+
+			nWAIT => '1',
+			nINT => '1',
+			nNMI => '1',
+			nRESET => clearNot,
+			nBUSRQ => '1',
+
+			CLK => dotClock,
+			A => cpuAddrBus,
+			D => cpuDataBus
+		);
+
+	-- Z80 ROM
+	z80_rom: z80Rom
+		port map (
+			address => cpuAddrBus(13 downto 0),
+			clock => dotClock,
+			q => cpuRomQ
+		);
+
+	-- Z80 RAM
+	z80_ram: z80Ram
+		port map (
+			address => cpuAddrBus(13 downto 0),
+			clock => dotClock,
+			data => cpuDataBus,
+			wren => cpuRamWren,
+			q => cpuRamQ
+		);
+
+	-- Z80 Bus
+	z80Bus: z80_bus
+		port map (
+			-- CPU Interface.
+			cpuAddr => cpuAddrBus,
+			cpuData => cpuDataBus,
+			cpuRden => nRD,
+			cpuWren => nWR,
+
+			-- CPU ROM Interface
+			cpuRomQ => cpuRomQ,
+
+			-- CPU RAM Interface
+			cpuRamWren => cpuRamWren,
+			cpuRamQ => cpuRamQ
+
+			-- UART Interface
+
+			-- VIDEO RAM Interface
+		);
 
 	-- Generate timing and addresses from the dot clock.  The row address
 	-- covers the whole frame (0 to 525).  The column address covers a whole
