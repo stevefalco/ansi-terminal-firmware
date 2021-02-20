@@ -16,11 +16,13 @@ entity z80_bus is
 
 		-- CPU RAM Interface
 		cpuRamWren	: out std_logic;
-		cpuRamQ		: in std_logic_vector (7 downto 0)
+		cpuRamQ		: in std_logic_vector (7 downto 0);
 
 		-- UART Interface
 
 		-- VIDEO RAM Interface
+		videoRamWren	: out std_logic;
+		videoRamQ	: in std_logic_vector (7 downto 0)
 	);
 end z80_bus;
 
@@ -30,6 +32,7 @@ begin
 	begin
 		-- Assume no writes
 		cpuRamWren <= '0';
+		videoRamWren <= '0';
 		cpuData <= (others => 'Z');
 
 		case cpuAddr(15 downto 14) is
@@ -46,6 +49,14 @@ begin
 					cpuData <= cpuRamQ;
 				elsif(cpuWren = '0') then
 					cpuRamWren <= '1';
+				end if;
+
+			when "10" =>
+				-- Video RAM
+				if(cpuRden = '0') then
+					cpuData <= videoRamQ;
+				elsif(cpuWren = '0') then
+					videoRamWren <= '1';
 				end if;
 
 			when others =>

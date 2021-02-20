@@ -89,14 +89,13 @@ set_location_assignment PIN_T15 -to HSYNC
 set_location_assignment PIN_P14 -to PIXEL_B1
 set_location_assignment PIN_R14 -to PIXEL_B2
 set_location_assignment PIN_N16 -to VSYNC
-set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
+
 set_global_assignment -name SOURCE_FILE z80Ram.cmp
 set_global_assignment -name SOURCE_FILE frame_ram.cmp
 set_global_assignment -name SOURCE_FILE char_rom.cmp
 set_global_assignment -name SOURCE_FILE dot_clock.cmp
 set_global_assignment -name SOURCE_FILE z80Rom.cmp
 set_global_assignment -name VHDL_FILE z80_bus.vhd
-set_global_assignment -name VHDL_FILE divider.vhd
 set_global_assignment -name VERILOG_FILE z80/z80_top_direct_n.v
 set_global_assignment -name VERILOG_FILE z80/sequencer.v
 set_global_assignment -name VERILOG_FILE z80/resets.v
@@ -146,3 +145,4 @@ set_global_assignment -name QIP_FILE char_rom.qip
 set_global_assignment -name QIP_FILE frame_ram.qip
 set_global_assignment -name QIP_FILE z80Ram.qip
 set_global_assignment -name QIP_FILE z80Rom.qip
+set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

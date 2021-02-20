@@ -32,7 +32,8 @@ architecture a of terminal is
 		port
 		(
 			inclk0		: in std_logic  := '0';
-			c0		: out std_logic 
+			c0		: out std_logic ;
+			c1		: out std_logic
 		);
 	end component;
 
@@ -61,7 +62,8 @@ architecture a of terminal is
 		port (
 			address_a	: in std_logic_vector (10 downto 0);
 			address_b	: in std_logic_vector (10 downto 0);
-			clock		: in std_logic;
+			clock_a		: in std_logic;
+			clock_b		: in std_logic;
 			data_a		: in std_logic_vector (7 downto 0);
 			data_b		: in std_logic_vector (7 downto 0);
 			wren_a		: in std_logic;
@@ -134,11 +136,13 @@ architecture a of terminal is
 
 			-- CPU RAM Interface
 			cpuRamWren	: out std_logic;
-			cpuRamQ		: in std_logic_vector (7 downto 0)
+			cpuRamQ		: in std_logic_vector (7 downto 0);
 
 			-- UART Interface
 
 			-- VIDEO RAM Interface
+			videoRamWren	: out std_logic;
+			videoRamQ	: in std_logic_vector (7 downto 0)
 		);
 	end component;
 
@@ -173,15 +177,12 @@ architecture a of terminal is
 	signal clearNot			: std_logic;
 
 	signal dotClock			: std_logic;
+	signal cpuClock			: std_logic;
 
-	-- VGA
 	signal addressA			: std_logic_vector (10 downto 0);
 
-	-- CPU
-	signal addressB			: std_logic_vector (10 downto 0);
-	signal dataB			: std_logic_vector (7 downto 0);
-	signal wrenB			: std_logic;
-	signal qB			: std_logic_vector (7 downto 0);
+	signal videoRamWren		: std_logic;
+	signal videoRamQ		: std_logic_vector (7 downto 0);
 	
 	signal rowAddressD0		: std_logic_vector (9 downto 0);
 
@@ -229,7 +230,8 @@ begin
 		port map
 		(
 			inclk0 => CLK12M,
-			c0 => dotClock
+			c0 => dotClock,
+			c1 => cpuClock
 		);
 
 	-- Reset all counters, registers, etc.
@@ -279,7 +281,7 @@ begin
 			nRESET => clearNot,
 			nBUSRQ => '1',
 
-			CLK => dotClock,
+			CLK => cpuClock,
 			A => cpuAddrBus,
 			D => cpuDataBus
 		);
@@ -288,7 +290,7 @@ begin
 	z80_rom: z80Rom
 		port map (
 			address => cpuAddrBus(13 downto 0),
-			clock => dotClock,
+			clock => cpuClock,
 			q => cpuRomQ
 		);
 
@@ -296,7 +298,7 @@ begin
 	z80_ram: z80Ram
 		port map (
 			address => cpuAddrBus(13 downto 0),
-			clock => dotClock,
+			clock => cpuClock,
 			data => cpuDataBus,
 			wren => cpuRamWren,
 			q => cpuRamQ
@@ -316,11 +318,13 @@ begin
 
 			-- CPU RAM Interface
 			cpuRamWren => cpuRamWren,
-			cpuRamQ => cpuRamQ
+			cpuRamQ => cpuRamQ,
 
 			-- UART Interface
 
 			-- VIDEO RAM Interface
+			videoRamWren => videoRamWren,
+			videoRamQ => videoRamQ
 		);
 
 	-- Generate timing and addresses from the dot clock.  The row address
@@ -390,14 +394,15 @@ begin
 	frameRam: frame_ram
 		port map (
 			address_a => addressA,
-			address_b => addressB,
-			clock => dotClock,
+			address_b => cpuAddrBus(10 downto 0),
+			clock_a => dotClock,
+			clock_b => cpuClock,
 			data_a => "00000000", -- not used
-			data_b => dataB,
+			data_b => cpuDataBus,
 			wren_a => '0', -- not used
-			wren_b => wrenB,
+			wren_b => videoRamWren,
 			q_a => frameChar,
-			q_b => qB
+			q_b => videoRamQ
 		);
 
 	-- Line up lineAddress with frameChar.
