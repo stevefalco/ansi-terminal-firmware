@@ -174,7 +174,8 @@ architecture a of terminal is
 
 	signal resetFSM			: resetFSM_type := resetIdle_state;
 	signal clear			: std_logic;
-	signal clearNot			: std_logic;
+	signal cpuClearD0_n		: std_logic;
+	signal cpuClearD1_n		: std_logic;
 
 	signal dotClock			: std_logic;
 	signal cpuClock			: std_logic;
@@ -244,14 +245,12 @@ begin
 				when resetIdle_state =>
 					resetFSM <= resetActive_state;
 					clear <= '1';
-					clearNot <= '0';
 					
 				when resetActive_state =>
 					resetDuration := resetDuration + 1;
 					if (resetDuration = "1111") then
 						resetFSM <= resetComplete_state;
 						clear <= '0';
-						clearNot <= '1';
 					end if;
 
 				when resetComplete_state =>
@@ -260,6 +259,15 @@ begin
 				when others =>
 					null;
 			end case;
+		end if;
+	end process;
+
+	-- Cross clock domains.
+	cpuResetProcess: process(cpuClock)
+	begin
+		if (rising_edge(cpuClock)) then
+			cpuClearD0_n <= not clear;
+			cpuClearD1_n <= cpuClearD0_n;
 		end if;
 	end process;
 
@@ -278,7 +286,7 @@ begin
 			nWAIT => '1',
 			nINT => '1',
 			nNMI => '1',
-			nRESET => clearNot,
+			nRESET => cpuClearD1_n,
 			nBUSRQ => '1',
 
 			CLK => cpuClock,
