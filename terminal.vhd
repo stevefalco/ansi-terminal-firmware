@@ -187,14 +187,12 @@ architecture a of terminal is
 
 	signal lineAddressD0		: std_logic_vector (8 downto 0);
 	signal lineAddressD1		: std_logic_vector (8 downto 0);
-	signal lineAddressD2		: std_logic_vector (8 downto 0);
 	signal frameChar		: std_logic_vector (7 downto 0);
 
 	signal columnAddressD0		: std_logic_vector (9 downto 0);
 	signal columnAddressD1		: std_logic_vector (9 downto 0);
 	signal columnAddressD2		: std_logic_vector (9 downto 0);
 	signal columnAddressD3		: std_logic_vector (9 downto 0);
-	signal columnAddressD4		: std_logic_vector (9 downto 0);
 	signal scanChar			: std_logic_vector (7 downto 0);
 
 	signal hSyncD0			: std_logic;
@@ -202,21 +200,18 @@ architecture a of terminal is
 	signal hSyncD2			: std_logic;
 	signal hSyncD3			: std_logic;
 	signal hSyncD4			: std_logic;
-	signal hSyncD5			: std_logic;
 
 	signal vSyncD0			: std_logic;
 	signal vSyncD1			: std_logic;
 	signal vSyncD2			: std_logic;
 	signal vSyncD3			: std_logic;
 	signal vSyncD4			: std_logic;
-	signal vSyncD5			: std_logic;
 
 	signal blankingD0		: std_logic;
 	signal blankingD1		: std_logic;
 	signal blankingD2		: std_logic;
 	signal blankingD3		: std_logic;
 	signal blankingD4		: std_logic;
-	signal blankingD5		: std_logic;
 
 	signal pixel			: std_logic;
 	signal pixelBlanked		: std_logic;
@@ -395,8 +390,9 @@ begin
 	-- Screen memory.  The A port is used to drive the VGA port.  The
 	-- B port is for CPU access.
 	--
-	-- Address and data are both registered, so frameChar is two clocks
-	-- behind addressA (and hence 2 behind lineAddress).
+	-- Address and data are both registered on input, but not on output,
+	-- so frameChar is one clock behind addressA (and hence 1 behind
+	-- lineAddress).
 	frameRam: frame_ram
 		port map (
 			address_a => addressA,
@@ -416,15 +412,14 @@ begin
 	begin
 		if(rising_edge(dotClock)) then
 			lineAddressD1 <= lineAddressD0;
-			lineAddressD2 <= lineAddressD1;
 		end if;
 	end process;
 
 	-- We are using 7-bit ascii, hence we toss frameChar(7).
 	--
-	-- Address and data are both registered, so scanChar is two clocks
-	-- behind romAddr, or four clocks behind addressA.
-	romAddr <= frameChar(6 downto 0) & lineAddressD2(3 downto 0);
+	-- Address and data output are both registered, so scanChar is
+	-- two clocks behind romAddr, or three clocks behind addressA.
+	romAddr <= frameChar(6 downto 0) & lineAddressD1(3 downto 0);
 	charRom: char_rom
 		port map (
 			address => romAddr,
@@ -439,7 +434,6 @@ begin
 			columnAddressD1 <= columnAddressD0;
 			columnAddressD2 <= columnAddressD1;
 			columnAddressD3 <= columnAddressD2;
-			columnAddressD4 <= columnAddressD3;
 		end if;
 	end process;
 
@@ -447,12 +441,12 @@ begin
 	-- displayed.
 	--
 	-- The output is registered, so pixel is one clock behind
-	-- scanChar, or 5 clocks behind addressA..
+	-- scanChar, or 4 clocks behind addressA.
 	pelSelect: pel_select
 		port map (
 			clock => dotClock,
 			inByte => scanChar,
-			sel => columnAddressD4(2 downto 0),
+			sel => columnAddressD3(2 downto 0),
 			outBit => pixel
 		);
 
@@ -464,25 +458,22 @@ begin
 			hSyncD2 <= hSyncD1;
 			hSyncD3 <= hSyncD2;
 			hSyncD4 <= hSyncD3;
-			hSyncD5 <= hSyncD4;
 
 			vSyncD1 <= vSyncD0;
 			vSyncD2 <= vSyncD1;
 			vSyncD3 <= vSyncD2;
 			vSyncD4 <= vSyncD3;
-			vSyncD5 <= vSyncD4;
 
 			blankingD1 <= blankingD0;
 			blankingD2 <= blankingD1;
 			blankingD3 <= blankingD2;
 			blankingD4 <= blankingD3;
-			blankingD5 <= blankingD4;
 		end if;
 	end process;
 
 	blankIt: process(all)
 	begin
-		if(not blankingD5) then
+		if(not blankingD4) then
 			pixelBlanked <= pixel;
 		else
 			pixelBlanked <= '0';
@@ -496,8 +487,8 @@ begin
 	PIXEL_B1 <= pixelBlanked;
 	PIXEL_B2 <= pixelBlanked;
 
-	HSYNC <= hSyncD5;
-	VSYNC <= vSyncD5;
+	HSYNC <= hSyncD4;
+	VSYNC <= vSyncD4;
 
 end a;
 

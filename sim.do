@@ -29,23 +29,25 @@ add wave /testbench/term/frameGen/vsync
 add wave /testbench/term/frameGen/blanking
 add wave -radix unsigned /testbench/term/rowAddressD0
 add wave -radix unsigned /testbench/term/lineAddressD0
-add wave -radix unsigned /testbench/term/lineAddressD2
+add wave -radix unsigned /testbench/term/lineAddressD1
 add wave -radix unsigned /testbench/term/columnAddressD0
-add wave -radix unsigned /testbench/term/columnAddressD4
+add wave -radix unsigned /testbench/term/columnAddressD3
 add wave -radix unsigned /testbench/term/addressA
 add wave -radix ascii /testbench/term/frameChar
 add wave -radix unsigned /testbench/term/romAddr
 add wave -radix hexadecimal /testbench/term/scanChar
 add wave /testbench/term/pixel
-add wave /testbench/term/blankingD5
+add wave /testbench/term/blankingD4
 add wave /testbench/term/pixelBlanked
-add wave /testbench/term/hSyncD5
-add wave /testbench/term/vSyncD5
+add wave /testbench/term/hSyncD4
+add wave /testbench/term/vSyncD4
 
 add wave /testbench/term/cpuClock
 add wave /testbench/term/cpuClearD1_n
 add wave -radix hexadecimal /testbench/term/cpuAddrBus
 add wave -radix hexadecimal /testbench/term/cpuDataBus
+add wave /testbench/term/cpuRamWren
+add wave /testbench/term/videoRamWren
 add wave /testbench/term/nM1
 add wave /testbench/term/nMREQ
 add wave /testbench/term/nIORQ

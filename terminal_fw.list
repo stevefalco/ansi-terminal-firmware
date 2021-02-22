@@ -1,0 +1,97 @@
+                        ; --------------------------------------
+                        ; zasm: assemble "terminal_fw.asm"
+                        ; date: 2021-02-22 12:00:24
+                        ; --------------------------------------
+
+
+                        #target rom
+                        
+0000:                   #code ROM, 0x0000, 0x4000
+                        
+0000:                   rom	equ 0x0000
+4000:                   ram	equ 0x4000
+8000:                   video	equ 0x8000
+                        
+0000: F3       [ 4]     RST0:	di
+0001: 31FF7F   [14]     	ld	sp, $7fff
+0004: C36D00   [24]     	jp	start
+                        
+0007: FF                	defs	0x08-$
+0008: C9       [10]     RST1:	ret
+                        
+0009: FFFFFFFF          	defs	0x10-$
+000D: FFFFFF            
+0010: C9       [10]     RST2:	ret
+                        
+0011: FFFFFFFF          	defs	0x18-$
+0015: FFFFFF            
+0018: C9       [10]     RST3:	ret
+                        
+0019: FFFFFFFF          	defs	0x20-$
+001D: FFFFFF            
+0020: C9       [10]     RST4:	ret
+                        
+0021: FFFFFFFF          	defs	0x28-$
+0025: FFFFFF            
+0028: C9       [10]     RST5:	ret
+                        
+0029: FFFFFFFF          	defs	0x30-$
+002D: FFFFFF            
+0030: C9       [10]     RST6:	ret
+                        
+0031: FFFFFFFF          	defs	0x38-$
+0035: FFFFFF            
+0038: FB       [ 4]     RST7:	ei
+0039: C9       [14]     	ret
+                        
+003A: FFFFFFFF          	defs	0x66-$
+003E: FF...             
+0066: ED57     [ 9]     NMI:	ld	a, i
+0068: F5       [20]     	push	af
+0069: F1       [30]     	pop	af
+006A: E0       [35|41]  	ret	po
+006B: FB       [39]     	ei
+006C: C9       [49]     	ret
+                        
+006D: 011000   [10]     start:	ld	bc, 16
+0070: 110080   [20]     	ld	de, video
+0073: 211080   [30]     	ld	hl, video + 16
+0076: 7E       [ 7]     again:	ld	a, (hl)
+0077: 12       [14]     	ld	(de), a
+0078: 23       [20]     	inc	hl
+0079: 13       [26]     	inc	de
+007A: 0B       [32]     	dec	bc
+007B: 78       [36]     	ld	a, b
+007C: B1       [40]     	or	c
+007D: 20F7     [47|52]  	jr	nz, again
+007F: 18FE     [59]     	jr	$
+                        
+
+
+; +++ segments +++
+
+#CODE ROM      = $0000 =     0,  size = $4000 = 16384
+
+; +++ global symbols +++
+
+NMI      = $0066 =   102  ROM     terminal_fw.asm:36 (unused)
+ROM      = $0000 =     0  ROM     terminal_fw.asm:3 (unused)
+ROM_end  = $4000 = 16384  ROM     terminal_fw.asm:3 (unused)
+ROM_size = $4000 = 16384  ROM     terminal_fw.asm:3 (unused)
+RST0     = $0000 =     0  ROM     terminal_fw.asm:9 (unused)
+RST1     = $0008 =     8  ROM     terminal_fw.asm:14 (unused)
+RST2     = $0010 =    16  ROM     terminal_fw.asm:17 (unused)
+RST3     = $0018 =    24  ROM     terminal_fw.asm:20 (unused)
+RST4     = $0020 =    32  ROM     terminal_fw.asm:23 (unused)
+RST5     = $0028 =    40  ROM     terminal_fw.asm:26 (unused)
+RST6     = $0030 =    48  ROM     terminal_fw.asm:29 (unused)
+RST7     = $0038 =    56  ROM     terminal_fw.asm:32 (unused)
+again    = $0076 =   118  ROM     terminal_fw.asm:46
+ram      = $4000 = 16384  ROM     terminal_fw.asm:6 (unused)
+rom      = $0000 =     0  ROM     terminal_fw.asm:5 (unused)
+start    = $006D =   109  ROM     terminal_fw.asm:43
+video    = $8000 = 32768  ROM     terminal_fw.asm:7
+
+
+total time: 0.0025 sec.
+no errors
