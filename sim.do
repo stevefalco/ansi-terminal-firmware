@@ -42,4 +42,18 @@ add wave /testbench/term/pixelBlanked
 add wave /testbench/term/hSyncD5
 add wave /testbench/term/vSyncD5
 
+add wave /testbench/term/cpuClock
+add wave /testbench/term/cpuClearD1_n
+add wave -radix hexadecimal /testbench/term/cpuAddrBus
+add wave -radix hexadecimal /testbench/term/cpuDataBus
+add wave /testbench/term/nM1
+add wave /testbench/term/nMREQ
+add wave /testbench/term/nIORQ
+add wave /testbench/term/nRD
+add wave /testbench/term/nWR
+add wave /testbench/term/nRFSH
+add wave /testbench/term/nHALT
+add wave /testbench/term/nBUSACK
+add wave /testbench/term/z80CPU/*
+
 run 40ms

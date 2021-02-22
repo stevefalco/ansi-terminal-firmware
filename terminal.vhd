@@ -159,8 +159,6 @@ architecture a of terminal is
 	signal cpuAddrBus		: std_logic_vector (15 downto 0);
 	signal cpuDataBus		: std_logic_vector (7 downto 0);
 
-	signal cpuBusClkOut		: std_logic;
-
 	signal cpuRomQ			: std_logic_vector (7 downto 0);
 
 	signal cpuRamWren		: std_logic;
@@ -173,12 +171,12 @@ architecture a of terminal is
 	);
 
 	signal resetFSM			: resetFSM_type := resetIdle_state;
-	signal clear			: std_logic;
-	signal cpuClearD0_n		: std_logic;
-	signal cpuClearD1_n		: std_logic;
+	signal clear			: std_logic := '1';
+	signal cpuClearD0_n		: std_logic := '0';
+	signal cpuClearD1_n		: std_logic := '0';
 
 	signal dotClock			: std_logic;
-	signal cpuClock			: std_logic;
+	signal cpuClock			: std_logic := '0';
 
 	signal addressA			: std_logic_vector (10 downto 0);
 
@@ -237,7 +235,7 @@ begin
 
 	-- Reset all counters, registers, etc.
 	resetProcess: process(dotClock)
-		variable resetDuration : unsigned(3 downto 0) := (others => '0');
+		variable resetDuration : unsigned(8 downto 0) := (others => '0');
 	begin
 		if (rising_edge(dotClock)) then
 			case resetFSM is
@@ -248,7 +246,7 @@ begin
 					
 				when resetActive_state =>
 					resetDuration := resetDuration + 1;
-					if (resetDuration = "1111") then
+					if (resetDuration = "11111111") then
 						resetFSM <= resetComplete_state;
 						clear <= '0';
 					end if;
