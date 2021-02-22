@@ -40,9 +40,9 @@ NMI:	ld	a, i
 	ei
 	ret
 
-start:	ld	bc, 16
-	ld	de, video
-	ld	hl, video + 16
+start:	ld	bc, 1920
+	ld	de, ram
+	ld	hl, video
 again:	ld	a, (hl)
 	ld	(de), a
 	inc	hl
@@ -51,5 +51,30 @@ again:	ld	a, (hl)
 	ld	a, b
 	or	c
 	jr	nz, again
+
+back:	ld	bc, 1920
+	ld	de, video
+	ld	hl, ram + 1919
+b2:	ld	a, (hl)
+	ld	(de), a
+	dec	hl
+	inc	de
+	dec	bc
+	ld	a, b
+	or	c
+	jr	nz, b2
+
+pause:	ld	d, 10
+
+b4:	ld	bc, 65535
+b3:	dec	bc
+	ld	a, b
+	or	c
+	jr	nz, b3
+
+	dec	d
+	jr	nz, b4
+
+	jr	start
 	jr	$
 

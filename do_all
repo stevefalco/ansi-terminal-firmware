@@ -2,5 +2,6 @@
 
 set -e
 
+make
 ./do_build
 ./do_prog

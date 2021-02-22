@@ -1,6 +1,6 @@
                         ; --------------------------------------
                         ; zasm: assemble "terminal_fw.asm"
-                        ; date: 2021-02-22 12:00:24
+                        ; date: 2021-02-22 14:15:27
                         ; --------------------------------------
 
 
@@ -53,9 +53,9 @@
 006B: FB       [39]     	ei
 006C: C9       [49]     	ret
                         
-006D: 011000   [10]     start:	ld	bc, 16
-0070: 110080   [20]     	ld	de, video
-0073: 211080   [30]     	ld	hl, video + 16
+006D: 018007   [10]     start:	ld	bc, 1920
+0070: 110040   [20]     	ld	de, ram
+0073: 210080   [30]     	ld	hl, video
 0076: 7E       [ 7]     again:	ld	a, (hl)
 0077: 12       [14]     	ld	(de), a
 0078: 23       [20]     	inc	hl
@@ -64,7 +64,32 @@
 007B: 78       [36]     	ld	a, b
 007C: B1       [40]     	or	c
 007D: 20F7     [47|52]  	jr	nz, again
-007F: 18FE     [59]     	jr	$
+                        
+007F: 018007   [10]     back:	ld	bc, 1920
+0082: 110080   [20]     	ld	de, video
+0085: 217F47   [30]     	ld	hl, ram + 1919
+0088: 7E       [ 7]     b2:	ld	a, (hl)
+0089: 12       [14]     	ld	(de), a
+008A: 2B       [20]     	dec	hl
+008B: 13       [26]     	inc	de
+008C: 0B       [32]     	dec	bc
+008D: 78       [36]     	ld	a, b
+008E: B1       [40]     	or	c
+008F: 20F7     [47|52]  	jr	nz, b2
+                        
+0091: 160A     [ 7]     pause:	ld	d, 10
+                        
+0093: 01FFFF   [10]     b4:	ld	bc, 65535
+0096: 0B       [ 6]     b3:	dec	bc
+0097: 78       [10]     	ld	a, b
+0098: B1       [14]     	or	c
+0099: 20FB     [21|26]  	jr	nz, b3
+                        
+009B: 15       [25]     	dec	d
+009C: 20F5     [32|37]  	jr	nz, b4
+                        
+009E: 18CD     [44]     	jr	start
+00A0: 18FE     [56]     	jr	$
                         
 
 
@@ -87,11 +112,16 @@ RST5     = $0028 =    40  ROM     terminal_fw.asm:26 (unused)
 RST6     = $0030 =    48  ROM     terminal_fw.asm:29 (unused)
 RST7     = $0038 =    56  ROM     terminal_fw.asm:32 (unused)
 again    = $0076 =   118  ROM     terminal_fw.asm:46
-ram      = $4000 = 16384  ROM     terminal_fw.asm:6 (unused)
+b2       = $0088 =   136  ROM     terminal_fw.asm:58
+b3       = $0096 =   150  ROM     terminal_fw.asm:70
+b4       = $0093 =   147  ROM     terminal_fw.asm:69
+back     = $007F =   127  ROM     terminal_fw.asm:55 (unused)
+pause    = $0091 =   145  ROM     terminal_fw.asm:67 (unused)
+ram      = $4000 = 16384  ROM     terminal_fw.asm:6
 rom      = $0000 =     0  ROM     terminal_fw.asm:5 (unused)
 start    = $006D =   109  ROM     terminal_fw.asm:43
 video    = $8000 = 32768  ROM     terminal_fw.asm:7
 
 
-total time: 0.0025 sec.
+total time: 0.0007 sec.
 no errors
