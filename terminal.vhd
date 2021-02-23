@@ -138,11 +138,11 @@ architecture a of terminal is
 			cpuRamWren	: out std_logic;
 			cpuRamQ		: in std_logic_vector (7 downto 0);
 
-			-- UART Interface
-
 			-- VIDEO RAM Interface
 			videoRamWren	: out std_logic;
 			videoRamQ	: in std_logic_vector (7 downto 0)
+
+			-- UART Interface
 		);
 	end component;
 
@@ -321,11 +321,11 @@ begin
 			cpuRamWren => cpuRamWren,
 			cpuRamQ => cpuRamQ,
 
-			-- UART Interface
-
 			-- VIDEO RAM Interface
 			videoRamWren => videoRamWren,
 			videoRamQ => videoRamQ
+
+			-- UART Interface
 		);
 
 	-- Generate timing and addresses from the dot clock.  The row address

@@ -18,11 +18,12 @@ entity z80_bus is
 		cpuRamWren	: out std_logic;
 		cpuRamQ		: in std_logic_vector (7 downto 0);
 
-		-- UART Interface
-
 		-- VIDEO RAM Interface
 		videoRamWren	: out std_logic;
 		videoRamQ	: in std_logic_vector (7 downto 0)
+
+		-- UART Interface
+
 	);
 end z80_bus;
 
