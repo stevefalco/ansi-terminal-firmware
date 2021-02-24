@@ -23,7 +23,10 @@ entity terminal is
 		PIXEL_B2		: out std_logic;
 
 		HSYNC			: out std_logic;
-		VSYNC			: out std_logic
+		VSYNC			: out std_logic;
+
+		UART_RX			: in std_logic;
+		UART_TX			: out std_logic
 	);
 end terminal;
 
@@ -32,7 +35,7 @@ architecture a of terminal is
 		port
 		(
 			inclk0		: in std_logic  := '0';
-			c0		: out std_logic ;
+			c0		: out std_logic;
 			c1		: out std_logic
 		);
 	end component;
@@ -140,9 +143,42 @@ architecture a of terminal is
 
 			-- VIDEO RAM Interface
 			videoRamWren	: out std_logic;
-			videoRamQ	: in std_logic_vector (7 downto 0)
+			videoRamQ	: in std_logic_vector (7 downto 0);
 
 			-- UART Interface
+			cpuUartCS	: out std_logic;
+			cpuUartWR	: out std_logic;
+			cpuUartQ	: in std_logic_vector (7 downto 0)
+		);
+	end component;
+
+	component gh_uart_16550 is
+		port(
+			clk     	: in std_logic;
+			BR_clk  	: in std_logic;
+			rst     	: in std_logic;
+			CS      	: in std_logic;
+			WR      	: in std_logic;
+			ADD     	: in std_logic_vector(2 downto 0);
+			D       	: in std_logic_vector(7 downto 0);
+
+			sRX		: in std_logic;
+			CTSn    	: in std_logic := '1';
+			DSRn    	: in std_logic := '1';
+			RIn     	: in std_logic := '1';
+			DCDn    	: in std_logic := '1';
+
+			sTX     	: out std_logic;
+			DTRn    	: out std_logic;
+			RTSn    	: out std_logic;
+			OUT1n   	: out std_logic;
+			OUT2n   	: out std_logic;
+			TXRDYn  	: out std_logic;
+			RXRDYn  	: out std_logic;
+
+			IRQ     	: out std_logic;
+			B_CLK   	: out std_logic;
+			RD      	: out std_logic_vector(7 downto 0)
 		);
 	end component;
 
@@ -164,6 +200,10 @@ architecture a of terminal is
 	signal cpuRamWren		: std_logic;
 	signal cpuRamQ			: std_logic_vector (7 downto 0);
 
+	signal cpuUartCS		: std_logic;
+	signal cpuUartWR		: std_logic;
+	signal cpuUartQ			: std_logic_vector (7 downto 0);
+
 	type resetFSM_type is (
 		resetIdle_state,
 		resetActive_state,
@@ -175,7 +215,7 @@ architecture a of terminal is
 	signal cpuClearD0_n		: std_logic := '0';
 	signal cpuClearD1_n		: std_logic := '0';
 
-	signal dotClock			: std_logic;
+	signal dotClock			: std_logic := '0';
 	signal cpuClock			: std_logic := '0';
 
 	signal addressA			: std_logic_vector (10 downto 0);
@@ -217,6 +257,9 @@ architecture a of terminal is
 	signal pixelBlanked		: std_logic;
 
 	signal romAddr			: std_logic_vector (10 downto 0);
+
+	signal uart_tx_int		: std_logic;
+	signal uart_rx_int		: std_logic;
 begin
 
 	-- Create a 25.2 MHz dot clock from the 12 MHz oscillator.
@@ -224,8 +267,8 @@ begin
 		port map
 		(
 			inclk0 => CLK12M,
-			c0 => dotClock,
-			c1 => cpuClock
+			c0 => dotClock,		-- 25.2 MHz
+			c1 => cpuClock		-- 14 MHz
 		);
 
 	-- Reset all counters, registers, etc.
@@ -305,6 +348,38 @@ begin
 			q => cpuRamQ
 		);
 
+	-- Z80 UART
+	uart: gh_uart_16550
+		port map(
+			-- processor interface
+			clk => cpuClock,
+			BR_clk => cpuClock,
+			rst => clear,
+			CS => cpuUartCS,
+			WR => cpuUartWR,
+			ADD => cpuAddrBus(2 downto 0),
+			D => cpuDataBus,
+			RD => cpuUartQ,
+
+			-- serial interface
+			sRX => uart_rx_int,
+			sTx => uart_tx_int,
+
+			-- modem control signals
+			CTSn => '0', -- cts, active low
+			DSRn => '0', -- dsr, active low
+			RIn => '0',  -- ring indicator, active low
+			DCDn => '0' -- dcd, active low
+		);
+
+	reclockUart: process(cpuClock)
+	begin
+		if(rising_edge(cpuClock)) then
+			uart_rx_int <= UART_RX;
+			UART_TX <= uart_tx_int;
+		end if;
+	end process;
+
 	-- Z80 Bus
 	z80Bus: z80_bus
 		port map (
@@ -323,9 +398,12 @@ begin
 
 			-- VIDEO RAM Interface
 			videoRamWren => videoRamWren,
-			videoRamQ => videoRamQ
+			videoRamQ => videoRamQ,
 
 			-- UART Interface
+			cpuUartCS => cpuUartCS,
+			cpuUartWR => cpuUartWR,
+			cpuUartQ => cpuUartQ
 		);
 
 	-- Generate timing and addresses from the dot clock.  The row address
@@ -480,15 +558,20 @@ begin
 		end if;
 	end process;
 
-	PIXEL_R1 <= pixelBlanked;
-	PIXEL_R2 <= pixelBlanked;
-	PIXEL_G1 <= pixelBlanked;
-	PIXEL_G2 <= pixelBlanked;
-	PIXEL_B1 <= pixelBlanked;
-	PIXEL_B2 <= pixelBlanked;
+	reclockVGA: process(dotCLock)
+	begin
+		if(rising_edge(dotClock)) then
+			PIXEL_R1 <= pixelBlanked;
+			PIXEL_R2 <= pixelBlanked;
+			PIXEL_G1 <= pixelBlanked;
+			PIXEL_G2 <= pixelBlanked;
+			PIXEL_B1 <= pixelBlanked;
+			PIXEL_B2 <= pixelBlanked;
 
-	HSYNC <= hSyncD4;
-	VSYNC <= vSyncD4;
+			HSYNC <= hSyncD4;
+			VSYNC <= vSyncD4;
+		end if;
+	end process;
 
 end a;
 

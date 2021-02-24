@@ -40,18 +40,29 @@ set refPeriod 12MHz
 
 create_clock -name {CLK12M} -period $refPeriod [get_ports {CLK12M}]
 
-create_clock -name dotClock_virt -period 25.2MHz
-
 derive_pll_clocks
 derive_clock_uncertainty
+
+#**************************************************************
+# Set Input Delay
+#**************************************************************
+
+set_input_delay -add_delay -clock [get_clocks {dotClockGen|altpll_component|auto_generated|pll1|clk[1]}] -max 20.0 [get_ports {UART_RX}]
+set_input_delay -add_delay -clock [get_clocks {dotClockGen|altpll_component|auto_generated|pll1|clk[1]}] -min -20.0 [get_ports {UART_RX}]
 
 #**************************************************************
 # Set Output Delay
 #**************************************************************
 
-set_output_delay -add_delay -clock [get_clocks {dotClock_virt}] -max 1.0 [get_ports {PIXEL_*}]
-set_output_delay -add_delay -clock [get_clocks {dotClock_virt}] -min -1.0 [get_ports {PIXEL_*}]
+set_output_delay -add_delay -clock [get_clocks {dotClockGen|altpll_component|auto_generated|pll1|clk[0]}] -max 1.0 [get_ports {PIXEL_*}]
+set_output_delay -add_delay -clock [get_clocks {dotClockGen|altpll_component|auto_generated|pll1|clk[0]}] -min -1.0 [get_ports {PIXEL_*}]
 
-set_output_delay -add_delay -clock [get_clocks {dotClock_virt}] -max 1.0 [get_ports {HSYNC VSYNC}]
-set_output_delay -add_delay -clock [get_clocks {dotClock_virt}] -min -1.0 [get_ports {HSYNC VSYNC}]
+set_output_delay -add_delay -clock [get_clocks {dotClockGen|altpll_component|auto_generated|pll1|clk[0]}] -max 1.0 [get_ports {HSYNC VSYNC}]
+set_output_delay -add_delay -clock [get_clocks {dotClockGen|altpll_component|auto_generated|pll1|clk[0]}] -min -1.0 [get_ports {HSYNC VSYNC}]
 
+set_output_delay -add_delay -clock [get_clocks {dotClockGen|altpll_component|auto_generated|pll1|clk[1]}] -max 20.0 [get_ports {UART_TX}]
+set_output_delay -add_delay -clock [get_clocks {dotClockGen|altpll_component|auto_generated|pll1|clk[1]}] -min -20.0 [get_ports {UART_TX}]
+
+# Isolate clocks
+set_false_path -from [get_clocks {dotClockGen|altpll_component|auto_generated|pll1|clk[0]}] -to [get_clocks {dotClockGen|altpll_component|auto_generated|pll1|clk[1]}]
+set_false_path -from [get_clocks {dotClockGen|altpll_component|auto_generated|pll1|clk[1]}] -to [get_clocks {dotClockGen|altpll_component|auto_generated|pll1|clk[0]}]

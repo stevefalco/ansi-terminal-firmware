@@ -28,17 +28,24 @@ architecture a of testbench is
 			PIXEL_B2		: out std_logic;
 
 			HSYNC			: out std_logic;
-			VSYNC			: out std_logic
+			VSYNC			: out std_logic;
+
+			UART_RX			: in std_logic;
+			UART_TX			: out std_logic
 		    );
 	end component;
 
 	signal CLK12M				: std_logic;
 
+	signal loopback				: std_logic;
+
 begin
 	term: terminal
 	port map
 	(
-		CLK12M => CLK12M
+		CLK12M => CLK12M,
+		UART_RX => loopback,
+		UART_TX => loopback
 	);
 
 	-- 12 Mhz

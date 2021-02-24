@@ -17,7 +17,8 @@ int baudTable[] = {
 int
 main()
 {
-	double clock = 24.0E6;
+	double clockStart = 10E6;
+	double clock;
 	double txActual;
 	double rxActual;
 	double txError;
@@ -26,24 +27,30 @@ main()
 	int baud;
 	int divisorTX;
 	int divisorRX;
-	int oversample = 8;
+	int oversample = 16;
 
 	int i;
+	int j;
 
-	for(i = 0; i < sizeof(baudTable) / sizeof(int); i++) {
-		baud = baudTable[i];
+	for(j = 0; j < 100; j++) {
+		clock = clockStart + (j * 1E5);
+		printf("clock %f\n", clock);
+		for(i = 0; i < sizeof(baudTable) / sizeof(int); i++) {
+			baud = baudTable[i];
 
-		divisorTX = (int)round(clock / baud);
-		divisorRX = (int)round((clock / oversample) / baud);
+			divisorTX = (int)round(clock / baud);
+			divisorRX = (int)round((clock / oversample) / baud);
 
-		txActual = (double)(divisorTX * baud);
-		rxActual = (double)(oversample * divisorRX * baud);
+			txActual = (double)(divisorTX * baud);
+			rxActual = (double)(oversample * divisorRX * baud);
 
-		txError = 100.0 * ((txActual - clock) / clock);
-		rxError = 100.0 * ((rxActual - clock) / clock);
+			txError = 100.0 * ((txActual - clock) / clock);
+			rxError = 100.0 * ((rxActual - clock) / clock);
 
-		printf("baud=%6d dTX=%6d dRX=%6d tA=%f rA=%f tE=%12.2f rE=%12.2f\n",
-				baud, divisorTX, divisorRX,
-				txActual, rxActual, txError, rxError);
+			printf("baud=%6d dTX=%6d dRX=%6d tA=%f rA=%f tE=%12.2f rE=%12.2f\n",
+					baud, divisorTX, divisorRX,
+					txActual, rxActual, txError, rxError);
+		}
+		printf("\n");
 	}
 }

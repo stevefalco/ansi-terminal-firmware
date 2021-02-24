@@ -20,10 +20,12 @@ entity z80_bus is
 
 		-- VIDEO RAM Interface
 		videoRamWren	: out std_logic;
-		videoRamQ	: in std_logic_vector (7 downto 0)
+		videoRamQ	: in std_logic_vector (7 downto 0);
 
 		-- UART Interface
-
+		cpuUartCS	: out std_logic;
+		cpuUartWR	: out std_logic;
+		cpuUartQ	: in std_logic_vector (7 downto 0)
 	);
 end z80_bus;
 
@@ -34,17 +36,19 @@ begin
 		-- Assume no writes
 		cpuRamWren <= '0';
 		videoRamWren <= '0';
+		cpuUartCS <= '0';
+		cpuUartWR <= '0';
 		cpuData <= (others => 'Z');
 
-		case cpuAddr(15 downto 14) is
+		case to_integer(unsigned(cpuAddr(15 downto 0))) is
 
-			when "00" =>
+			when 16#0000# to 16#3FFF# =>
 				-- CPU ROM
 				if(cpuRden = '0') then
 					cpuData <= cpuRomQ;
 				end if;
 
-			when "01" =>
+			when 16#4000# to 16#7FFF# =>
 				-- CPU RAM
 				if(cpuRden = '0') then
 					cpuData <= cpuRamQ;
@@ -52,12 +56,23 @@ begin
 					cpuRamWren <= '1';
 				end if;
 
-			when "10" =>
+			when 16#8000# to 16#BFFF# =>
 				-- Video RAM
 				if(cpuRden = '0') then
 					cpuData <= videoRamQ;
 				elsif(cpuWren = '0') then
 					videoRamWren <= '1';
+				end if;
+
+			when 16#C000# to 16#C007# =>
+				-- UART
+				if(cpuRden = '0') then
+					cpuUartCS <= '1';
+					cpuUartWR <= '0';
+					cpuData <= cpuUartQ;
+				elsif(cpuWren = '0') then
+					cpuUartCS <= '1';
+					cpuUartWR <= '1';
 				end if;
 
 			when others =>
