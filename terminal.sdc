@@ -47,9 +47,6 @@ derive_clock_uncertainty
 # Set Input Delay
 #**************************************************************
 
-set_input_delay -add_delay -clock [get_clocks {dotClockGen|altpll_component|auto_generated|pll1|clk[1]}] -max 20.0 [get_ports {UART_RX}]
-set_input_delay -add_delay -clock [get_clocks {dotClockGen|altpll_component|auto_generated|pll1|clk[1]}] -min -20.0 [get_ports {UART_RX}]
-
 #**************************************************************
 # Set Output Delay
 #**************************************************************
@@ -60,9 +57,11 @@ set_output_delay -add_delay -clock [get_clocks {dotClockGen|altpll_component|aut
 set_output_delay -add_delay -clock [get_clocks {dotClockGen|altpll_component|auto_generated|pll1|clk[0]}] -max 1.0 [get_ports {HSYNC VSYNC}]
 set_output_delay -add_delay -clock [get_clocks {dotClockGen|altpll_component|auto_generated|pll1|clk[0]}] -min -1.0 [get_ports {HSYNC VSYNC}]
 
-set_output_delay -add_delay -clock [get_clocks {dotClockGen|altpll_component|auto_generated|pll1|clk[1]}] -max 20.0 [get_ports {UART_TX}]
-set_output_delay -add_delay -clock [get_clocks {dotClockGen|altpll_component|auto_generated|pll1|clk[1]}] -min -20.0 [get_ports {UART_TX}]
-
 # Isolate clocks
-set_false_path -from [get_clocks {dotClockGen|altpll_component|auto_generated|pll1|clk[0]}] -to [get_clocks {dotClockGen|altpll_component|auto_generated|pll1|clk[1]}]
-set_false_path -from [get_clocks {dotClockGen|altpll_component|auto_generated|pll1|clk[1]}] -to [get_clocks {dotClockGen|altpll_component|auto_generated|pll1|clk[0]}]
+set_clock_groups -exclusive \
+	-group  {dotClockGen|altpll_component|auto_generated|pll1|clk[0]} \
+	-group  {cpuClockGen|altpll_component|auto_generated|pll1|clk[0]}
+
+# Don't cares
+set_false_path -from [get_ports {UART_RX}] -to *
+set_false_path -from * -to [get_ports {UART_TX}]

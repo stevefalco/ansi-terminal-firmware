@@ -34,9 +34,16 @@ architecture a of terminal is
 	component dot_clock
 		port
 		(
-			inclk0		: in std_logic  := '0';
-			c0		: out std_logic;
-			c1		: out std_logic
+			inclk0		: in std_logic;
+			c0		: out std_logic
+		);
+	end component;
+
+	component cpu_clock
+		port
+		(
+			inclk0		: in std_logic;
+			c0		: out std_logic
 		);
 	end component;
 
@@ -258,8 +265,6 @@ architecture a of terminal is
 
 	signal romAddr			: std_logic_vector (10 downto 0);
 
-	signal uart_tx_int		: std_logic;
-	signal uart_rx_int		: std_logic;
 begin
 
 	-- Create a 25.2 MHz dot clock from the 12 MHz oscillator.
@@ -267,8 +272,16 @@ begin
 		port map
 		(
 			inclk0 => CLK12M,
-			c0 => dotClock,		-- 25.170732 MHz
-			c1 => cpuClock		-- 12.900000 MHz
+			c0 => dotClock		-- 25.2 MHz
+		);
+
+	-- Create a 12.9 MHz cpu clock from the 12 MHz oscillator.
+	-- This frequency is chosen to get good baud rate accuracy.
+	cpuClockGen: cpu_clock
+		port map
+		(
+			inclk0 => CLK12M,
+			c0 => cpuClock		-- 12.9 MHz
 		);
 
 	-- Reset all counters, registers, etc.
@@ -362,8 +375,8 @@ begin
 			RD => cpuUartQ,
 
 			-- serial interface
-			sRX => uart_rx_int,
-			sTx => uart_tx_int,
+			sRX => UART_RX,
+			sTx => UART_TX,
 
 			-- modem control signals
 			CTSn => '0', -- cts, active low
@@ -371,14 +384,6 @@ begin
 			RIn => '0',  -- ring indicator, active low
 			DCDn => '0' -- dcd, active low
 		);
-
-	reclockUart: process(cpuClock)
-	begin
-		if(rising_edge(cpuClock)) then
-			uart_rx_int <= UART_RX;
-			UART_TX <= uart_tx_int;
-		end if;
-	end process;
 
 	-- Z80 Bus
 	z80Bus: z80_bus
