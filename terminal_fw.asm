@@ -6,6 +6,7 @@ rom	equ 0x0000
 ram	equ 0x4000
 video	equ 0x8000
 uart	equ 0xc000
+dipSW	equ 0xc010
 
 RST0:	di
 	ld	sp, $7fff
@@ -42,64 +43,19 @@ NMI:	ld	a, i
 	ret
 
 start:
-	; unlock divisor registers
-	ld	hl, uart + 3
-	ld	a, 0x80
-	ld	(hl), a
-
-	; baud rate divisor
-	; baud=   300 dTX= 43000 dRX=  2688 tA=12900000.000000 rA=12902400.000000 tE=        0.00 rE=        0.02
-	; baud=   600 dTX= 21500 dRX=  1344 tA=12900000.000000 rA=12902400.000000 tE=        0.00 rE=        0.02
-	; baud=  1200 dTX= 10750 dRX=   672 tA=12900000.000000 rA=12902400.000000 tE=        0.00 rE=        0.02
-	; baud=  2400 dTX=  5375 dRX=   336 tA=12900000.000000 rA=12902400.000000 tE=        0.00 rE=        0.02
-	; baud=  4800 dTX=  2688 dRX=   168 tA=12902400.000000 rA=12902400.000000 tE=        0.02 rE=        0.02
-	; baud=  9600 dTX=  1344 dRX=    84 tA=12902400.000000 rA=12902400.000000 tE=        0.02 rE=        0.02
-	; baud= 19200 dTX=   672 dRX=    42 tA=12902400.000000 rA=12902400.000000 tE=        0.02 rE=        0.02
-	; baud= 38400 dTX=   336 dRX=    21 tA=12902400.000000 rA=12902400.000000 tE=        0.02 rE=        0.02
-	; baud= 57600 dTX=   224 dRX=    14 tA=12902400.000000 rA=12902400.000000 tE=        0.02 rE=        0.02
-	; baud=115200 dTX=   112 dRX=     7 tA=12902400.000000 rA=12902400.000000 tE=        0.02 rE=        0.02
-	ld	hl, uart
-	ld	a, 0x07
-	ld	(hl), a
-
-	inc	hl
-	ld	a, 0x00
-	ld	(hl), a
-
-	; lock divisor registers and set 8 bit data, no parity, one stop bit.
-	ld	hl, uart + 3
-	ld	a, 0x03
-	ld	(hl), a
+	call	set_baud
 
 	; write char
-	ld	hl, uart
-	ld	a, 0x29
-	ld	(hl), a
-
-wait1:	ld	hl, uart + 5
-	ld	a, (hl)
-	bit	6, a
-	jr	z, wait1
+	ld	b, 0x29
+	call	send_char
 
 	; write char
-	ld	hl, uart
-	ld	a, 0x55
-	ld	(hl), a
-
-wait2:	ld	hl, uart + 5
-	ld	a, (hl)
-	bit	6, a
-	jr	z, wait2
+	ld	b, 0x55
+	call	send_char
 
 	; write char
-	ld	hl, uart
-	ld	a, 0xaa
-	ld	(hl), a
-
-wait3:	ld	hl, uart + 5
-	ld	a, (hl)
-	bit	6, a
-	jr	z, wait3
+	ld	b, 0xaa
+	call	send_char
 
 	; move bytes around
 mover:	ld	bc, 1920
@@ -140,3 +96,77 @@ b3:	dec	bc
 	jr	start
 	jr	$
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; send_char - write the character in B to the uart
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+send_char:
+
+	ld	hl, uart + 5
+	ld	a, (hl)
+	bit	6, a
+	jr	z, send_char ; wait for the uart to be ready
+
+	ld	hl, uart
+	ld	(hl), b
+
+	ret
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; set_baud - set the baud rate based on the dip switches
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+set_baud:
+
+	; read dip switches into de
+	ld	hl, dipSW
+	ld	d, 0
+	ld	e, (hl)
+
+	; point to the correct entry
+	ld	hl, baud_table
+	add	hl, de
+	add	hl, de
+
+	; load the entry into bc
+	ld	a, (hl)
+	inc	hl
+	ld	b, (hl)
+	ld	c, a
+
+	; unlock divisor registers
+	ld	hl, uart + 3
+	ld	a, 0x80
+	ld	(hl), a
+
+	; write the baud rate divisor
+	ld	hl, uart
+	ld	(hl), c
+
+	inc	hl
+	ld	(hl), b
+
+	; lock divisor registers and set 8 bit data, no parity, one stop bit.
+	ld	hl, uart + 3
+	ld	a, 0x03
+	ld	(hl), a
+
+	ret
+
+baud_table:
+	.DW	7330	; sw=0 for 110 baud
+	.DW	2688	; sw=1 for 300 baud
+	.DW	1344	; sw=2 for 600 baud
+	.DW	672	; sw=3 for 1200 baud
+	.DW	336	; sw=4 for 2400 baud
+	.DW	168	; sw=5 for 4800 baud
+	.DW	84	; sw=6 for 9600 baud
+	.DW	42	; sw=7 for 19200 baud
+	.DW	21	; sw=8 for 38400 baud
+	.DW	14	; sw=9 for 57600 baud
+	.DW	7	; sw=10 for 115200 baud
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

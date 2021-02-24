@@ -2,6 +2,7 @@
 #include <math.h>
 
 int baudTable[] = {
+	110,
 	300,
 	600,
 	1200,
@@ -47,7 +48,7 @@ main()
 			txError = 100.0 * ((txActual - clock) / clock);
 			rxError = 100.0 * ((rxActual - clock) / clock);
 
-			printf("baud=%6d dTX=%6d dRX=%6d tA=%f rA=%f tE=%12.2f rE=%12.2f\n",
+			printf("baud=%6d dTX=%6d dRX=%6d tA=%10.0f rA=%10.0f tE=%7.2f rE=%7.2f\n",
 					baud, divisorTX, divisorRX,
 					txActual, rxActual, txError, rxError);
 		}

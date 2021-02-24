@@ -25,7 +25,10 @@ entity z80_bus is
 		-- UART Interface
 		cpuUartCS	: out std_logic;
 		cpuUartWR	: out std_logic;
-		cpuUartQ	: in std_logic_vector (7 downto 0)
+		cpuUartQ	: in std_logic_vector (7 downto 0);
+
+		-- DIP Switch Interface
+		cpuDipQ		: in std_logic_vector (3 downto 0)
 	);
 end z80_bus;
 
@@ -73,6 +76,12 @@ begin
 				elsif(cpuWren = '0') then
 					cpuUartCS <= '1';
 					cpuUartWR <= '1';
+				end if;
+
+			when 16#C010# =>
+				-- DIP Switches
+				if(cpuRden = '0') then
+					cpuData <= "0000" & cpuDipQ;
 				end if;
 
 			when others =>

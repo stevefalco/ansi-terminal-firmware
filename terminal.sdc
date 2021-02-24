@@ -65,3 +65,5 @@ set_clock_groups -exclusive \
 # Don't cares
 set_false_path -from [get_ports {UART_RX}] -to *
 set_false_path -from * -to [get_ports {UART_TX}]
+
+set_false_path -from [get_ports {DIP_SW[*]}] -to *

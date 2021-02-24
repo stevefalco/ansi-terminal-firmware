@@ -7,6 +7,9 @@ entity terminal is
 	port (
 		CLK12M			: in std_logic;
 
+		-- DIP switches for baud rate
+		DIP_SW			: in std_logic_vector(3 downto 0);
+
 		-- The FPGA can drive 8 mA per pin.  The RGB pins drive a 75 ohm
 		-- load, and we need to get it to 0.7 volts for "white".
 		--
@@ -155,7 +158,10 @@ architecture a of terminal is
 			-- UART Interface
 			cpuUartCS	: out std_logic;
 			cpuUartWR	: out std_logic;
-			cpuUartQ	: in std_logic_vector (7 downto 0)
+			cpuUartQ	: in std_logic_vector (7 downto 0);
+
+			-- DIP Switch Interface
+			cpuDipQ		: in std_logic_vector (3 downto 0)
 		);
 	end component;
 
@@ -388,7 +394,7 @@ begin
 	-- Z80 Bus
 	z80Bus: z80_bus
 		port map (
-			-- CPU Interface.
+			-- CPU Interface
 			cpuAddr => cpuAddrBus,
 			cpuData => cpuDataBus,
 			cpuRden => nRD,
@@ -408,7 +414,10 @@ begin
 			-- UART Interface
 			cpuUartCS => cpuUartCS,
 			cpuUartWR => cpuUartWR,
-			cpuUartQ => cpuUartQ
+			cpuUartQ => cpuUartQ,
+			
+			-- DIP Switch Interface
+			cpuDipQ => DIP_SW
 		);
 
 	-- Generate timing and addresses from the dot clock.  The row address

@@ -1,6 +1,6 @@
                         ; --------------------------------------
                         ; zasm: assemble "terminal_fw.asm"
-                        ; date: 2021-02-24 13:13:39
+                        ; date: 2021-02-24 15:48:49
                         ; --------------------------------------
 
 
@@ -12,6 +12,7 @@
 4000:                   ram	equ 0x4000
 8000:                   video	equ 0x8000
 C000:                   uart	equ 0xc000
+C010:                   dipSW	equ 0xc010
                         
 0000: F3       [ 4]     RST0:	di
 0001: 31FF7F   [14]     	ld	sp, $7fff
@@ -55,104 +56,133 @@ C000:                   uart	equ 0xc000
 006C: C9       [49]     	ret
                         
 006D:                   start:
-                        	; unlock divisor registers
-006D: 2103C0   [10]     	ld	hl, uart + 3
-0070: 3E80     [17]     	ld	a, 0x80
-0072: 77       [24]     	ld	(hl), a
-                        
-                        	; baud rate divisor
-                        	; baud=   300 dTX= 43000 dRX=  2688 tA=12900000.000000 rA=12902400.000000 tE=        0.00 rE=        0.02
-                        	; baud=   600 dTX= 21500 dRX=  1344 tA=12900000.000000 rA=12902400.000000 tE=        0.00 rE=        0.02
-                        	; baud=  1200 dTX= 10750 dRX=   672 tA=12900000.000000 rA=12902400.000000 tE=        0.00 rE=        0.02
-                        	; baud=  2400 dTX=  5375 dRX=   336 tA=12900000.000000 rA=12902400.000000 tE=        0.00 rE=        0.02
-                        	; baud=  4800 dTX=  2688 dRX=   168 tA=12902400.000000 rA=12902400.000000 tE=        0.02 rE=        0.02
-                        	; baud=  9600 dTX=  1344 dRX=    84 tA=12902400.000000 rA=12902400.000000 tE=        0.02 rE=        0.02
-                        	; baud= 19200 dTX=   672 dRX=    42 tA=12902400.000000 rA=12902400.000000 tE=        0.02 rE=        0.02
-                        	; baud= 38400 dTX=   336 dRX=    21 tA=12902400.000000 rA=12902400.000000 tE=        0.02 rE=        0.02
-                        	; baud= 57600 dTX=   224 dRX=    14 tA=12902400.000000 rA=12902400.000000 tE=        0.02 rE=        0.02
-                        	; baud=115200 dTX=   112 dRX=     7 tA=12902400.000000 rA=12902400.000000 tE=        0.02 rE=        0.02
-0073: 2100C0   [34]     	ld	hl, uart
-0076: 3E07     [41]     	ld	a, 0x07
-0078: 77       [48]     	ld	(hl), a
-                        
-0079: 23       [54]     	inc	hl
-007A: 3E00     [61]     	ld	a, 0x00
-007C: 77       [68]     	ld	(hl), a
-                        
-                        	; lock divisor registers and set 8 bit data, no parity, one stop bit.
-007D: 2103C0   [78]     	ld	hl, uart + 3
-0080: 3E03     [85]     	ld	a, 0x03
-0082: 77       [92]     	ld	(hl), a
+006D: CDC100   [17]     	call	set_baud
                         
                         	; write char
-0083: 2100C0   [102]    	ld	hl, uart
-0086: 3E29     [109]    	ld	a, 0x29
-0088: 77       [116]    	ld	(hl), a
-                        
-0089: 2105C0   [10]     wait1:	ld	hl, uart + 5
-008C: 7E       [17]     	ld	a, (hl)
-008D: CB77     [25]     	bit	6, a
-008F: 28F8     [32|37]  	jr	z, wait1
+0070: 0629     [24]     	ld	b, 0x29
+0072: CDB400   [41]     	call	send_char
                         
                         	; write char
-0091: 2100C0   [42]     	ld	hl, uart
-0094: 3E55     [49]     	ld	a, 0x55
-0096: 77       [56]     	ld	(hl), a
-                        
-0097: 2105C0   [10]     wait2:	ld	hl, uart + 5
-009A: 7E       [17]     	ld	a, (hl)
-009B: CB77     [25]     	bit	6, a
-009D: 28F8     [32|37]  	jr	z, wait2
+0075: 0655     [48]     	ld	b, 0x55
+0077: CDB400   [65]     	call	send_char
                         
                         	; write char
-009F: 2100C0   [42]     	ld	hl, uart
-00A2: 3EAA     [49]     	ld	a, 0xaa
-00A4: 77       [56]     	ld	(hl), a
-                        
-00A5: 2105C0   [10]     wait3:	ld	hl, uart + 5
-00A8: 7E       [17]     	ld	a, (hl)
-00A9: CB77     [25]     	bit	6, a
-00AB: 28F8     [32|37]  	jr	z, wait3
+007A: 06AA     [72]     	ld	b, 0xaa
+007C: CDB400   [89]     	call	send_char
                         
                         	; move bytes around
-00AD: 018007   [10]     mover:	ld	bc, 1920
-00B0: 110040   [20]     	ld	de, ram
-00B3: 210080   [30]     	ld	hl, video
-00B6: 7E       [ 7]     again:	ld	a, (hl)
-00B7: 12       [14]     	ld	(de), a
-00B8: 23       [20]     	inc	hl
-00B9: 13       [26]     	inc	de
-00BA: 0B       [32]     	dec	bc
-00BB: 78       [36]     	ld	a, b
-00BC: B1       [40]     	or	c
-00BD: 20F7     [47|52]  	jr	nz, again
+007F: 018007   [10]     mover:	ld	bc, 1920
+0082: 110040   [20]     	ld	de, ram
+0085: 210080   [30]     	ld	hl, video
+0088: 7E       [ 7]     again:	ld	a, (hl)
+0089: 12       [14]     	ld	(de), a
+008A: 23       [20]     	inc	hl
+008B: 13       [26]     	inc	de
+008C: 0B       [32]     	dec	bc
+008D: 78       [36]     	ld	a, b
+008E: B1       [40]     	or	c
+008F: 20F7     [47|52]  	jr	nz, again
                         
-00BF: 018007   [10]     back:	ld	bc, 1920
-00C2: 110080   [20]     	ld	de, video
-00C5: 217F47   [30]     	ld	hl, ram + 1919
-00C8: 7E       [ 7]     b2:	ld	a, (hl)
-00C9: 12       [14]     	ld	(de), a
-00CA: 2B       [20]     	dec	hl
-00CB: 13       [26]     	inc	de
-00CC: 0B       [32]     	dec	bc
-00CD: 78       [36]     	ld	a, b
-00CE: B1       [40]     	or	c
-00CF: 20F7     [47|52]  	jr	nz, b2
+0091: 018007   [10]     back:	ld	bc, 1920
+0094: 110080   [20]     	ld	de, video
+0097: 217F47   [30]     	ld	hl, ram + 1919
+009A: 7E       [ 7]     b2:	ld	a, (hl)
+009B: 12       [14]     	ld	(de), a
+009C: 2B       [20]     	dec	hl
+009D: 13       [26]     	inc	de
+009E: 0B       [32]     	dec	bc
+009F: 78       [36]     	ld	a, b
+00A0: B1       [40]     	or	c
+00A1: 20F7     [47|52]  	jr	nz, b2
                         
-00D1: 160A     [ 7]     pause:	ld	d, 10
+00A3: 160A     [ 7]     pause:	ld	d, 10
                         
-00D3: 01FFFF   [10]     b4:	ld	bc, 65535
-00D6: 0B       [ 6]     b3:	dec	bc
-00D7: 78       [10]     	ld	a, b
-00D8: B1       [14]     	or	c
-00D9: 20FB     [21|26]  	jr	nz, b3
+00A5: 01FFFF   [10]     b4:	ld	bc, 65535
+00A8: 0B       [ 6]     b3:	dec	bc
+00A9: 78       [10]     	ld	a, b
+00AA: B1       [14]     	or	c
+00AB: 20FB     [21|26]  	jr	nz, b3
                         
-00DB: 15       [25]     	dec	d
-00DC: 20F5     [32|37]  	jr	nz, b4
+00AD: 15       [25]     	dec	d
+00AE: 20F5     [32|37]  	jr	nz, b4
                         
-00DE: 188D     [44]     	jr	start
-00E0: 18FE     [56]     	jr	$
+00B0: 18BB     [44]     	jr	start
+00B2: 18FE     [56]     	jr	$
                         
+                        
+                        ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                        ; send_char - write the character in B to the uart
+                        ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                        
+00B4:                   send_char:
+                        
+00B4: 2105C0   [10]     	ld	hl, uart + 5
+00B7: 7E       [17]     	ld	a, (hl)
+00B8: CB77     [25]     	bit	6, a
+00BA: 28F8     [32|37]  	jr	z, send_char ; wait for the uart to be ready
+                        
+00BC: 2100C0   [42]     	ld	hl, uart
+00BF: 70       [49]     	ld	(hl), b
+                        
+00C0: C9       [59]     	ret
+                        
+                        ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                        
+                        ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                        ; set_baud - set the baud rate based on the dip switches
+                        ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                        
+00C1:                   set_baud:
+                        
+                        	; read dip switches into de
+00C1: 2110C0   [10]     	ld	hl, dipSW
+00C4: 1600     [17]     	ld	d, 0
+00C6: 5E       [24]     	ld	e, (hl)
+                        
+                        	; point to the correct entry
+00C7: 21E300   [34]     	ld	hl, baud_table
+00CA: 19       [45]     	add	hl, de
+00CB: 19       [56]     	add	hl, de
+                        
+                        	; load the entry into bc
+00CC: 7E       [63]     	ld	a, (hl)
+00CD: 23       [69]     	inc	hl
+00CE: 46       [76]     	ld	b, (hl)
+00CF: 4F       [80]     	ld	c, a
+                        
+                        	; unlock divisor registers
+00D0: 2103C0   [90]     	ld	hl, uart + 3
+00D3: 3E80     [97]     	ld	a, 0x80
+00D5: 77       [104]    	ld	(hl), a
+                        
+                        	; write the baud rate divisor
+00D6: 2100C0   [114]    	ld	hl, uart
+00D9: 71       [121]    	ld	(hl), c
+                        
+00DA: 23       [127]    	inc	hl
+00DB: 70       [134]    	ld	(hl), b
+                        
+                        	; lock divisor registers and set 8 bit data, no parity, one stop bit.
+00DC: 2103C0   [144]    	ld	hl, uart + 3
+00DF: 3E03     [151]    	ld	a, 0x03
+00E1: 77       [158]    	ld	(hl), a
+                        
+00E2: C9       [168]    	ret
+                        
+00E3:                   baud_table:
+00E3: A21C              	.DW	7330	; sw=0 for 110 baud
+00E5: 800A              	.DW	2688	; sw=1 for 300 baud
+00E7: 4005              	.DW	1344	; sw=2 for 600 baud
+00E9: A002              	.DW	672	; sw=3 for 1200 baud
+00EB: 5001              	.DW	336	; sw=4 for 2400 baud
+00ED: A800              	.DW	168	; sw=5 for 4800 baud
+00EF: 5400              	.DW	84	; sw=6 for 9600 baud
+00F1: 2A00              	.DW	42	; sw=7 for 19200 baud
+00F3: 1500              	.DW	21	; sw=8 for 38400 baud
+00F5: 0E00              	.DW	14	; sw=9 for 57600 baud
+00F7: 0700              	.DW	7	; sw=10 for 115200 baud
+                        
+                        ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
 ; +++ segments +++
@@ -161,34 +191,35 @@ C000:                   uart	equ 0xc000
 
 ; +++ global symbols +++
 
-NMI      = $0066 =   102  ROM     terminal_fw.asm:37 (unused)
-ROM      = $0000 =     0  ROM     terminal_fw.asm:3 (unused)
-ROM_end  = $4000 = 16384  ROM     terminal_fw.asm:3 (unused)
-ROM_size = $4000 = 16384  ROM     terminal_fw.asm:3 (unused)
-RST0     = $0000 =     0  ROM     terminal_fw.asm:10 (unused)
-RST1     = $0008 =     8  ROM     terminal_fw.asm:15 (unused)
-RST2     = $0010 =    16  ROM     terminal_fw.asm:18 (unused)
-RST3     = $0018 =    24  ROM     terminal_fw.asm:21 (unused)
-RST4     = $0020 =    32  ROM     terminal_fw.asm:24 (unused)
-RST5     = $0028 =    40  ROM     terminal_fw.asm:27 (unused)
-RST6     = $0030 =    48  ROM     terminal_fw.asm:30 (unused)
-RST7     = $0038 =    56  ROM     terminal_fw.asm:33 (unused)
-again    = $00B6 =   182  ROM     terminal_fw.asm:108
-b2       = $00C8 =   200  ROM     terminal_fw.asm:120
-b3       = $00D6 =   214  ROM     terminal_fw.asm:132
-b4       = $00D3 =   211  ROM     terminal_fw.asm:131
-back     = $00BF =   191  ROM     terminal_fw.asm:117 (unused)
-mover    = $00AD =   173  ROM     terminal_fw.asm:105 (unused)
-pause    = $00D1 =   209  ROM     terminal_fw.asm:129 (unused)
-ram      = $4000 = 16384  ROM     terminal_fw.asm:6
-rom      = $0000 =     0  ROM     terminal_fw.asm:5 (unused)
-start    = $006D =   109  ROM     terminal_fw.asm:44
-uart     = $C000 = 49152  ROM     terminal_fw.asm:8
-video    = $8000 = 32768  ROM     terminal_fw.asm:7
-wait1    = $0089 =   137  ROM     terminal_fw.asm:79
-wait2    = $0097 =   151  ROM     terminal_fw.asm:89
-wait3    = $00A5 =   165  ROM     terminal_fw.asm:99
+NMI        = $0066 =   102  ROM     terminal_fw.asm:38 (unused)
+ROM        = $0000 =     0  ROM     terminal_fw.asm:3 (unused)
+ROM_end    = $4000 = 16384  ROM     terminal_fw.asm:3 (unused)
+ROM_size   = $4000 = 16384  ROM     terminal_fw.asm:3 (unused)
+RST0       = $0000 =     0  ROM     terminal_fw.asm:11 (unused)
+RST1       = $0008 =     8  ROM     terminal_fw.asm:16 (unused)
+RST2       = $0010 =    16  ROM     terminal_fw.asm:19 (unused)
+RST3       = $0018 =    24  ROM     terminal_fw.asm:22 (unused)
+RST4       = $0020 =    32  ROM     terminal_fw.asm:25 (unused)
+RST5       = $0028 =    40  ROM     terminal_fw.asm:28 (unused)
+RST6       = $0030 =    48  ROM     terminal_fw.asm:31 (unused)
+RST7       = $0038 =    56  ROM     terminal_fw.asm:34 (unused)
+again      = $0088 =   136  ROM     terminal_fw.asm:64
+b2         = $009A =   154  ROM     terminal_fw.asm:76
+b3         = $00A8 =   168  ROM     terminal_fw.asm:88
+b4         = $00A5 =   165  ROM     terminal_fw.asm:87
+back       = $0091 =   145  ROM     terminal_fw.asm:73 (unused)
+baud_table = $00E3 =   227  ROM     terminal_fw.asm:159
+dipSW      = $C010 = 49168  ROM     terminal_fw.asm:9
+mover      = $007F =   127  ROM     terminal_fw.asm:61 (unused)
+pause      = $00A3 =   163  ROM     terminal_fw.asm:85 (unused)
+ram        = $4000 = 16384  ROM     terminal_fw.asm:6
+rom        = $0000 =     0  ROM     terminal_fw.asm:5 (unused)
+send_char  = $00B4 =   180  ROM     terminal_fw.asm:104
+set_baud   = $00C1 =   193  ROM     terminal_fw.asm:122
+start      = $006D =   109  ROM     terminal_fw.asm:45
+uart       = $C000 = 49152  ROM     terminal_fw.asm:8
+video      = $8000 = 32768  ROM     terminal_fw.asm:7
 
 
-total time: 0.0009 sec.
+total time: 0.0032 sec.
 no errors
