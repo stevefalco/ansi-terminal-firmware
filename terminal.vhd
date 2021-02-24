@@ -267,8 +267,8 @@ begin
 		port map
 		(
 			inclk0 => CLK12M,
-			c0 => dotClock,		-- 25.2 MHz
-			c1 => cpuClock		-- 14 MHz
+			c0 => dotClock,		-- 25.170732 MHz
+			c1 => cpuClock		-- 12.900000 MHz
 		);
 
 	-- Reset all counters, registers, etc.
