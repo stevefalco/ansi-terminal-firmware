@@ -93,6 +93,14 @@ b3:	dec	bc
 	jr	$
 
 isr:
+	; See what caused this interrupt.  It could be the keyboard,
+	; the uart, or both.
+	;
+	; Check the uart.  The routine will read any available data
+	; and clear the interrupt.
+	call	uart_test_interrupt
+
+	ret
 
 #data RAM
 screen_buffer:

@@ -30,6 +30,9 @@ uart_IER_EDSSI_v	equ (1 << uart_IER_EDSSI_b)
 ; IER convenience
 uart_IER_INIT		equ (uart_IER_ERBFI_v)
 
+; IIR
+uart_IIR_PENDING_b	equ 0				; Interrupt pending when 0
+
 ; FCR
 uart_FCR_FEN_b		equ 0				; FIFO Enable
 uart_FCR_RFR_b		equ 1				; Receive FIFO Reset
@@ -86,6 +89,34 @@ uart_LSR_THRE_v		equ (1 << uart_LSR_THRE_b)
 
 ; Baud rate dip switches
 dipSW			equ 0xc010
+
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; uart_test_interrupt - see if the uart has posted an interrupt
+;
+; This runs from the interrupt service routine with interrupts disabled.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+uart_test_interrupt:
+
+	; (Bit_0 = 1) means no interrupt
+	ld	a, (uart_IIR)
+	bit	uart_IIR_PENDING_b, a
+	jp	nz, uart_test_interrupt_done
+
+	; Read characters and store them until the uart is empty.  This
+	; is ugly because we really cannot tell how much data is in the
+	; fifo.  However, we have set the threshold to "1", so when the
+	; interrupt clears, the fifo must be empty.  If we had set any
+	; other threshold, we'd have to burst "threshold" characters out.
+	; We couldn't use the interrupt flag, because it would clear as
+	; soon as we went below threshold, which would leave some characters
+	; in the fifo.  With threshold = 1, that cannot happen.
+	call	uart_store_char
+	jp	uart_test_interrupt
+
+uart_test_interrupt_done:
+	ret
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
