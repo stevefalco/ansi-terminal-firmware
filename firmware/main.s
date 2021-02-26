@@ -99,4 +99,4 @@ b3:	dec	bc
 	jr	mover
 	jr	$
 
-#include "uart.asm"
+#include "uart.s"
