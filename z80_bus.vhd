@@ -10,6 +10,7 @@ entity z80_bus is
 		cpuData		: inout std_logic_vector (7 downto 0);
 		cpuRden		: in std_logic;
 		cpuWren		: in std_logic;
+		cpuInt_n	: out std_logic;
 
 		-- CPU ROM Interface
 		cpuRomQ		: in std_logic_vector (7 downto 0);
@@ -26,6 +27,7 @@ entity z80_bus is
 		cpuUartCS	: out std_logic;
 		cpuUartWR	: out std_logic;
 		cpuUartQ	: in std_logic_vector (7 downto 0);
+		cpuUartInt	: in std_logic;
 
 		-- DIP Switch Interface
 		cpuDipQ		: in std_logic_vector (3 downto 0)
@@ -87,6 +89,15 @@ begin
 			when others =>
 				null;
 		end case;
+	end process;
+
+	z80_int_process: process(all)
+	begin
+		if(cpuUartInt = '1') then
+			cpuInt_n <= '0';
+		else
+			cpuInt_n <= '1';
+		end if;
 	end process;
 
 end a;

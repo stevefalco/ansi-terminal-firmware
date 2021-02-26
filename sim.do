@@ -58,7 +58,9 @@ add wave /testbench/term/nHALT
 add wave /testbench/term/nBUSACK
 add wave /testbench/term/UART_RX
 add wave /testbench/term/UART_TX
-add wave /testbench/term/uart/*
+add wave /testbench/term/cpuUartInt
+
+#add wave /testbench/term/uart/*
 #add wave /testbench/term/z80CPU/*
 
 run 40ms

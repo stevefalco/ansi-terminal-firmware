@@ -143,6 +143,7 @@ architecture a of terminal is
 			cpuData		: inout std_logic_vector (7 downto 0);
 			cpuRden		: in std_logic;
 			cpuWren		: in std_logic;
+			cpuInt_n	: out std_logic;
 
 			-- CPU ROM Interface
 			cpuRomQ		: in std_logic_vector (7 downto 0);
@@ -159,6 +160,7 @@ architecture a of terminal is
 			cpuUartCS	: out std_logic;
 			cpuUartWR	: out std_logic;
 			cpuUartQ	: in std_logic_vector (7 downto 0);
+			cpuUartInt	: in std_logic;
 
 			-- DIP Switch Interface
 			cpuDipQ		: in std_logic_vector (3 downto 0)
@@ -207,6 +209,7 @@ architecture a of terminal is
 
 	signal cpuAddrBus		: std_logic_vector (15 downto 0);
 	signal cpuDataBus		: std_logic_vector (7 downto 0);
+	signal cpuInt_n			: std_logic;
 
 	signal cpuRomQ			: std_logic_vector (7 downto 0);
 
@@ -216,6 +219,7 @@ architecture a of terminal is
 	signal cpuUartCS		: std_logic;
 	signal cpuUartWR		: std_logic;
 	signal cpuUartQ			: std_logic_vector (7 downto 0);
+	signal cpuUartInt		: std_logic;
 
 	type resetFSM_type is (
 		resetIdle_state,
@@ -339,7 +343,7 @@ begin
 			nBUSACK => nBUSACK,
 
 			nWAIT => '1',
-			nINT => '1',
+			nINT => cpuInt_n,
 			nNMI => '1',
 			nRESET => cpuClearD1_n,
 			nBUSRQ => '1',
@@ -379,6 +383,7 @@ begin
 			ADD => cpuAddrBus(2 downto 0),
 			D => cpuDataBus,
 			RD => cpuUartQ,
+			IRQ => cpuUartInt,
 
 			-- serial interface
 			sRX => UART_RX,
@@ -399,6 +404,7 @@ begin
 			cpuData => cpuDataBus,
 			cpuRden => nRD,
 			cpuWren => nWR,
+			cpuInt_n => cpuInt_n,
 
 			-- CPU ROM Interface
 			cpuRomQ => cpuRomQ,
@@ -415,6 +421,7 @@ begin
 			cpuUartCS => cpuUartCS,
 			cpuUartWR => cpuUartWR,
 			cpuUartQ => cpuUartQ,
+			cpuUartInt => cpuUartInt,
 			
 			-- DIP Switch Interface
 			cpuDipQ => DIP_SW
