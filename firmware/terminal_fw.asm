@@ -117,7 +117,7 @@ RST5:	ret
 RST6:	ret
 
 	defs	0x38-$
-RST7:	ei
+RST7:	;ei
 	ret
 
 	defs	0x66-$
@@ -129,7 +129,12 @@ NMI:	ld	a, i
 	ret
 
 start:
+	im	1
+
 	call	uart_initialize
+
+	; Ready for interrupts
+	ei
 
 	; write char
 	ld	b, 0x29
