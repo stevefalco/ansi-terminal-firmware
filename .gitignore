@@ -9,3 +9,6 @@ timing/
 testbench/
 greybox_tmp
 *_sim/
+
+firmware/*.list
+firmware/*.rom
