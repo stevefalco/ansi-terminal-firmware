@@ -28,7 +28,7 @@ uart_IER_ELSI_v		equ (1 << uart_IER_ELSI_b)
 uart_IER_EDSSI_v	equ (1 << uart_IER_EDSSI_b)
 
 ; IER convenience
-uart_IER_INIT		equ (uart_IER_ERBFI_v | uart_IER_ETBEI_v | uart_IER_ELSI_v | uart_IER_EDSSI_v)
+uart_IER_INIT		equ (uart_IER_ERBFI_v)
 
 ; FCR
 uart_FCR_FEN_b		equ 0				; FIFO Enable
@@ -87,6 +87,70 @@ uart_LSR_THRE_v		equ (1 << uart_LSR_THRE_b)
 ; Baud rate dip switches
 dipSW			equ 0xc010
 
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; uart_store_char - store a character in the receive buffer
+;
+; This runs from the interrupt service routine with interrupts disabled.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+uart_store_char:
+
+	; See if there is room in the buffer
+	ld	a, (uart_rb_count)
+	sub	128
+	jp	P, uart_store_char_no_room
+
+	; Find the place to store the character.  We use a tricky
+	; way to add an 8 and 16 bit register together.
+	ld	a, (uart_rb_input)	; offset into buffer
+	ld	hl, uart_rb		; start of buffer
+	add	a, l			; a = a + l
+	ld	l, a			; l = a + l
+	adc	a, h			; a = a + l + h + carry
+	sub	l			; a = a + h + carry
+	ld	h, a			; h = h + carry
+	ld	a, (uart_RBR)		; read from the uart
+	ld	(hl), a			; store the character
+
+	; Increment the count
+	ld	a, (uart_rb_count)
+	inc	a
+	ld	(uart_rb_count), a
+
+	; Bump the input pointer for next time.
+	ld	a, (uart_rb_input)
+	inc	a
+	and	0x7f			; keep it in range
+	ld	(uart_rb_input), a
+
+uart_store_char_no_room:
+	ret
+
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; uart_receive - receive characters and place them in a circular buffer
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+uart_receive:
+
+	ret
+
+#data RAM
+uart_rb:
+	ds	128
+uart_rb_end:
+
+uart_rb_input:
+	ds	1
+
+uart_rb_output:
+	ds	1
+
+uart_rb_count:
+	ds	1
+
+#code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; uart_transmit - transmit the character in register B
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -103,12 +167,19 @@ uart_transmit:
 
 	ret
 
+#code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; uart_initialize - get the uart ready
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 uart_initialize:
 	
+	; Clear the receive buffer
+	xor	a
+	ld	(uart_rb_input), a
+	ld	(uart_rb_output), a
+	ld	(uart_rb_count), a
+
 	; Set an initial baud rate
 	call	uart_set_baud
 
@@ -128,13 +199,16 @@ uart_initialize:
 	ld	a, uart_MCR_INIT
 	ld	(hl), a
 
-	; Enable interrupts
+	; Enable interrupt - we really only care about received characters
+	; because we assume we can't type fast enough to overrun the tx
+	; buffer.
 	ld	hl, uart_IER
 	ld	a, uart_IER_INIT
 	ld	(hl), a
 	
 	ret
 
+#code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; uart_set_baud - set the baud rate based on the dip switches
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

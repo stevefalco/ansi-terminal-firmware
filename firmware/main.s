@@ -1,39 +1,32 @@
 #target rom
 
 #code ROM, 0x0000, 0x4000
+#data RAM, 0x4000, 0x4000
 
-rom			equ 0x0000
 ram			equ 0x4000
 video			equ 0x8000
 
-RST0:	di
-	ld	sp, $7fff
+#code ROM
+
+rst0:	; at address 0x0000
+	di
+	ld	sp, $8000	; stack pre-decrements, grows down
 	jp	start
 
-	defs	0x08-$
-RST1:	ret
+	defs	0x38-$, $00
+isr38:	; at address 0x0038
+	di			; block interrupts while in handler
+	ex	af, af'		; exchange a & f with their shadows
+	exx			; exchange bc, de, and hl with their shadows
+	call	isr		; call our handler
+	exx			; restore bc, de, and hl
+	ex	af, af'		; restore a & f
+	ei			; re-enable interrupts
+	ret			; and go back to where we were
 
-	defs	0x10-$
-RST2:	ret
-
-	defs	0x18-$
-RST3:	ret
-
-	defs	0x20-$
-RST4:	ret
-
-	defs	0x28-$
-RST5:	ret
-
-	defs	0x30-$
-RST6:	ret
-
-	defs	0x38-$
-RST7:	;ei
-	ret
-
-	defs	0x66-$
-NMI:	ld	a, i
+	defs	0x66-$, $00
+nmi:	; at address 0x0066
+	ld	a, i
 	push	af
 	pop	af
 	ret	po
@@ -41,7 +34,7 @@ NMI:	ld	a, i
 	ret
 
 start:
-	im	1
+	im	1		; interrupt mode=1, all ISRs go to 0x38
 
 	call	uart_initialize
 
@@ -61,8 +54,8 @@ start:
 	;call	uart_transmit
 
 	; move bytes around
-mover:	ld	bc, 1920
-	ld	de, ram
+mover:	ld	bc, screen_buffer_end - screen_buffer
+	ld	de, screen_buffer
 	ld	hl, video
 again:	ld	a, (hl)
 	ld	(de), a
@@ -73,9 +66,9 @@ again:	ld	a, (hl)
 	or	c
 	jr	nz, again
 
-back:	ld	bc, 1920
+back:	ld	bc, screen_buffer_end - screen_buffer
 	ld	de, video
-	ld	hl, ram + 1919
+	ld	hl, screen_buffer_end - 1
 b2:	ld	a, (hl)
 	ld	(de), a
 	dec	hl
@@ -98,5 +91,12 @@ b3:	dec	bc
 
 	jr	mover
 	jr	$
+
+isr:
+
+#data RAM
+screen_buffer:
+	ds	1920
+screen_buffer_end:
 
 #include "uart.s"
