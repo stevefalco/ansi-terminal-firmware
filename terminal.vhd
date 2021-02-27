@@ -218,7 +218,8 @@ architecture a of terminal is
 
 	signal cpuUartCS		: std_logic;
 	signal cpuUartWR		: std_logic;
-	signal cpuUartQ			: std_logic_vector (7 downto 0);
+	signal cpuUartQ_D0		: std_logic_vector (7 downto 0);
+	signal cpuUartQ_D1		: std_logic_vector (7 downto 0);
 	signal cpuUartInt		: std_logic;
 
 	type resetFSM_type is (
@@ -382,7 +383,7 @@ begin
 			WR => cpuUartWR,
 			ADD => cpuAddrBus(2 downto 0),
 			D => cpuDataBus,
-			RD => cpuUartQ,
+			RD => cpuUartQ_D0,
 			IRQ => cpuUartInt,
 
 			-- serial interface
@@ -395,6 +396,16 @@ begin
 			RIn => '0',  -- ring indicator, active low
 			DCDn => '0' -- dcd, active low
 		);
+
+	-- CPU puts address out on falling edge.  It then reads on the
+	-- second rising edge, so we need to delay the uart data one
+	-- cycle to compensate.
+	uartDelay: process(cpuClock)
+	begin
+		if (rising_edge(cpuClock)) then
+			cpuUartQ_D1 <= cpuUartQ_D0;
+		end if;
+	end process;
 
 	-- Z80 Bus
 	z80Bus: z80_bus
@@ -420,7 +431,7 @@ begin
 			-- UART Interface
 			cpuUartCS => cpuUartCS,
 			cpuUartWR => cpuUartWR,
-			cpuUartQ => cpuUartQ,
+			cpuUartQ => cpuUartQ_D1,
 			cpuUartInt => cpuUartInt,
 			
 			-- DIP Switch Interface

@@ -92,6 +92,55 @@ dipSW			equ 0xc010
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; uart_receive - get a character from the receiver queue
+;
+; We have to disable interrupts for mutual exclusion with the
+; uart_test_interrupt routine.
+;
+; Return the character in the B register, or -1 if nothing
+; available.
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+uart_receive:
+	di
+
+	; Assume nothing available.
+	ld	b, -1
+
+	; See if there is something in the buffer
+	ld	a, (uart_rb_count)
+	or	a
+	jp	Z, uart_get_char_none
+
+	; Find the place to get the character.  We use a tricky
+	; way to add an 8 and 16 bit register together.
+	ld	a, (uart_rb_output)	; offset into buffer
+	ld	hl, uart_rb		; start of buffer
+	add	a, l			; a = a + l
+	ld	l, a			; l = a + l
+	adc	a, h			; a = a + l + h + carry
+	sub	l			; a = a + h + carry
+	ld	h, a			; h = h + carry
+	ld	b, (hl)			; read from the buffer
+
+	; Decrement the count.
+	ld	a, (uart_rb_count)
+	dec	a
+	ld	(uart_rb_count), a
+
+	; Bump the output pointer for next time.
+	ld	a, (uart_rb_output)
+	inc	a
+	and	0x7f			; keep it in range
+	ld	(uart_rb_output), a
+
+uart_get_char_none:
+	ei
+	ret
+
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; uart_test_interrupt - see if the uart has posted an interrupt
 ;
 ; This runs from the interrupt service routine with interrupts disabled.
@@ -156,15 +205,6 @@ uart_store_char:
 	ld	(uart_rb_input), a
 
 uart_store_char_no_room:
-	ret
-
-#code ROM
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; uart_receive - receive characters and place them in a circular buffer
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-uart_receive:
-
 	ret
 
 #data RAM
@@ -291,4 +331,91 @@ baud_table:
 	.DW	21	; sw=8 for 38400 baud
 	.DW	14	; sw=9 for 57600 baud
 	.DW	7	; sw=10 for 115200 baud
+
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; uart_printf - print the string pointed to by hl
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+uart_printf:
+
+	ld	a, (hl)
+	or	a		; set flags
+	jr	Z, uart_printf_done
+
+	ld	b, a
+
+	push	hl
+	call	uart_transmit
+	pop	hl
+	inc	hl
+
+	jr	uart_printf
+
+uart_printf_done:
+	ret
+
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; uart_print_hex_nibble - print the hex value of the lower 4 bits in register B
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+uart_print_hex_nibble:
+
+	ld	a, b
+	and	a, 0xf
+
+	; Is it >= 0xa
+	cp	0xa
+	jp	P, uart_print_hex_nibble_ge
+
+	add	a, '0'
+	jr	uart_print_hex_nibble_ready
+
+uart_print_hex_nibble_ge:
+	add	a, 'A' - 0xa
+
+uart_print_hex_nibble_ready:
+	ld	b, a
+	call	uart_transmit
+
+	ret
+
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; uart_print_hex - print the hex value in register B
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+uart_print_hex:
+
+	ld	a, b
+	ld	c, b
+
+	; Get high nibble
+	rr	a
+	rr	a
+	rr	a
+	rr	a
+	ld	b, a
+	call	uart_print_hex_nibble
+
+	; Get low nibble
+	ld	b, c
+	call	uart_print_hex_nibble
+
+	ret
+
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; uart_print_eol - print CR-LF
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+uart_print_eol:
+	ld	b, 0x0d
+	call	uart_transmit
+
+	ld	b, 0x0a
+	call	uart_transmit
+
+	ret
 

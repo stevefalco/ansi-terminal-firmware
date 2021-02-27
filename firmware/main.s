@@ -36,6 +36,24 @@ nmi:	; at address 0x0066
 start:
 	im	1		; interrupt mode=1, all ISRs go to 0x38
 
+	; Simulator wants everything cleared.
+	ld	a, 0
+	ex	af, af'
+	ld	a, 0
+	ex	af, af'
+
+	ld	bc, 0
+	ld	de, 0
+	ld	hl, 0
+	exx
+	ld	bc, 0
+	ld	de, 0
+	ld	hl, 0
+	exx
+
+	ld	ix, 0
+	ld	iy, 0
+	
 	call	uart_initialize
 
 	; Ready for interrupts
@@ -44,14 +62,7 @@ start:
 	; write char
 	ld	b, 0x29
 	call	uart_transmit
-
-	; write char
-	;ld	b, 0x55
-	;call	uart_transmit
-
-	; write char
-	;ld	b, 0xaa
-	;call	uart_transmit
+	jp	looper
 
 	; move bytes around
 mover:	ld	bc, screen_buffer_end - screen_buffer
@@ -89,6 +100,25 @@ b3:	dec	bc
 	dec	d
 	jr	nz, b4
 
+looper:
+	; loopback test
+	call	uart_receive
+
+	; ld	d, b
+	;ld	hl, str
+	;call	uart_printf
+	;ld	b, d
+	;call	uart_print_hex
+	;call	uart_print_eol
+	; ld	b, d
+
+	ld	a, b
+	cpl			; -1 means nothing available
+	or	a
+	jp	Z, nothing_read
+	call	uart_transmit
+nothing_read:
+
 	jr	mover
 	jr	$
 
@@ -101,6 +131,9 @@ isr:
 	call	uart_test_interrupt
 
 	ret
+
+str:
+	.asciz "got "
 
 #data RAM
 screen_buffer:

@@ -60,7 +60,51 @@ add wave /testbench/term/UART_RX
 add wave /testbench/term/UART_TX
 add wave /testbench/term/cpuUartInt
 
-#add wave /testbench/term/uart/*
+add wave /testbench/term/uart/*
 #add wave /testbench/term/z80CPU/*
+
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_af_hi/db
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_af_lo/db
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_bc_hi/db
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_bc_lo/db
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_de_hi/db
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_de_lo/db
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_hl_hi/db
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_hl_lo/db
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_pc_hi/db
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_pc_lo/db
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_sp_hi/db
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_sp_lo/db
+
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_af_hi/latch
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_af_lo/latch
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_bc_hi/latch
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_bc_lo/latch
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_de_hi/latch
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_de_lo/latch
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_hl_hi/latch
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_hl_lo/latch
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_pc_hi/latch
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_pc_lo/latch
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_sp_hi/latch
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_sp_lo/latch
+
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_af2_hi/db
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_af2_lo/db
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_bc2_hi/db
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_bc2_lo/db
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_de2_hi/db
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_de2_lo/db
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_hl2_hi/db
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_hl2_lo/db
+
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_af2_hi/latch
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_af2_lo/latch
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_bc2_hi/latch
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_bc2_lo/latch
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_de2_hi/latch
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_de2_lo/latch
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_hl2_hi/latch
+add wave /testbench/term/z80CPU/reg_file_/b2v_latch_hl2_lo/latch
 
 run 40ms
