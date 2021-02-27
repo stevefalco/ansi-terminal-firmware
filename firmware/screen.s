@@ -166,6 +166,29 @@ screen_handle_ff:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 screen_handle_cr:
+
+	; Blank out the existing cursor.
+	ld	hl, (screen_cursor_location)
+	ld	(hl), char_space
+	
+	; Find what line we are on.  The call returns 0 to 23 in register A.
+	call	screen_cursor_in_line
+
+	; Bump A so we can use sub below.
+	add	a, 1
+	ld	hl, screen_base - screen_line
+	ld	bc, screen_line
+
+screen_handle_cr_again:
+	add	hl, bc
+	sub	1
+	jr	NZ, screen_handle_cr_again
+
+screen_handle_cr_found:
+	; HL contains first byte of the line.  Put the cursor there.
+	ld	(hl), char_del
+	ld	(screen_cursor_location), hl
+
 	ret
 
 #code ROM
@@ -228,9 +251,44 @@ screen_initialize_loop:
 
 	ret
 
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; screen_cursor_in_line - figure out which line the cursor is in.
+;
+; Result in register A
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+screen_cursor_in_line:
+
+	xor	a				; Clear register A
+
+	; Start at the beginning.
+	ld	de, screen_line
+	ld	hl, screen_base
+	ld	bc, (screen_cursor_location)
+
+	; Save the screen base for use in the loop.
+	push	hl
+
+screen_cursor_in_line_again:
+	; Calculate the end of a line and place it into hl.
+	pop	hl
+	add	hl, de				; Side effect: clears carry for sbc below.
+	push	hl
+
+	; See if we are past it.
+	sbc	hl, bc				; Will set borrow if bc > hl
+	jr	NC, screen_cursor_in_line_found	; No borrow.  Cursor is in this line.
+
+	; Next line
+	inc	a
+	jr	screen_cursor_in_line_again
+
+screen_cursor_in_line_found:
+	ret
+
 #data RAM
 
 ; Pointer into video memory.
 screen_cursor_location:
 	ds	2
-
