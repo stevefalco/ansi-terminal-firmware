@@ -291,6 +291,31 @@ screen_cursor_in_line_again:
 	add	hl, de				; Side effect: clears carry for sbc below.
 	push	hl
 
+	push	bc
+	push	de
+	push	af
+	push	hl
+
+	ld	hl, eol_at
+	call	uart_printf
+
+	pop	hl
+	push	hl
+	ld	b, h
+	call	uart_print_hex
+
+	pop	hl
+	push	hl
+	ld	b, l
+	call	uart_print_hex
+
+	call	uart_print_eol
+
+	pop	hl
+	pop	af
+	pop	de
+	pop	bc
+
 	; See if we are past it.
 	sbc	hl, bc				; Will set borrow if bc > hl
 	jr	NC, screen_cursor_in_line_found	; No borrow.  Cursor is in this line.
@@ -300,7 +325,22 @@ screen_cursor_in_line_again:
 	jr	screen_cursor_in_line_again
 
 screen_cursor_in_line_found:
+
+	push	af
+	ld	hl, eol_val
+	call	uart_printf
+	pop	af
+	push	af
+	ld	b, a
+	call	uart_print_hex
+	call	uart_print_eol
+	call	uart_print_eol
+	pop	af
+
 	ret
+
+eol_at:		.asciz "eol "
+eol_val:	.asciz "val "
 
 #data RAM
 
