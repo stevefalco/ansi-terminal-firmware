@@ -79,7 +79,9 @@ screen_normal_char:
 	ld	(hl), b
 	inc	hl
 
-	; Paint a new cursor.
+	; Paint a new cursor, but first save whatever is there.
+	ld	a, (hl)
+	ld	(screen_char_under_cursor), a
 	ld	(screen_cursor_location), hl
 	ld	(hl), char_del
 
@@ -118,27 +120,35 @@ screen_handle_lf:
 	sbc	hl, bc			; will set borrow if bc > hl
 	jr	C, screen_lf_no_scroll
 
-	; We have to scroll up.  First, clear the old cursor.
+	; We have to scroll up.  First, put back whatever was under the cursor.
+	ld	a, (screen_char_under_cursor)
 	ld	hl, (screen_cursor_location)
-	ld	(hl), char_space
+	ld	(hl), a
 
 	; Now scroll up.
 	call	screen_scroll_up
 
-	; Finally, repaint the cursor.
+	; Finally, repaint the cursor.  The new line is blank, so save the
+	; space under the cursor.
 	ld	hl, (screen_cursor_location)
+	ld	a, (hl)
+	ld	(screen_char_under_cursor), a
 	ld	(hl), char_del
 
 	ret
 
 screen_lf_no_scroll:
 
-	; Just move the cursor.  First, clear under the cursor.
+	; Just move the cursor.  First, replace whatever was under the cursor.
+	ld	a, (screen_char_under_cursor)
 	ld	hl, (screen_cursor_location)
-	ld	(hl), char_space
+	ld	(hl), a
 
-	; Now paint a new cursor and save the location.
+	; Now save whatever is under the new cursor, and paint a cursor over it.
+	; And save the location.
 	ld	hl, de
+	ld	a, (hl)
+	ld	(screen_char_under_cursor), a
 	ld	(hl), char_del
 	ld	(screen_cursor_location), hl
 
@@ -167,9 +177,10 @@ screen_handle_ff:
 
 screen_handle_cr:
 
-	; Blank out the existing cursor.
+	; Replace the existing cursor with whatever should be under it.
+	ld	a, (screen_char_under_cursor)
 	ld	hl, (screen_cursor_location)
-	ld	(hl), char_space
+	ld	(hl), a
 	
 	; Find what line we are on.  The call returns 0 to 23 in register A.
 	call	screen_cursor_in_line
@@ -185,7 +196,9 @@ screen_handle_cr_again:
 	jr	NZ, screen_handle_cr_again
 
 screen_handle_cr_found:
-	; HL contains first byte of the line.  Put the cursor there.
+	; HL contains first byte of the line.  Save under, then put the cursor there.
+	ld	a, (hl)
+	ld	(screen_char_under_cursor), a
 	ld	(hl), char_del
 	ld	(screen_cursor_location), hl
 
@@ -246,7 +259,9 @@ screen_initialize_loop:
 	ld	hl, screen_base
 	ld	(screen_cursor_location), hl
 
-	; Put up a cursor.
+	; Put up a cursor with a space under it.
+	ld	a, (hl)
+	ld	(screen_char_under_cursor), a
 	ld	(hl), char_del
 
 	ret
@@ -292,3 +307,6 @@ screen_cursor_in_line_found:
 ; Pointer into video memory.
 screen_cursor_location:
 	ds	2
+
+screen_char_under_cursor:
+	ds	1
