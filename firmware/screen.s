@@ -350,20 +350,23 @@ screen_cursor_in_line:
 
 	; Start at the beginning.
 	ld	de, screen_line			; de = 80 chars per line
-	ld	hl, screen_base			; hl = base address of video
+	ld	hl, screen_base - 1		; hl = base address of video minus 1
 	ld	bc, (screen_cursor_location)	; bc = cursor address in video ram
 
 	; Save the screen base for use in the loop.
 	push	hl
 
 screen_cursor_in_line_again:
-	; Calculate the end of a line and place it into hl.
+	; Calculate the end of a line and place it into HL.  HL will contain
+	; the address of the end of the line, thus it should always refer to
+	; column 79.
 	pop	hl
 	add	hl, de				; Side effect: clears carry for sbc below.
 	push	hl
 
 	; See if we are past it.
-	sbc	hl, bc				; Will set borrow if bc > hl
+	sbc	hl, bc				; Will set borrow if bc > hl, meaning the
+						; cursor is past the end of this line.
 	jr	NC, screen_cursor_in_line_found	; No borrow.  Cursor is in this line.
 
 	; Next line
@@ -373,6 +376,7 @@ screen_cursor_in_line_again:
 screen_cursor_in_line_found:
 	; Undo the initial push.
 	pop	hl
+	call	show_a
 
 	ret
 
@@ -404,6 +408,8 @@ screen_cursor_start_of_line_again:
 	jr	NZ, screen_cursor_start_of_line_again
 
 	; HL contains pointer to the first byte of the line.
+	call	show_hl
+
 	ret
 
 #data RAM
