@@ -15,10 +15,6 @@ char_escape		equ 0x1b
 char_space		equ 0x20
 char_del		equ 0x7f
 
-; Escape state machine states.
-escape_none		equ 0x00
-escape_next		equ 0x01
-
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; screen_handler - read from the uart and update the screen
@@ -33,7 +29,7 @@ screen_handler:
 	; We first have to determine if we are collecting an escape
 	; sequence.
 	ld	a, (screen_escape_state)
-	cp	escape_none
+	cp	escape_none_state
 	ld	a, b
 	jp	NZ, screen_escape_handler	; We are handling an escape sequence.
 
@@ -279,7 +275,7 @@ screen_handle_escape:
 	;
 	; We have seen an escape character, so we now must wait for the next
 	; character to see what it means.
-	ld	a, escape_next
+	ld	a, escape_first_state
 	ld	(screen_escape_state), a
 	
 	ret
@@ -340,8 +336,9 @@ screen_initialize_loop:
 	ld	(hl), char_del
 
 	; Not handling an escape sequence.
-	xor	a
+	ld	a, escape_none_state
 	ld	(screen_escape_state), a
+	ld	(screen_group_0_digits), a
 
 	ret
 
@@ -420,6 +417,12 @@ screen_cursor_start_of_line_again:
 
 char_lsb		equ '['
 
+; Escape state machine states.
+escape_none_state	equ 0x00			; No escape yet
+escape_first_state	equ 0x01			; Need first char of sequence
+escape_csi_state	equ 0x02			; First char is '['
+escape_csi_d0_state	equ 0x03			; Accumulating first group of digits in CSI
+
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; screen_escape_handler - Run the escape state machine.
@@ -429,9 +432,81 @@ char_lsb		equ '['
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 screen_escape_handler:
-	cp	char_lsb
+
+	; FIXME
+	;
+	; Our UART returns 8-bit characters, but some documents suggest that
+	; escape sequence characters might have 0x40 added to them.  For example,
+	; a left square bracket might be 0x5b, or it might be 0x9b.  If that
+	; turns out to be the case, we may have to make an adjustment and handle
+	; both forms here...
+
+	; What state are we in?
+	ld	a, (screen_escape_state)
+	cp	escape_first_state
+	jr	Z, screen_escape_handler_first		; Got first char after escape
+
+	cp	escape_csi_state
+	jr	Z, screen_escape_handler_lsb		; Got first char after '['
+
+	; Eventually there will be more states above.  This is the catch-all,
+	; which we shouldn't ever hit.  So, clear the escape state and give
+	; up.
+	ld	a, escape_none_state
+	ld	(screen_escape_state), a
 	ret
 
+screen_escape_handler_first:
+
+	; This is the first character after an escape.
+	;
+	; Test for '[', the so-called CSI
+	ld	a, b
+	cp	char_lsb
+	jr	Z, screen_escape_handler_lsb
+
+	; Eventually there may be additional first chars.  This is the
+	; catch-all, which we shouldn't ever hit.  So, clear the escape
+	; state and give up.
+
+	ld	a, escape_none_state
+	ld	(screen_escape_state), a
+	ret
+
+screen_escape_handler_lsb:
+
+	; We have the first character after a '['.
+	;
+	; Many of the sequences now have a number, which may be multiple
+	; digits long.  If this is a digit, go to an "accumulating digits"
+	; state, until we see a non-digit.
+	ld	a, b
+	cp	'0'
+	jr	C, screen_bad_sequence			; < '0' character
+	cp	'9' + 1
+	jr	C, screen_got_group_0_digit		; <= '9' character
+
+	; > 9 is not something we handle yet
+
+screen_bad_sequence:
+
+	; This is not a sequence we handle yet.
+	ld	a, escape_none_state
+	ld	(screen_escape_state), a
+	ret
+
+screen_got_group_0_digit:
+
+	; We have a digit.  Go into the group 0 digits state.
+	ld	a, escape_csi_d0_state
+	ld	(screen_escape_state), a
+
+	; Save this digit.  First, multiply the previous digits, if any, by 10.
+	ld	a, (screen_group_0_digits)
+
+	ld	a, b
+	sub	'0'
+	
 #data RAM
 
 ; Pointer into video memory.
@@ -442,5 +517,8 @@ screen_char_under_cursor:
 	ds	1
 
 screen_escape_state:
+	ds	1
+
+screen_group_0_digits:
 	ds	1
 
