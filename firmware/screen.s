@@ -376,7 +376,6 @@ screen_cursor_in_line_again:
 screen_cursor_in_line_found:
 	; Undo the initial push.
 	pop	hl
-	call	show_a
 
 	ret
 
@@ -408,8 +407,6 @@ screen_cursor_start_of_line_again:
 	jr	NZ, screen_cursor_start_of_line_again
 
 	; HL contains pointer to the first byte of the line.
-	call	show_hl
-
 	ret
 
 #data RAM
