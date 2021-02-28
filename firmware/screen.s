@@ -183,7 +183,9 @@ screen_handle_cr:
 	ld	(hl), a
 	
 	; Find what line we are on.  The call returns 0 to 23 in register A.
+	push	af
 	call	screen_cursor_in_line
+	pop	af
 
 	; Bump A so we can use sub below.
 	add	a, 1
@@ -275,6 +277,15 @@ screen_initialize_loop:
 
 screen_cursor_in_line:
 
+	ld	hl, eol_cursor
+	call	uart_printf
+	ld	bc, (screen_cursor_location)
+	call	uart_print_hex
+	ld	bc, (screen_cursor_location)
+	ld	b, c
+	call	uart_print_hex
+	call	uart_print_eol
+
 	xor	a				; Clear register A
 
 	; Start at the beginning.
@@ -292,8 +303,8 @@ screen_cursor_in_line_again:
 	push	hl
 
 	push	bc
-	push	de
 	push	af
+	push	de
 	push	hl
 
 	ld	hl, eol_at
@@ -309,11 +320,28 @@ screen_cursor_in_line_again:
 	ld	b, l
 	call	uart_print_hex
 
+	ld	hl, eol_space
+	call	uart_printf
+
+	pop	hl
+	pop	de
+	push	de
+	push	hl
+	ld	b, d
+	call	uart_print_hex
+
+	pop	hl
+	pop	de
+	push	de
+	push	hl
+	ld	b, e
+	call	uart_print_hex
+
 	call	uart_print_eol
 
 	pop	hl
-	pop	af
 	pop	de
+	pop	af
 	pop	bc
 
 	; See if we are past it.
@@ -339,6 +367,8 @@ screen_cursor_in_line_found:
 
 	ret
 
+eol_cursor:	.asciz "cursor "
+eol_space:	.asciz " "
 eol_at:		.asciz "eol "
 eol_val:	.asciz "val "
 
