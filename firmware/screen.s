@@ -1,7 +1,9 @@
 ; Dual-ported video memory - 1920 bytes.
-screen_base		equ 0x8000
-screen_length		equ 1920
-screen_end		equ (screen_base + screen_length)
+screen_base		equ 0x8000				; Physical address
+screen_line		equ 80					; Length of one line
+screen_length		equ 1920				; Length of whole screen
+screen_end		equ (screen_base + screen_length)	; LWA+1
+screen_last_line_start	equ (screen_end - screen_line)		; Address of col=0, row=23
 
 char_bs			equ 0x08
 char_ht			equ 0x09
@@ -12,8 +14,6 @@ char_cr			equ 0x0d
 char_escape		equ 0x1b
 char_space		equ 0x20
 char_del		equ 0x7f
-
-screen_line		equ 80
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -79,6 +79,20 @@ screen_normal_char:
 	ld	(hl), b
 	inc	hl
 
+	; See if hl is now off screen.  If so, we must scroll up before
+	; placing the cursor.
+	push	hl				; Save potential new cursor position
+	or	a				; Clear carry
+	ld	bc, screen_end			; LWA+1 of screen memory
+	sbc	hl, bc				; Sets borrow if bc > hl
+	pop	hl				; Restore potential new cursor position
+	jr	C, screen_normal_char_new_cursor; The cursor is still on screen, use it
+
+	; The cursor is off the screen at LWA+1
+	call	screen_scroll_up		; Scroll up
+	ld	hl, screen_last_line_start	; Cursor now at col=0, row=23
+
+screen_normal_char_new_cursor:
 	; Paint a new cursor, but first save whatever is there.
 	ld	a, (hl)
 	ld	(screen_char_under_cursor), a
@@ -113,10 +127,10 @@ screen_handle_lf:
 	; line-feed means we move 80 characters forward, but if that would
 	; move us off the screen, then we have to scroll up one line.
 	ld	hl, (screen_cursor_location)
-	ld	bc, screen_line
+	ld	bc, screen_line		; bc = 80
 	add	hl, bc			; this will clear carry
 	ld	de, hl			; save the result
-	ld	bc, screen_end
+	ld	bc, screen_end		; LWA + 1
 	sbc	hl, bc			; will set borrow if bc > hl
 	jr	C, screen_lf_no_scroll
 
@@ -217,6 +231,9 @@ screen_handle_escape:
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; screen_scroll_up - scroll up one line
+;
+; Uses af, bc, de, hl
+;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 screen_scroll_up:
