@@ -107,6 +107,30 @@ screen_normal_char_new_cursor:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 screen_handle_bs:
+	
+	; We want to move the cursor backwards one position, but we cannot
+	; go before col=0, row=0.
+
+	; See if it is legal to move back.
+	or	a				; Clear carry
+	ld	hl, (screen_cursor_location)	; Current position
+	ld	bc, screen_base			; FWA
+	sbc	hl, bc				; Sets Z flag if hl == bc
+	jr	Z, screen_handle_bs_at_fwa	; Cannot move before FWA
+	
+	; Restore the character under the old cursor.
+	ld	a, (screen_char_under_cursor)
+	ld	hl, (screen_cursor_location)
+	ld	(hl), a
+
+	; Move back one position, save under the position, and draw the new cursor.
+	dec	hl
+	ld	a, (hl)
+	ld	(screen_char_under_cursor), a
+	ld	(screen_cursor_location), hl
+	ld	(hl), char_del
+
+screen_handle_bs_at_fwa:
 	ret
 
 #code ROM
