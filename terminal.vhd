@@ -139,6 +139,7 @@ architecture a of terminal is
 	component z80_bus
 		port (
 			-- CPU Interface.
+			cpuClock	: in std_logic;
 			cpuAddr		: in std_logic_vector (15 downto 0);
 			cpuData		: inout std_logic_vector (7 downto 0);
 			cpuRden		: in std_logic;
@@ -216,8 +217,6 @@ architecture a of terminal is
 	signal cpuRamWren		: std_logic;
 	signal cpuRamQ			: std_logic_vector (7 downto 0);
 
-	signal cpuUartCS_D0		: std_logic;
-	signal cpuUartCS_D1		: std_logic;
 	signal cpuUartCS		: std_logic;
 	signal cpuUartWR		: std_logic;
 	signal cpuUartQ			: std_logic_vector (7 downto 0);
@@ -398,18 +397,11 @@ begin
 			DCDn => '0' -- dcd, active low
 		);
 
-	uartDelay: process(cpuClock)
-	begin
-		if (falling_edge(cpuClock)) then
-			cpuUartCS_D1 <= cpuUartCS_D0;
-		end if;
-	end process;
-	cpuUartCS <= cpuUartCS_D0 and cpuUartCS_D1 when nRD = '0' else cpuUartCS_D0;
-
 	-- Z80 Bus
 	z80Bus: z80_bus
 		port map (
 			-- CPU Interface
+			cpuClock => cpuClock,
 			cpuAddr => cpuAddrBus,
 			cpuData => cpuDataBus,
 			cpuRden => nRD,
@@ -428,7 +420,7 @@ begin
 			videoRamQ => videoRamQ,
 
 			-- UART Interface
-			cpuUartCS => cpuUartCS_D0,
+			cpuUartCS => cpuUartCS,
 			cpuUartWR => cpuUartWR,
 			cpuUartQ => cpuUartQ,
 			cpuUartInt => cpuUartInt,

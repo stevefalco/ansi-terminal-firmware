@@ -59,12 +59,14 @@ add wave /testbench/term/nBUSACK
 add wave /testbench/term/UART_RX
 add wave /testbench/term/UART_TX
 add wave /testbench/term/cpuUartInt
-add wave /testbench/term/cpuUartCS_D0
-add wave /testbench/term/cpuUartCS_D1
 add wave /testbench/term/cpuUartCS
 add wave /testbench/term/cpuUartWR
 
+add wave /testbench/term/z80Bus/cpuUartCS_D0
+add wave /testbench/term/z80Bus/cpuUartCS_D1
+add wave /testbench/term/z80Bus/cpuUartCS
 add wave /testbench/term/uart/*
+
 #add wave /testbench/term/z80CPU/*
 
 add wave /testbench/term/z80CPU/reg_file_/b2v_latch_af_hi/db
