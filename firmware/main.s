@@ -8,7 +8,7 @@
 rst0:	; at address 0x0000
 	di
 	ld	sp, $8000	; stack pre-decrements, grows down
-	jp	start
+	jr	start
 
 	defs	0x38-$, $00
 isr38:	; at address 0x0038

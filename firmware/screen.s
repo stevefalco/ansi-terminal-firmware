@@ -15,6 +15,10 @@ char_escape		equ 0x1b
 char_space		equ 0x20
 char_del		equ 0x7f
 
+; Escape state machine states.
+escape_none		equ 0x00
+escape_next		equ 0x01
+
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; screen_handler - read from the uart and update the screen
@@ -24,10 +28,21 @@ screen_handler:
 	call	uart_receive
 	ld	a, b
 	cp	-1		; -1 means "nothing available"
-	jp	NZ, screen_handler_got_one
+	ret	Z		; No characters in our receive buffer.
+
+	; We first have to determine if we are collecting an escape
+	; sequence.
+	ld	a, (screen_escape_state)
+	cp	escape_none
+	jr	Z, screen_handler_normal
+
+	; We've seen an escape - what does this new character mean?
+	call	screen_escape_handler
 	ret
 
-screen_handler_got_one:
+screen_handler_normal:
+	; Not in an escape sequence, so treat it as a normal character.
+	ld	a, b
 
 	; Printing characters run from 0x20 through 0x7f.
 	cp	char_space
@@ -38,23 +53,25 @@ screen_handler_got_one:
 
 	; Is it a backspace?
 	cp	char_bs
-	jp	Z, screen_handle_bs
+	jr	Z, screen_handle_bs
 
 	; Is it a horizontal tab?
 	cp	char_ht
-	jp	Z, screen_handle_ht
+	jr	Z, screen_handle_ht
 
 	; Is it a line feed?
 	cp	char_lf
-	jp	Z, screen_handle_lf
+	jr	Z, screen_handle_lf
 
-	; Is it a vertical tab?
+	; Is it a vertical tab?  This is handled like a line-feed according to a
+	; VT102 document I found.
 	cp	char_vt
-	jp	Z, screen_handle_vt
+	jr	Z, screen_handle_lf
 
-	; Is it a form feed?
+	; Is it a form feed?  This is handled like a line-feed according to a
+	; VT102 document I found.
 	cp	char_ff
-	jp	Z, screen_handle_ff
+	jr	Z, screen_handle_lf
 
 	; Is it a carriage return?
 	cp	char_cr
@@ -233,22 +250,6 @@ screen_lf_no_scroll:
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; screen_handle_vt - handle a vertical tab
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-screen_handle_vt:
-	ret
-
-#code ROM
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; screen_handle_ff - handle a form feed
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-screen_handle_ff:
-	ret
-
-#code ROM
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; screen_handle_cr - handle a carriage return
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -277,6 +278,15 @@ screen_handle_cr:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 screen_handle_escape:
+
+	; An escape sequence is variable length.  We need a state-machine to
+	; keep track of where we are in a potential sequence.
+	;
+	; We have seen an escape character, so we now must wait for the next
+	; character to see what it means.
+	ld	a, escape_next
+	ld	(screen_escape_state), a
+	
 	ret
 
 #code ROM
@@ -333,6 +343,10 @@ screen_initialize_loop:
 	ld	a, (hl)
 	ld	(screen_char_under_cursor), a
 	ld	(hl), char_del
+
+	; Not handling an escape sequence.
+	xor	a
+	ld	(screen_escape_state), a
 
 	ret
 
@@ -409,6 +423,14 @@ screen_cursor_start_of_line_again:
 	; HL contains pointer to the first byte of the line.
 	ret
 
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; screen_escape_handler - Run the escape state machine.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+screen_escape_handler:
+	ret
+
 #data RAM
 
 ; Pointer into video memory.
@@ -417,3 +439,7 @@ screen_cursor_location:
 
 screen_char_under_cursor:
 	ds	1
+
+screen_escape_state:
+	ds	1
+

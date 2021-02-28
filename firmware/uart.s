@@ -111,7 +111,7 @@ uart_receive:
 	; See if there is something in the buffer
 	ld	a, (uart_rb_count)
 	or	a
-	jp	Z, uart_get_char_none
+	jr	Z, uart_get_char_none
 
 	; Find the place to get the character.  We use a tricky
 	; way to add an 8 and 16 bit register together.
@@ -151,7 +151,7 @@ uart_test_interrupt:
 	; (Bit_0 = 1) means no interrupt
 	ld	a, (uart_IIR)
 	bit	uart_IIR_PENDING_b, a
-	jp	nz, uart_test_interrupt_done
+	jr	NZ, uart_test_interrupt_done
 
 	; Read characters and store them until the uart is empty.  This
 	; is ugly because we really cannot tell how much data is in the
@@ -162,7 +162,7 @@ uart_test_interrupt:
 	; soon as we went below threshold, which would leave some characters
 	; in the fifo.  With threshold = 1, that cannot happen.
 	call	uart_store_char
-	jp	uart_test_interrupt
+	jr	uart_test_interrupt
 
 uart_test_interrupt_done:
 	ret
