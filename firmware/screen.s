@@ -34,16 +34,11 @@ screen_handler:
 	; sequence.
 	ld	a, (screen_escape_state)
 	cp	escape_none
-	jr	Z, screen_handler_normal
-
-	; We've seen an escape - what does this new character mean?
-	call	screen_escape_handler
-	ret
-
-screen_handler_normal:
-	; Not in an escape sequence, so treat it as a normal character.
 	ld	a, b
+	jp	NZ, screen_escape_handler	; We are handling an escape sequence.
 
+	; Not in an escape sequence, so treat it as a normal character.
+	;
 	; Printing characters run from 0x20 through 0x7f.
 	cp	char_space
 	jp	P, screen_normal_char	; Positive means >=
@@ -423,12 +418,18 @@ screen_cursor_start_of_line_again:
 	; HL contains pointer to the first byte of the line.
 	ret
 
+char_lsb		equ '['
+
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; screen_escape_handler - Run the escape state machine.
+;
+; New character is in both registers A and B
+;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 screen_escape_handler:
+	cp	char_lsb
 	ret
 
 #data RAM
