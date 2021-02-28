@@ -183,17 +183,17 @@ screen_handle_cr:
 	ld	(hl), a
 	
 	; Find what line we are on.  The call returns 0 to 23 in register A.
-	push	af
 	call	screen_cursor_in_line
-	pop	af
 
 	; Bump A so we can use sub below.
 	add	a, 1
-	ld	hl, screen_base - screen_line
-	ld	bc, screen_line
+	ld	hl, screen_base - screen_line		; hl = imaginary line before buffer
+	ld	bc, screen_line				; bc = 80
 
+	; We essentially need to add (A * 80) to hl.  Since there is no
+	; multiply instruction, we just repeatedly add.
 screen_handle_cr_again:
-	add	hl, bc
+	add	hl, bc					; hl = start of next line
 	sub	1
 	jr	NZ, screen_handle_cr_again
 
@@ -272,26 +272,18 @@ screen_initialize_loop:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; screen_cursor_in_line - figure out which line the cursor is in.
 ;
+; Uses af, bc, de, hl
+;
 ; Result in register A
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 screen_cursor_in_line:
-
-	ld	hl, eol_cursor
-	call	uart_printf
-	ld	bc, (screen_cursor_location)
-	call	uart_print_hex
-	ld	bc, (screen_cursor_location)
-	ld	b, c
-	call	uart_print_hex
-	call	uart_print_eol
-
 	xor	a				; Clear register A
 
 	; Start at the beginning.
-	ld	de, screen_line
-	ld	hl, screen_base
-	ld	bc, (screen_cursor_location)
+	ld	de, screen_line			; de = 80 chars per line
+	ld	hl, screen_base			; hl = base address of video
+	ld	bc, (screen_cursor_location)	; bc = cursor address in video ram
 
 	; Save the screen base for use in the loop.
 	push	hl
@@ -302,48 +294,6 @@ screen_cursor_in_line_again:
 	add	hl, de				; Side effect: clears carry for sbc below.
 	push	hl
 
-	push	bc
-	push	af
-	push	de
-	push	hl
-
-	ld	hl, eol_at
-	call	uart_printf
-
-	pop	hl
-	push	hl
-	ld	b, h
-	call	uart_print_hex
-
-	pop	hl
-	push	hl
-	ld	b, l
-	call	uart_print_hex
-
-	ld	hl, eol_space
-	call	uart_printf
-
-	pop	hl
-	pop	de
-	push	de
-	push	hl
-	ld	b, d
-	call	uart_print_hex
-
-	pop	hl
-	pop	de
-	push	de
-	push	hl
-	ld	b, e
-	call	uart_print_hex
-
-	call	uart_print_eol
-
-	pop	hl
-	pop	de
-	pop	af
-	pop	bc
-
 	; See if we are past it.
 	sbc	hl, bc				; Will set borrow if bc > hl
 	jr	NC, screen_cursor_in_line_found	; No borrow.  Cursor is in this line.
@@ -353,17 +303,8 @@ screen_cursor_in_line_again:
 	jr	screen_cursor_in_line_again
 
 screen_cursor_in_line_found:
-
-	push	af
-	ld	hl, eol_val
-	call	uart_printf
-	pop	af
-	push	af
-	ld	b, a
-	call	uart_print_hex
-	call	uart_print_eol
-	call	uart_print_eol
-	pop	af
+	; Undo the initial push.
+	pop	hl
 
 	ret
 
