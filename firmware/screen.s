@@ -139,6 +139,45 @@ screen_handle_bs_at_fwa:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 screen_handle_ht:
+
+	; Move the cursor to the next modulo-8 position on the line.
+	;
+	; First, get the starting address of the line in hl.
+	; The routine also clears carry.
+	call	screen_cursor_start_of_line
+
+	ld	de, (screen_cursor_location)	; DE = current position, HL = start of line
+	ex	de, hl				; HL = current position, DE = start of line
+
+	; Put back the saved character.
+	ld	a, (screen_char_under_cursor)
+	ld	(hl), a
+	
+	; Find the new location.  Note that we must stay in this line, so we
+	; must not go past column 79.
+	sbc	hl, de			; HL = column number, range 0 to 79
+	ld	a, l			; A = column number, range 0 to 79
+	add	a, 8			; Move forward 8 positions
+	and	a, 0xf8			; Clear three LSBs
+
+	; Now we need to make sure we didn't run off the end of the line.
+	ld	l, a			; Save the column into L
+	cp	a, screen_line		; Did we go too far?
+	jr	C, screen_handle_ht_ok	; No, we are ok
+
+	; We went too far.  Instead, we need to stop at column 79.
+	ld	l, screen_line - 1
+
+screen_handle_ht_ok:
+
+	add	hl, de			; HL = new position
+
+	; Save under and paint a new cursor.
+	ld	a, (hl)
+	ld	(screen_char_under_cursor), a
+	ld	(screen_cursor_location), hl
+	ld	(hl), char_del
+
 	ret
 
 #code ROM
@@ -220,23 +259,11 @@ screen_handle_cr:
 	ld	hl, (screen_cursor_location)
 	ld	(hl), a
 	
-	; Find what line we are on.  The call returns 0 to 23 in register A.
-	call	screen_cursor_in_line
+	; Find the start of whatever line the cursor is on.  The pointer is
+	; returned in HL.
+	call	screen_cursor_start_of_line
 
-	; Bump A so we can use sub below.
-	add	a, 1
-	ld	hl, screen_base - screen_line		; hl = imaginary line before buffer
-	ld	bc, screen_line				; bc = 80
-
-	; We essentially need to add (A * 80) to hl.  Since there is no
-	; multiply instruction, we just repeatedly add.
-screen_handle_cr_again:
-	add	hl, bc					; hl = start of next line
-	sub	1
-	jr	NZ, screen_handle_cr_again
-
-screen_handle_cr_found:
-	; HL contains first byte of the line.  Save under, then put the cursor there.
+	; Save under, then put the cursor there.
 	ld	a, (hl)
 	ld	(screen_char_under_cursor), a
 	ld	(hl), char_del
@@ -315,7 +342,7 @@ screen_initialize_loop:
 ;
 ; Uses af, bc, de, hl
 ;
-; Result in register A
+; Result in register A, carry will be clear at the end of this routine.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 screen_cursor_in_line:
@@ -349,10 +376,35 @@ screen_cursor_in_line_found:
 
 	ret
 
-eol_cursor:	.asciz "cursor "
-eol_space:	.asciz " "
-eol_at:		.asciz "eol "
-eol_val:	.asciz "val "
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; screen_cursor_start_of_line - Find the address of the start of the line containing cursor
+;
+; Uses af, bc, de, hl
+;
+; Result in register HL, carry will be clear at the end of this routine.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+screen_cursor_start_of_line:
+
+	; Find what line we are on.  The call returns 0 to 23 in register A.
+	; As a side effect, it also clears carry.
+	call	screen_cursor_in_line
+
+	; Bump A so we can use sub below.
+	add	a, 1					; Can't set carry
+	ld	hl, screen_base - screen_line		; hl = imaginary line before buffer
+	ld	bc, screen_line				; bc = 80
+
+	; We essentially need to add (A * 80) to hl.  Since there is no
+	; multiply instruction, we just repeatedly add.
+screen_cursor_start_of_line_again:
+	add	hl, bc					; hl = start of next line, no carry
+	sub	1					; Won't set borrow (carry)
+	jr	NZ, screen_cursor_start_of_line_again
+
+	; HL contains pointer to the first byte of the line.
+	ret
 
 #data RAM
 
