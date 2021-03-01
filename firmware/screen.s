@@ -118,27 +118,31 @@ screen_handle_bs:
 	
 	; We want to move the cursor backwards one position, but we cannot
 	; go before col=0 of the row.
+	;
+	; Find the beginning of the line, so we don't move too far.
+	call	screen_cursor_start_of_line	; HL = FWA of this line
+	ex	de, hl				; DE = FWA of this line
+	ld	hl, (screen_cursor_location)	; HL = current position
+	dec	hl				; HL = proposed new position
+	xor	a				; Clear carry
+	sbc	hl, de				; Sets borrow if DE (FWA) > HL (proposal)
+	jr	C, screen_move_cursor_bs_done	; The move is bad, we cannot move
 
-	; See if it is legal to move back.
-	or	a				; Clear carry
-	ld	hl, (screen_cursor_location)	; Current position
-	ld	bc, screen_base			; FWA
-	sbc	hl, bc				; Sets Z flag if hl == bc
-	jr	Z, screen_handle_bs_at_fwa	; Cannot move before FWA
-	
-	; Restore the character under the old cursor.
+	; The move is good.  Restore the character under the old cursor.
 	ld	a, (screen_char_under_cursor)
 	ld	hl, (screen_cursor_location)
 	ld	(hl), a
 
-	; Move back one position, save under the position, and draw the new cursor.
+	; Back up one position.
 	dec	hl
+
+	; Save whatever is under the new cursor position and paint a new cursor.
 	ld	a, (hl)
 	ld	(screen_char_under_cursor), a
 	ld	(screen_cursor_location), hl
 	ld	(hl), char_del
 
-screen_handle_bs_at_fwa:
+screen_move_cursor_bs_done:
 	ret
 
 #code ROM
