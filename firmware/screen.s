@@ -117,7 +117,7 @@ screen_normal_char_new_cursor:
 screen_handle_bs:
 	
 	; We want to move the cursor backwards one position, but we cannot
-	; go before col=0, row=0.
+	; go before col=0 of the row.
 
 	; See if it is legal to move back.
 	or	a				; Clear carry
@@ -574,6 +574,9 @@ screen_escape_handler_in_csi:
 	cp	'C'
 	jp	Z, screen_move_cursor_right
 
+	cp	'D'
+	jp	Z, screen_move_cursor_left
+
 screen_bad_sequence:
 
 	; This is not a sequence we handle yet.
@@ -828,6 +831,83 @@ screen_move_cursor_right_do:
 	ex	de, hl
 
 screen_move_cursor_right_go:
+
+	; Save whatever is under the new cursor position and paint a new cursor.
+	ld	a, (hl)
+	ld	(screen_char_under_cursor), a
+	ld	(screen_cursor_location), hl
+	ld	(hl), char_del
+
+	; Escape sequence complete.
+	ld	a, escape_none_state
+	ld	(screen_escape_state), a
+	ret
+	
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; screen_move_cursor_left
+;
+; Input none
+; Alters HL, BC, DE, AF
+; Output none
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+d9: .asciz "screen_move_cursor_left"
+
+screen_move_cursor_left:
+
+	ld	hl, d8
+	call	debug_print_string
+	call	debug_print_eol
+
+	; Restore the character under the old cursor.
+	ld	a, (screen_char_under_cursor)
+	ld	hl, (screen_cursor_location)
+	ld	(hl), a
+
+	; If we are still in the escape_csi_state state, we didn't get any
+	; digits, so we just move the cursor left one character.  Start
+	; by assuming that.
+	xor	a
+	ld	b, a
+	ld	c, 1
+	
+	;  Test the assumption.
+	ld	a, (screen_escape_state)
+	cp	escape_csi_state
+	jr	Z, screen_move_cursor_left_do	; Assumption was correct
+
+	; Assumption was wrong; get the distance to move left.  Note that
+	; B is still zero from above.
+	ld	a, (screen_group_0_digits)
+	ld	c, a
+
+screen_move_cursor_left_do:
+
+	; HL still contains the current position.  Decrement HL to the proposed
+	; new position and save it on the stack.  We will pop it into DE.
+	or	a				; Clear carry
+	sbc	hl, bc
+	push	hl				; push proposal
+
+	; Find the beginning of the line, so we don't move too far.
+	call	screen_cursor_start_of_line	; HL = FWA of this line
+
+	; Retrieve the proposed location and see if we can move that far.
+	pop	de				; DE = proposal
+	push	de				; push proposal
+	ex	de, hl				; DE = FWA, HL = proposal
+	sbc	hl, de				; Sets borrow if DE (FWA) > HL (proposal)
+	ex	de, hl				; HL = FWA, DE = garbage
+	pop	de				; DE = proposal
+	jr	C, screen_move_cursor_left_go	; The move is bad, use FWA, alread in HL
+
+	; THe proposed move is good.  Get it into HL.
+	ex	de, hl
+
+screen_move_cursor_left_go:
 
 	; Save whatever is under the new cursor position and paint a new cursor.
 	ld	a, (hl)
