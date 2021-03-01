@@ -82,4 +82,5 @@ str:
 
 #include "uart.s"
 #include "screen.s"
+#include "math.s"
 #include "debug.s"

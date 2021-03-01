@@ -265,23 +265,6 @@ screen_handle_cr:
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; screen_handle_escape - handle an escape
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-screen_handle_escape:
-
-	; An escape sequence is variable length.  We need a state-machine to
-	; keep track of where we are in a potential sequence.
-	;
-	; We have seen an escape character, so we now must wait for the next
-	; character to see what it means.
-	ld	a, escape_first_state
-	ld	(screen_escape_state), a
-	
-	ret
-
-#code ROM
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; screen_scroll_up - scroll up one line
 ;
 ; Uses af, bc, de, hl
@@ -419,19 +402,54 @@ char_lsb		equ '['
 
 ; Escape state machine states.
 escape_none_state	equ 0x00			; No escape yet
-escape_first_state	equ 0x01			; Need first char of sequence
+escape_need_first_state	equ 0x01			; Need first char of sequence
 escape_csi_state	equ 0x02			; First char is '['
 escape_csi_d0_state	equ 0x03			; Accumulating first group of digits in CSI
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; screen_handle_escape - handle an escape
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+d0: .asciz "screen_handle_escape"
+
+screen_handle_escape:
+
+	ld	hl, d0
+	call	debug_print_string
+	call	debug_print_eol
+
+	; An escape sequence is variable length.  We need a state-machine to
+	; keep track of where we are in a potential sequence.
+	;
+	; We have seen an escape character, so we now must wait for the next
+	; character to see what it means.
+	ld	a, escape_need_first_state
+	ld	(screen_escape_state), a
+	
+	ret
+
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
 ; screen_escape_handler - Run the escape state machine.
+;
+; Called for each new character until the escape sequence ends.
 ;
 ; New character is in both registers A and B
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+d1: .asciz "screen_escape_handler"
+
 screen_escape_handler:
+
+	ld	hl, d1
+	call	debug_print_string
+	call	debug_print_eol
+
+	; We are in an escape sequence, and we've gotten the next character
+	; of it.
 
 	; FIXME
 	;
@@ -443,11 +461,15 @@ screen_escape_handler:
 
 	; What state are we in?
 	ld	a, (screen_escape_state)
-	cp	escape_first_state
+
+	cp	escape_need_first_state
 	jr	Z, screen_escape_handler_first		; Got first char after escape
 
 	cp	escape_csi_state
-	jr	Z, screen_escape_handler_lsb		; Got first char after '['
+	jp	Z, screen_escape_handler_in_csi		; Got first char after '['
+
+	cp	escape_csi_d0_state
+	jp	Z, screen_escape_handler_in_csi		; Accumulating d0
 
 	; Eventually there will be more states above.  This is the catch-all,
 	; which we shouldn't ever hit.  So, clear the escape state and give
@@ -456,14 +478,33 @@ screen_escape_handler:
 	ld	(screen_escape_state), a
 	ret
 
-screen_escape_handler_first:
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; screen_escape_handler_first
+;
+; We have the first character after an escape.  Based on what we've got,
+; change states.
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+d2: .asciz "screen_escape_handler_first"
+
+screen_escape_handler_first:
+	
+	ld	hl, d2
+	call	debug_print_string
+	call	debug_print_eol
+
+	; Clear our working storage.
+	xor	a
+	ld	(screen_group_0_digits), a
+	
 	; This is the first character after an escape.
 	;
 	; Test for '[', the so-called CSI
 	ld	a, b
 	cp	char_lsb
-	jr	Z, screen_escape_handler_lsb
+	jr	Z, screen_escape_handler_start_csi
 
 	; Eventually there may be additional first chars.  This is the
 	; catch-all, which we shouldn't ever hit.  So, clear the escape
@@ -473,20 +514,60 @@ screen_escape_handler_first:
 	ld	(screen_escape_state), a
 	ret
 
-screen_escape_handler_lsb:
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; screen_escape_handler_start_csi
+;
+; We received a '['.
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-	; We have the first character after a '['.
-	;
-	; Many of the sequences now have a number, which may be multiple
-	; digits long.  If this is a digit, go to an "accumulating digits"
-	; state, until we see a non-digit.
+d3: .asciz "screen_escape_handler_start_csi"
+
+screen_escape_handler_start_csi:
+
+	ld	hl, d3
+	call	debug_print_string
+	call	debug_print_eol
+
+	; Switch to the CSI state.
+	ld	a, escape_csi_state
+	ld	(screen_escape_state), a
+
+	ret
+
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; screen_escape_handler_in_csi
+;
+; We received a character following a '['.  Normally, this will be a digit.
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+d4: .asciz "screen_escape_handler_in_csi"
+
+screen_escape_handler_in_csi:
+
+	ld	hl, d4
+	call	debug_print_string
+	call	debug_print_eol
+
+	; If this is a digit, go to an "accumulating digits" state, until we
+	; see a non-digit.
 	ld	a, b
 	cp	'0'
 	jr	C, screen_bad_sequence			; < '0' character
 	cp	'9' + 1
 	jr	C, screen_got_group_0_digit		; <= '9' character
 
-	; > 9 is not something we handle yet
+	; It is not a digit.  If it is a semicolon, we have collected all the
+	; digits in an argument.  If it is something else, then we have the
+	; whole sequence.
+	
+	cp	'A'
+	jp	Z, screen_move_cursor_up
+	
 
 screen_bad_sequence:
 
@@ -495,7 +576,18 @@ screen_bad_sequence:
 	ld	(screen_escape_state), a
 	ret
 
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; screen_got_group_0_digit
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+d5: .asciz "screen_got_group_0_digit"
+
 screen_got_group_0_digit:
+
+	ld	hl, d5
+	call	debug_print_string
+	call	debug_print_eol
 
 	; We have a digit.  Go into the group 0 digits state.
 	ld	a, escape_csi_d0_state
@@ -503,10 +595,92 @@ screen_got_group_0_digit:
 
 	; Save this digit.  First, multiply the previous digits, if any, by 10.
 	ld	a, (screen_group_0_digits)
+	call	math_multiply_10
+	add	a, b					; Add the new digit as ASCII
+	sub	'0'					; Correct it to be numeric
+	ld	(screen_group_0_digits), a		; Save the result
 
-	ld	a, b
-	sub	'0'
+	ret
 	
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; screen_move_cursor_up
+;
+; Input none
+; Alters HL, BC, DE, AF
+; Output none
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+d6: .asciz "screen_move_cursor_up"
+
+screen_move_cursor_up:
+
+	ld	hl, d6
+	call	debug_print_string
+	call	debug_print_eol
+
+	; If we are still in the escape_csi_state state, we didn't get any
+	; digits, so we just move the cursor up one line.  Start by assuming
+	; that.
+	ld	b, 1
+	push	bc					; Save the assumed value
+	
+	;  Test the assumption.
+	ld	a, (screen_escape_state)
+	cp	escape_csi_state
+	jr	Z, screen_move_cursor_up_do		; Assumption was correct
+
+	; Assumption was wrong; get the distance to move up.
+	pop	bc					; Discard the assumed value
+	ld	a, (screen_group_0_digits)
+	ld	b, a
+	push	bc					; Save the corrected value
+
+screen_move_cursor_up_do:
+
+	; Move cursor 80 characters backwards, but if that would
+	; move us off the screen, then do nothing.
+	;
+	; FIXME - not sure if that is correct, or if we should
+	; scroll down.
+	or	a			; Clear carry
+	ld	hl, (screen_cursor_location)
+	ld	bc, screen_line		; BC = 80
+	sbc	hl, bc			; this will clear carry
+	ld	de, hl			; save the result
+	ld	bc, screen_base		; FWA
+	sbc	hl, bc			; will set borrow if bc > hl
+	jr	C, screen_move_cursor_up_cannot
+
+	; We have room to move the cursor.  Replace what was under the cursor.
+	ld	a, (screen_char_under_cursor)
+	ld	hl, (screen_cursor_location)
+	ld	(hl), a
+
+	; Now save whatever is under the new cursor, and paint a cursor over it.
+	; And save the location.
+	ld	hl, de
+	ld	a, (hl)
+	ld	(screen_char_under_cursor), a
+	ld	(hl), char_del
+	ld	(screen_cursor_location), hl
+
+	; See if we are done.
+	pop	bc					; Retrieve the count
+	dec	b
+	push	bc
+	jr	NZ, screen_move_cursor_up_do		; Move up another line.
+
+screen_move_cursor_up_cannot:
+	pop	bc					; Clean up stack
+
+	; Escape sequence complete.
+	ld	a, escape_none_state
+	ld	(screen_escape_state), a
+	ret
+
 #data RAM
 
 ; Pointer into video memory.

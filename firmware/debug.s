@@ -1,9 +1,22 @@
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; debug_print_string - print the string pointed to by hl
+;
+; debug_print_string - print the string pointed to by HL
+;
+; Input HL
+; Alters none
+; Output none
+;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 debug_print_string:
+
+	push	af
+	push	bc
+	push	de
+	push	hl
+
+debug_print_string_again:
 
 	ld	a, (hl)
 	or	a		; set flags
@@ -16,17 +29,34 @@ debug_print_string:
 	pop	hl
 	inc	hl
 
-	jr	debug_print_string
+	jr	debug_print_string_again
 
 debug_printf_done:
+
+	pop	hl
+	pop	de
+	pop	bc
+	pop	af
+
 	ret
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
 ; debug_print_hex_nibble - print the hex value of the lower 4 bits in register B
+;
+; Input B
+; Alters none
+; Output none
+;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 debug_print_hex_nibble:
+
+	push	af
+	push	bc
+	push	de
+	push	hl
 
 	ld	a, b
 	and	a, 0xf
@@ -45,14 +75,30 @@ debug_print_hex_nibble_ready:
 	ld	b, a
 	call	uart_transmit
 
+	pop	hl
+	pop	de
+	pop	bc
+	pop	af
+
 	ret
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
 ; debug_print_hex - print the hex value in register B
+;
+; Input B
+; Alters none
+; Output none
+;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 debug_print_hex:
+
+	push	af
+	push	bc
+	push	de
+	push	hl
 
 	ld	a, b
 	ld	c, b
@@ -69,27 +115,53 @@ debug_print_hex:
 	ld	b, c
 	call	debug_print_hex_nibble
 
+	pop	hl
+	pop	de
+	pop	bc
+	pop	af
+
 	ret
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
 ; debug_print_eol - print CR-LF
+;
+; Input none
+; Alters none
+; Output none
+;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 debug_print_eol:
+
+	push	af
+	push	bc
+	push	de
+	push	hl
+
 	ld	b, 0x0d
 	call	uart_transmit
 
 	ld	b, 0x0a
 	call	uart_transmit
 
+	pop	hl
+	pop	de
+	pop	bc
+	pop	af
+
 	ret
-
-
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
 ; debug_show_a - Show contents of a
+;
+; Input none
+; Alters none
+; Output none
+;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 debug_show_a:
@@ -117,7 +189,13 @@ s_a: .asciz "a: "
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
 ; debug_show_bc - Show contents of bc
+;
+; Input none
+; Alters none
+; Output none
+;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 debug_show_bc:
@@ -149,7 +227,13 @@ s_bc: .asciz "bc: "
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
 ; debug_show_de - Show contents of de
+;
+; Input none
+; Alters none
+; Output none
+;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 debug_show_de:
@@ -181,7 +265,13 @@ s_de: .asciz "de: "
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
 ; debug_show_hl - Show contents of hl
+;
+; Input none
+; Alters none
+; Output none
+;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 debug_show_hl:
@@ -210,3 +300,50 @@ debug_show_hl:
 	ret
 
 s_hl: .asciz "hl: "
+
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; debug_show_sp - Show contents of sp
+;
+; Input none
+; Alters none
+; Output none
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+debug_show_sp:
+
+	; The only way to read the SP is to copy it to memory.
+	; Note that the value we get will include the return
+	; address that we must go back to.
+	ld	(debug_get_sp), SP
+
+	push	de
+	push	bc
+	push	af
+	push	hl
+
+	ld	hl, s_sp
+	call	debug_print_string
+	ld	hl, (debug_get_sp)
+	ld	b, h
+	call	debug_print_hex
+	ld	hl, (debug_get_sp)
+	ld	b, l
+	call	debug_print_hex
+	call	debug_print_eol
+
+	pop	hl
+	pop	af
+	pop	bc
+	pop	de
+
+	ret
+
+s_sp: .asciz "sp: "
+
+#data RAM
+
+debug_get_sp:
+	ds	2

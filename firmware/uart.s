@@ -92,6 +92,7 @@ dipSW			equ 0xc010
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
 ; uart_receive - get a character from the receiver queue
 ;
 ; We have to disable interrupts for mutual exclusion with the
@@ -223,7 +224,13 @@ uart_rb_count:
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
 ; uart_transmit - transmit the character in register B
+;
+; Input B
+; Alters HL, A
+; Output none
+;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 uart_transmit:
@@ -240,7 +247,12 @@ uart_transmit:
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
 ; uart_initialize - get the uart ready
+;
+; Input none
+; Alters HL, DE, BC, AF
+;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 uart_initialize:
@@ -281,7 +293,13 @@ uart_initialize:
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
 ; uart_set_baud - set the baud rate based on the dip switches
+;
+; Input none
+; Alters HL, DE, BC, AF
+; Output none
+;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 uart_set_baud:
