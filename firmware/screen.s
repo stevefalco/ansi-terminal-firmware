@@ -568,6 +568,8 @@ screen_escape_handler_in_csi:
 	cp	'A'
 	jp	Z, screen_move_cursor_up
 	
+	cp	'B'
+	jp	Z, screen_move_cursor_down
 
 screen_bad_sequence:
 
@@ -674,6 +676,84 @@ screen_move_cursor_up_do:
 	jr	NZ, screen_move_cursor_up_do		; Move up another line.
 
 screen_move_cursor_up_cannot:
+	pop	bc					; Clean up stack
+
+	; Escape sequence complete.
+	ld	a, escape_none_state
+	ld	(screen_escape_state), a
+	ret
+
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; screen_move_cursor_down
+;
+; Input none
+; Alters HL, BC, DE, AF
+; Output none
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+d7: .asciz "screen_move_cursor_down"
+
+screen_move_cursor_down:
+
+	ld	hl, d7
+	call	debug_print_string
+	call	debug_print_eol
+
+	; If we are still in the escape_csi_state state, we didn't get any
+	; digits, so we just move the cursor down one line.  Start by assuming
+	; that.
+	ld	b, 1
+	push	bc				; Save the assumed value
+	
+	;  Test the assumption.
+	ld	a, (screen_escape_state)
+	cp	escape_csi_state
+	jr	Z, screen_move_cursor_down_do	; Assumption was correct
+
+	; Assumption was wrong; get the distance to move down.
+	pop	bc				; Discard the assumed value
+	ld	a, (screen_group_0_digits)
+	ld	b, a
+	push	bc				; Save the corrected value
+
+screen_move_cursor_down_do:
+
+	; Move cursor 80 characters forwards, but if that would
+	; move us off the screen, then do nothing.
+	;
+	; FIXME - not sure if that is correct, or if we should
+	; scroll up.
+	ld	hl, (screen_cursor_location)
+	ld	bc, screen_line			; BC = 80
+	add	hl, bc				; this will clear carry
+	ld	de, hl				; save the result
+	ld	bc, screen_end			; LWA+1 of screen memory
+	sbc	hl, bc				; Sets borrow if bc > hl
+	jr	NC, screen_move_cursor_down_cannot
+
+	; We have room to move the cursor.  Replace what was under the cursor.
+	ld	a, (screen_char_under_cursor)
+	ld	hl, (screen_cursor_location)
+	ld	(hl), a
+
+	; Now save whatever is under the new cursor, and paint a cursor over it.
+	; And save the location.
+	ld	hl, de
+	ld	a, (hl)
+	ld	(screen_char_under_cursor), a
+	ld	(hl), char_del
+	ld	(screen_cursor_location), hl
+
+	; See if we are done.
+	pop	bc					; Retrieve the count
+	dec	b
+	push	bc
+	jr	NZ, screen_move_cursor_down_do		; Move down another line.
+
+screen_move_cursor_down_cannot:
 	pop	bc					; Clean up stack
 
 	; Escape sequence complete.
