@@ -571,6 +571,9 @@ screen_escape_handler_in_csi:
 	cp	'B'
 	jp	Z, screen_move_cursor_down
 
+	cp	'C'
+	jp	Z, screen_move_cursor_right
+
 screen_bad_sequence:
 
 	; This is not a sequence we handle yet.
@@ -721,7 +724,7 @@ screen_move_cursor_down:
 
 screen_move_cursor_down_do:
 
-	; Move cursor 80 characters forwards, but if that would
+	; Move cursor 80 characters forward, but if that would
 	; move us off the screen, then do nothing.
 	;
 	; FIXME - not sure if that is correct, or if we should
@@ -761,6 +764,89 @@ screen_move_cursor_down_cannot:
 	ld	(screen_escape_state), a
 	ret
 
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; screen_move_cursor_right
+;
+; Input none
+; Alters HL, BC, DE, AF
+; Output none
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+d8: .asciz "screen_move_cursor_right"
+
+screen_move_cursor_right:
+
+	ld	hl, d8
+	call	debug_print_string
+	call	debug_print_eol
+
+	; Restore the character under the old cursor.
+	ld	a, (screen_char_under_cursor)
+	ld	hl, (screen_cursor_location)
+	ld	(hl), a
+
+	; If we are still in the escape_csi_state state, we didn't get any
+	; digits, so we just move the cursor right one character.  Start
+	; by assuming that.
+	xor	a
+	ld	b, a
+	ld	c, 1
+	
+	;  Test the assumption.
+	ld	a, (screen_escape_state)
+	cp	escape_csi_state
+	jr	Z, screen_move_cursor_right_do	; Assumption was correct
+
+	; Assumption was wrong; get the distance to move right.  Note that
+	; B is still zero from above.
+	ld	a, (screen_group_0_digits)
+	ld	c, a
+
+screen_move_cursor_right_do:
+
+	; HL still contains the current position.  Increment HL to the proposed
+	; new position and save it on the stack.
+	add	hl, bc
+	push	hl
+
+	; Find the end of the line, so we don't move too far.
+	call	screen_cursor_start_of_line	; HL = FWA of this line
+	ld	de, screen_line			; DE = 80
+	add	hl, de				; HL = LWA+1 of this line, clears carry
+
+	; Preserve the end of the line in case that limits the motion.
+	ex	de, hl				; DE = LWA+1, HL = 80
+
+	; Retrieve the proposed location and see if we can move that far.
+	pop	hl				; Get HL (proposed loc) back,
+	push	hl				; but we still want it on the stack.
+	sbc	hl, de				; Sets borrow if de > hl
+	pop	hl				; Get HL (proposed loc) back
+	jr	C, screen_move_cursor_right_ok	; The move is ok, use HL as is
+
+	; The move would be too far, we must limit motion to DE - 1.  Note that
+	; borrow (carry) must already be clear from the sbc above, since we didn't
+	; jump.
+	ld	hl, 1				; HL = 1, DE still LWA+1
+	ex	de, hl				; DE = 1, HL = LWA+1
+	sbc	hl, de				; HL = LWA
+
+screen_move_cursor_right_ok:
+
+	; Save whatever is under the new cursor position and paint a new cursor.
+	ld	a, (hl)
+	ld	(screen_char_under_cursor), a
+	ld	(screen_cursor_location), hl
+	ld	(hl), char_del
+
+	; Escape sequence complete.
+	ld	a, escape_none_state
+	ld	(screen_escape_state), a
+	ret
+	
 #data RAM
 
 ; Pointer into video memory.
@@ -775,4 +861,3 @@ screen_escape_state:
 
 screen_group_0_digits:
 	ds	1
-
