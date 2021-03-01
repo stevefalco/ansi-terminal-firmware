@@ -808,33 +808,26 @@ screen_move_cursor_right:
 screen_move_cursor_right_do:
 
 	; HL still contains the current position.  Increment HL to the proposed
-	; new position and save it on the stack.
+	; new position and save it on the stack.  We will pop it into DE.
 	add	hl, bc
-	push	hl
+	push	hl				; push proposal
 
 	; Find the end of the line, so we don't move too far.
 	call	screen_cursor_start_of_line	; HL = FWA of this line
-	ld	de, screen_line			; DE = 80
-	add	hl, de				; HL = LWA+1 of this line, clears carry
-
-	; Preserve the end of the line in case that limits the motion.
-	ex	de, hl				; DE = LWA+1, HL = 80
+	ld	de, screen_line - 1		; DE = 79
+	add	hl, de				; HL = LWA of this line, clears carry
 
 	; Retrieve the proposed location and see if we can move that far.
-	pop	hl				; Get HL (proposed loc) back,
-	push	hl				; but we still want it on the stack.
-	sbc	hl, de				; Sets borrow if de > hl
-	pop	hl				; Get HL (proposed loc) back
-	jr	C, screen_move_cursor_right_ok	; The move is ok, use HL as is
+	pop	de				; DE = proposal
+	push	hl				; push LWA
+	sbc	hl, de				; Sets borrow if DE (proposal) > HL (LWA)
+	pop	hl				; HL = LWA
+	jr	C, screen_move_cursor_right_go	; The move is bad, use LWA, alread in HL
 
-	; The move would be too far, we must limit motion to DE - 1.  Note that
-	; borrow (carry) must already be clear from the sbc above, since we didn't
-	; jump.
-	ld	hl, 1				; HL = 1, DE still LWA+1
-	ex	de, hl				; DE = 1, HL = LWA+1
-	sbc	hl, de				; HL = LWA
+	; THe proposed move is good.  Get it into HL.
+	ex	de, hl
 
-screen_move_cursor_right_ok:
+screen_move_cursor_right_go:
 
 	; Save whatever is under the new cursor position and paint a new cursor.
 	ld	a, (hl)
