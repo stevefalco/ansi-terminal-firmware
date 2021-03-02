@@ -376,7 +376,7 @@ screen_cursor_in_line_found:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; screen_cursor_start_of_line - Find the address of the start of the line containing cursor
 ;
-; Uses af, bc, de, hl
+; Uses AF, BC, DE, HL
 ;
 ; Result in register HL, carry will be clear at the end of this routine.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -936,7 +936,7 @@ screen_move_cursor_left_go:
 ; screen_clear_to_end_of_screen
 ;
 ; Input none
-; Alters HL, BC, DE, AF
+; Alters HL, DE, AF
 ; Output none
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -951,7 +951,7 @@ screen_clear_to_end_of_screen:
 
 	; Clear the character under the cursor
 	; FIXME - not sure if this is correct.
-	xor	a				; Clear A, clear carry
+	xor	a				; Clear A
 	ld	(screen_char_under_cursor), a
 
 	ld	hl, (screen_cursor_location)	; HL = cursor location
@@ -963,7 +963,8 @@ screen_clear_to_end_of_screen:
 screen_clear_to_end_of_screen_loop:
 	inc	hl				; Next position to clear
 
-	; Make sure we haven't gone off the end.  Carry is already clear.
+	; Make sure we haven't gone off the end.
+	or	a				; Clear carry
 	push	hl				; Save HL on the stack
 	sbc	hl, de				; Sets borrow if DE > HL
 	pop	hl				; HL = position to clear
@@ -996,6 +997,35 @@ screen_clear_to_end_of_line:
 	ld	hl, d11
 	call	debug_print_string
 	call	debug_print_eol
+
+	; Clear the character under the cursor
+	; FIXME - not sure if this is correct.
+	xor	a				; Clear A
+	ld	(screen_char_under_cursor), a
+
+	; Find the end of the line, so we don't move too far.
+	call	screen_cursor_start_of_line	; HL = FWA of this line
+	ld	de, screen_line			; DE = 80
+	add	hl, de				; HL = LWA+1 of this line, clears carry
+	ex	de, hl				; DE = LWA+1, HL=80
+	ld	hl, (screen_cursor_location)	; HL = cursor location
+
+	; We will clear with space characters.
+	ld	a, char_space
+
+screen_clear_to_end_of_line_loop:
+	inc	hl				; Next position to clear
+
+	; Make sure we haven't gone off the end.  Carry is already clear.
+	or	a				; Clear carry
+	push	hl				; Save HL on the stack
+	sbc	hl, de				; Sets borrow if DE > HL
+	pop	hl				; HL = position to clear
+	jr	NC, screen_clear_to_end_of_line_done
+	ld	(hl), a				; Clear the character
+	jr	screen_clear_to_end_of_line_loop
+
+screen_clear_to_end_of_line_done:
 
 	; Escape sequence complete.
 	ld	a, escape_none_state
