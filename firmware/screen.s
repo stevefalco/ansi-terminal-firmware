@@ -285,14 +285,37 @@ screen_scroll_up:
 	
 	; Now clear the last line, since it is "new".
 	ld	hl, screen_base	+ (23 * screen_line)
-	ld	bc, screen_line
-screen_scroll_loop:
+	ld	b, screen_line
+screen_scroll_up_loop:
 	ld	(hl), 0
 	inc	hl
-	dec	bc
-	ld	a, b
-	or	c
-	jr	nz, screen_scroll_loop
+	djnz	screen_scroll_up_loop
+
+	ret
+
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; screen_scroll_down - scroll down one line
+;
+; Uses af, bc, de, hl
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+screen_scroll_down:
+
+	; Move 23 lines down.  The bottom line is lost.
+	ld	hl, screen_end - 1 - screen_line	; source
+	ld	de, screen_end - 1			; destination
+	ld	bc, screen_line * 23			; all 23 lines
+	lddr
+	
+	; Now clear the first line, since it is "new".
+	ld	hl, screen_base
+	ld	b, screen_line
+screen_scroll_down_loop:
+	ld	(hl), 0
+	inc	hl
+	djnz	screen_scroll_down_loop
 
 	ret
 
@@ -522,6 +545,9 @@ screen_escape_handler_first:
 
 	cp	'8'
 	jp	Z, screen_restore_cursor_position
+
+	cp	'M'
+	jp	Z, screen_handle_reverse_scroll
 
 	; Eventually there may be additional first chars.  This is the
 	; catch-all, which we shouldn't ever hit.  So, clear the escape
@@ -1226,6 +1252,47 @@ screen_restore_cursor_position:
 	ld	a, (hl)
 	ld	(screen_char_under_cursor), a
 	ld	(hl), char_del
+
+	; Escape sequence complete.
+	ld	a, escape_none_state
+	ld	(screen_escape_state), a
+	ret
+
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; screen_handle_reverse_scroll
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+screen_handle_reverse_scroll:
+
+	; First, put back whatever was under the cursor.
+	ld	a, (screen_char_under_cursor)
+	ld	hl, (screen_cursor_location)
+	ld	(hl), a
+
+	; reverse-scroll means we move 80 characters backward, but if that would
+	; move us off the screen, then we have to scroll down one line.
+	ld	hl, (screen_cursor_location)
+	ld	bc, screen_line		; BC = 80
+	or	a			; clear carry
+	sbc	hl, bc			; HL = proposed new position
+	ld	de, hl			; DE = proposed new position
+	ld	bc, screen_base		; BC = FWA
+	sbc	hl, bc			; will set borrow if BC (FWA) > HL (proposed position)
+	ld	hl, de			; HL = proposed new position
+	jr	NC, screen_reverse_no_scroll
+
+	; We have to scroll down.
+	call	screen_scroll_down
+	ld	hl, (screen_cursor_location); HL = original position
+
+screen_reverse_no_scroll:
+
+	; Save whatever is under the new cursor, and paint a cursor over it.
+	ld	a, (hl)
+	ld	(screen_char_under_cursor), a
+	ld	(hl), char_del
+	ld	(screen_cursor_location), hl
 
 	; Escape sequence complete.
 	ld	a, escape_none_state
