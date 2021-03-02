@@ -326,6 +326,9 @@ screen_initialize_loop:
 	ld	a, escape_none_state
 	ld	(screen_escape_state), a
 	ld	(screen_group_0_digits), a
+	ld	(screen_group_1_digits), a
+	ld	hl, screen_group_0_digits	; Pointer to the group_0 buffer
+	ld	(screen_group_pointer), hl	; Save the pointer
 
 	ret
 
@@ -408,7 +411,7 @@ char_lsb		equ '['
 escape_none_state	equ 0x00			; No escape yet
 escape_need_first_state	equ 0x01			; Need first char of sequence
 escape_csi_state	equ 0x02			; First char is '['
-escape_csi_d0_state	equ 0x03			; Accumulating first group of digits in CSI
+escape_csi_d_N_state	equ 0x03			; Accumulating group of digits in CSI
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -472,7 +475,7 @@ screen_escape_handler:
 	cp	escape_csi_state
 	jp	Z, screen_escape_handler_in_csi		; Got first char after '['
 
-	cp	escape_csi_d0_state
+	cp	escape_csi_d_N_state
 	jp	Z, screen_escape_handler_in_csi		; Accumulating d0
 
 	; Eventually there will be more states above.  This is the catch-all,
@@ -502,6 +505,9 @@ screen_escape_handler_first:
 	; Clear our working storage.
 	xor	a
 	ld	(screen_group_0_digits), a
+	ld	(screen_group_1_digits), a
+	ld	hl, screen_group_0_digits	; Pointer to the group_0 buffer
+	ld	(screen_group_pointer), hl	; Save the pointer
 	
 	; This is the first character after an escape.
 	;
@@ -563,11 +569,13 @@ screen_escape_handler_in_csi:
 	cp	'0'
 	jr	C, screen_bad_sequence			; < '0' character
 	cp	'9' + 1
-	jr	C, screen_got_group_0_digit		; <= '9' character
+	jr	C, screen_got_group_N_digit		; <= '9' character
 
 	; It is not a digit.  If it is a semicolon, we have collected all the
-	; digits in an argument.  If it is something else, then we have the
-	; whole sequence.
+	; digits in an argument.  Note that there may be no digits before the
+	; semicolon, which implies zero.
+	;
+	; If it is something else, then we have the whole sequence.
 	
 	cp	'A'
 	jp	Z, screen_move_cursor_up
@@ -581,11 +589,17 @@ screen_escape_handler_in_csi:
 	cp	'D'
 	jp	Z, screen_move_cursor_left
 
+	cp	'H'
+	jp	Z, screen_move_cursor_numeric
+
 	cp	'J'
 	jp	Z, screen_clear_to_end_of_screen
 
 	cp	'K'
 	jp	Z, screen_clear_to_end_of_line
+
+	cp	';'
+	jp	Z, screen_next_argument
 
 screen_bad_sequence:
 
@@ -596,27 +610,30 @@ screen_bad_sequence:
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; screen_got_group_0_digit
+; screen_got_group_N_digit
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-d5: .asciz "screen_got_group_0_digit"
+d5: .asciz "screen_got_group_N_digit"
 
-screen_got_group_0_digit:
+screen_got_group_N_digit:
 
 	ld	hl, d5
 	call	debug_print_string
 	call	debug_print_eol
 
-	; We have a digit.  Go into the group 0 digits state.
-	ld	a, escape_csi_d0_state
+	; We have a digit.  Go into the group N digits state.
+	ld	a, escape_csi_d_N_state
 	ld	(screen_escape_state), a
 
+	; Find the buffer we are using.
+	ld	hl, (screen_group_pointer)
+
 	; Save this digit.  First, multiply the previous digits, if any, by 10.
-	ld	a, (screen_group_0_digits)
+	ld	a, (hl)
 	call	math_multiply_10
 	add	a, b					; Add the new digit as ASCII
 	sub	'0'					; Correct it to be numeric
-	ld	(screen_group_0_digits), a		; Save the result
+	ld	(hl), a		; Save the result
 
 	ret
 	
@@ -1032,10 +1049,85 @@ screen_clear_to_end_of_line_done:
 	ld	(screen_escape_state), a
 	ret
 
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; screen_next_argument
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+d12: .asciz "screen_next_argument"
+
+screen_next_argument:
+
+	ld	hl, d12
+	call	debug_print_string
+	call	debug_print_eol
+
+	; I think there can only be two arguments.  So, just switch to
+	; group 1.
+	ld	hl, screen_group_1_digits	; Pointer to the group_1 buffer
+	ld	(screen_group_pointer), hl	; Save the pointer
+
+	ret
+
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; screen_move_cursor_numeric
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+d13: .asciz "screen_move_cursor_numeric"
+
+screen_move_cursor_numeric:
+
+	ld	hl, d13
+	call	debug_print_string
+	call	debug_print_eol
+
+	; There may be digits or not, but it doesn't matter.  If there are
+	; no digits, our numeric buffers have 0,0 which means the same thing
+	; as if there were no digits.
+	
+	; Restore the character under the old cursor.
+	ld	a, (screen_char_under_cursor)
+	ld	hl, (screen_cursor_location)
+	ld	(hl), a
+
+	; Zero D for use in the multiplies and adds.
+	xor	a
+	ld	d, a
+
+	; Get the line parameter, and multiply it by 80.
+	ld	a, (screen_group_0_digits)
+	ld	e, a
+	ld	a, 80
+	call	math_multiply_16x8
+
+	; Get the column parameter and add it in.
+	ld	a, (screen_group_1_digits)
+	ld	e, a
+	add	hl, de
+
+	; Get the start of the screen and combine.
+	ld	de, screen_base
+	add	hl, de
+
+	; Paint a new cursor, but first save whatever is there.
+	ld	a, (hl)
+	ld	(screen_char_under_cursor), a
+	ld	(screen_cursor_location), hl
+	ld	(hl), char_del
+
+	; Escape sequence complete.
+	ld	a, escape_none_state
+	ld	(screen_escape_state), a
+	ret
+
 #data RAM
 
 ; Pointer into video memory.
 screen_cursor_location:
+	ds	2
+
+screen_group_pointer:
 	ds	2
 
 screen_char_under_cursor:
@@ -1045,4 +1137,7 @@ screen_escape_state:
 	ds	1
 
 screen_group_0_digits:
+	ds	1
+
+screen_group_1_digits:
 	ds	1
