@@ -667,9 +667,14 @@ screen_move_cursor_up:
 	cp	escape_csi_state
 	jr	Z, screen_move_cursor_up_do		; Assumption was correct
 
-	; Assumption was wrong; get the distance to move up.
+	; Assumption was wrong; get the distance to move up.  This is tricky
+	; because 0 or 1 means 1.
 	pop	bc					; Discard the assumed value
-	ld	a, (screen_group_0_digits)
+	ld	a, (screen_group_0_digits)		; Get the value
+	or	a					; Set flags
+	jr	NZ, screen_move_cursor_up_ready		; Non zero - use it directly
+	inc	a					; Change 0 to 1
+screen_move_cursor_up_ready:
 	ld	b, a
 	push	bc					; Save the corrected value
 
@@ -746,11 +751,16 @@ screen_move_cursor_down:
 	cp	escape_csi_state
 	jr	Z, screen_move_cursor_down_do	; Assumption was correct
 
-	; Assumption was wrong; get the distance to move down.
-	pop	bc				; Discard the assumed value
-	ld	a, (screen_group_0_digits)
+	; Assumption was wrong; get the distance to move up.  This is tricky
+	; because 0 or 1 means 1.
+	pop	bc					; Discard the assumed value
+	ld	a, (screen_group_0_digits)		; Get the value
+	or	a					; Set flags
+	jr	NZ, screen_move_cursor_down_ready	; Non zero - use it directly
+	inc	a					; Change 0 to 1
+screen_move_cursor_down_ready:
 	ld	b, a
-	push	bc				; Save the corrected value
+	push	bc					; Save the corrected value
 
 screen_move_cursor_down_do:
 
@@ -830,9 +840,15 @@ screen_move_cursor_right:
 	cp	escape_csi_state
 	jr	Z, screen_move_cursor_right_do	; Assumption was correct
 
-	; Assumption was wrong; get the distance to move right.  Note that
-	; B is still zero from above.
-	ld	a, (screen_group_0_digits)
+	; Assumption was wrong; get the distance to move right.  This is tricky
+	; because 0 or 1 means 1.
+	;
+	; Note that B is still zero from above.
+	ld	a, (screen_group_0_digits)		; Get the value
+	or	a					; Set flags
+	jr	NZ, screen_move_cursor_right_ready	; Non zero - use it directly
+	inc	a					; Change 0 to 1
+screen_move_cursor_right_ready:
 	ld	c, a
 
 screen_move_cursor_right_do:
@@ -906,9 +922,15 @@ screen_move_cursor_left:
 	cp	escape_csi_state
 	jr	Z, screen_move_cursor_left_do	; Assumption was correct
 
-	; Assumption was wrong; get the distance to move left.  Note that
-	; B is still zero from above.
-	ld	a, (screen_group_0_digits)
+	; Assumption was wrong; get the distance to move left.  This is tricky
+	; because 0 or 1 means 1.
+	;
+	; Note that B is still zero from above.
+	ld	a, (screen_group_0_digits)		; Get the value
+	or	a					; Set flags
+	jr	NZ, screen_move_cursor_left_ready	; Non zero - use it directly
+	inc	a					; Change 0 to 1
+screen_move_cursor_left_ready:
 	ld	c, a
 
 screen_move_cursor_left_do:
@@ -1084,8 +1106,16 @@ screen_move_cursor_numeric:
 
 	; There may be digits or not, but it doesn't matter.  If there are
 	; no digits, our numeric buffers have 0,0 which means the same thing
-	; as if there were no digits.
-	
+	; as if there were no digits; i.e. go to the upper left corner.
+	;
+	; HOWEVER, in VT100 escape sequences, the lines and columns are
+	; numbered from 1, and the spec says that either 0 or 1 are to be
+	; interpreted as 1.  We number lines and columns from 0, so we need
+	; to make some adjustments.
+	;
+	; Basically, we have to decrement the parameters to make them 0-based,
+	; but we must not go below zero.
+
 	; Restore the character under the old cursor.
 	ld	a, (screen_char_under_cursor)
 	ld	hl, (screen_cursor_location)
@@ -1097,12 +1127,32 @@ screen_move_cursor_numeric:
 
 	; Get the line parameter, and multiply it by 80.
 	ld	a, (screen_group_0_digits)
+	or	a				; See if it needs adjustment
+	jr	Z, screen_move_cursor_numeric_no_decrement_group_0
+	dec	a				; Yes - convert to 0-based
+screen_move_cursor_numeric_no_decrement_group_0:
+
+	; We also need to limit the line parameter to a maximum of 23.
+	cp	24				; sets borrow if A = 23 or less
+	jr	C, screen_move_cursor_numeric_no_overflow_group_0
+	ld	a, 23				; Overflow, so limit it
+screen_move_cursor_numeric_no_overflow_group_0:
 	ld	e, a
 	ld	a, 80
 	call	math_multiply_16x8
 
 	; Get the column parameter and add it in.
 	ld	a, (screen_group_1_digits)
+	or	a				; See if it needs adjustment
+	jr	Z, screen_move_cursor_numeric_no_decrement_group_1
+	dec	a				; Yes - convert to 0-based
+screen_move_cursor_numeric_no_decrement_group_1:
+
+	; We also need to limit the column parameter to a maximum of 79.
+	cp	80				; sets borrow if A = 79 or less
+	jr	C, screen_move_cursor_numeric_no_overflow_group_1
+	ld	a, 79				; Overflow, so limit it
+screen_move_cursor_numeric_no_overflow_group_1:
 	ld	e, a
 	add	hl, de
 
