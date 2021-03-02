@@ -98,8 +98,9 @@ dipSW			equ 0xc010
 ; We have to disable interrupts for mutual exclusion with the
 ; uart_test_interrupt routine.
 ;
-; Return the character in the B register, or -1 if nothing
-; available.
+; Input none
+; Alters AF, HL
+; Output B = character, or -1 if nothing available.
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -142,9 +143,15 @@ uart_get_char_none:
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
 ; uart_test_interrupt - see if the uart has posted an interrupt
 ;
 ; This runs from the interrupt service routine with interrupts disabled.
+;
+; Input none
+; Alters AF', HL'
+; Output none
+;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 uart_test_interrupt:
@@ -170,9 +177,15 @@ uart_test_interrupt_done:
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
 ; uart_store_char - store a character in the receive buffer
 ;
 ; This runs from the interrupt service routine with interrupts disabled.
+;
+; Input none
+; Alters AF', HL'
+; Output none
+;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 uart_store_char:
@@ -209,16 +222,21 @@ uart_store_char_no_room:
 	ret
 
 #data RAM
+
+; Circular receive buffer
 uart_rb:
 	ds	128
 uart_rb_end:
 
+; Input offset into receive buffer.
 uart_rb_input:
 	ds	1
 
+; Output offset into receive buffer.
 uart_rb_output:
 	ds	1
 
+; How many bytes are in the receive buffer.
 uart_rb_count:
 	ds	1
 
@@ -228,7 +246,7 @@ uart_rb_count:
 ; uart_transmit - transmit the character in register B
 ;
 ; Input B
-; Alters HL, A
+; Alters AF, HL
 ; Output none
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -251,7 +269,8 @@ uart_transmit:
 ; uart_initialize - get the uart ready
 ;
 ; Input none
-; Alters HL, DE, BC, AF
+; Alters AF, BC, DE, HL
+; Output none
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -297,7 +316,7 @@ uart_initialize:
 ; uart_set_baud - set the baud rate based on the dip switches
 ;
 ; Input none
-; Alters HL, DE, BC, AF
+; Alters AF, BC, DE, HL
 ; Output none
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

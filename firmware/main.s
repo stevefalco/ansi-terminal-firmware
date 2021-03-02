@@ -5,13 +5,13 @@
 
 #code ROM
 
-rst0:	; at address 0x0000
+rst0:	; At address 0x0000
 	di
 	ld	sp, $8000	; stack pre-decrements, grows down
 	jr	start
 
 	defs	0x38-$, $00
-isr38:	; at address 0x0038
+isr38:	; At address 0x0038
 	di			; block interrupts while in handler
 	ex	af, af'		; exchange a & f with their shadows
 	exx			; exchange bc, de, and hl with their shadows
@@ -22,7 +22,7 @@ isr38:	; at address 0x0038
 	ret			; and go back to where we were
 
 	defs	0x66-$, $00
-nmi:	; at address 0x0066
+nmi:	; At address 0x0066
 	ld	a, i
 	push	af
 	pop	af
@@ -33,7 +33,7 @@ nmi:	; at address 0x0066
 start:
 	im	1		; interrupt mode=1, all ISRs go to 0x38
 
-	; Simulator wants everything cleared.
+	; ModelSim wants everything cleared or else unknowns kill the simulation.
 	;
 	; Note that we cannot use "xor a" to clear A here, because it is
 	; initially undefined in the simulator!

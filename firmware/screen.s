@@ -509,7 +509,7 @@ screen_escape_handler:
 
 	; FIXME
 	;
-	; Our UART returns 8-bit characters, but some documents suggest that
+	; Our UART returns 8-bit characters, and some documents suggest that
 	; escape sequence characters might have 0x40 added to them.  For example,
 	; a left square bracket might be 0x5b, or it might be 0x9b.  If that
 	; turns out to be the case, we may have to make an adjustment and handle
