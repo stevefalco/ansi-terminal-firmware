@@ -581,6 +581,12 @@ screen_escape_handler_in_csi:
 	cp	'D'
 	jp	Z, screen_move_cursor_left
 
+	cp	'J'
+	jp	Z, screen_clear_to_end_of_screen
+
+	cp	'K'
+	jp	Z, screen_clear_to_end_of_line
+
 screen_bad_sequence:
 
 	; This is not a sequence we handle yet.
@@ -862,7 +868,7 @@ d9: .asciz "screen_move_cursor_left"
 
 screen_move_cursor_left:
 
-	ld	hl, d8
+	ld	hl, d9
 	call	debug_print_string
 	call	debug_print_eol
 
@@ -923,7 +929,79 @@ screen_move_cursor_left_go:
 	ld	a, escape_none_state
 	ld	(screen_escape_state), a
 	ret
-	
+
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; screen_clear_to_end_of_screen
+;
+; Input none
+; Alters HL, BC, DE, AF
+; Output none
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+d10: .asciz "screen_clear_to_end_of_screen"
+
+screen_clear_to_end_of_screen:
+
+	ld	hl, d10
+	call	debug_print_string
+	call	debug_print_eol
+
+	; Clear the character under the cursor
+	; FIXME - not sure if this is correct.
+	xor	a				; Clear A, clear carry
+	ld	(screen_char_under_cursor), a
+
+	ld	hl, (screen_cursor_location)	; HL = cursor location
+	ld	de, screen_end			; DE = LWA+1
+
+	; We will clear with space characters.
+	ld	a, char_space
+
+screen_clear_to_end_of_screen_loop:
+	inc	hl				; Next position to clear
+
+	; Make sure we haven't gone off the end.  Carry is already clear.
+	push	hl				; Save HL on the stack
+	sbc	hl, de				; Sets borrow if DE > HL
+	pop	hl				; HL = position to clear
+	jr	NC, screen_clear_to_end_of_screen_done
+	ld	(hl), a				; Clear the character
+	jr	screen_clear_to_end_of_screen_loop
+
+screen_clear_to_end_of_screen_done:
+
+	; Escape sequence complete.
+	ld	a, escape_none_state
+	ld	(screen_escape_state), a
+	ret
+
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; screen_clear_to_end_of_screen
+;
+; Input none
+; Alters HL, BC, DE, AF
+; Output none
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+d11: .asciz "screen_clear_to_end_of_line"
+
+screen_clear_to_end_of_line:
+
+	ld	hl, d11
+	call	debug_print_string
+	call	debug_print_eol
+
+	; Escape sequence complete.
+	ld	a, escape_none_state
+	ld	(screen_escape_state), a
+	ret
+
 #data RAM
 
 ; Pointer into video memory.
