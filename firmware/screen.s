@@ -1,9 +1,10 @@
 ; Dual-ported video memory - 1920 bytes.
 screen_base		equ 0x8000				; Physical address
-screen_line		equ 80					; Length of one line
+screen_cols		equ 80					; Number of columns
+screen_lines		equ 24					; Number of lines
 screen_length		equ 1920				; Length of whole screen
 screen_end		equ (screen_base + screen_length)	; LWA+1
-screen_last_line_start	equ (screen_end - screen_line)		; Address of col=0, row=23
+screen_last_line_start	equ (screen_end - screen_cols)		; Address of col=0, row=23
 
 char_bs			equ 0x08
 char_ht			equ 0x09
@@ -12,12 +13,23 @@ char_vt			equ 0x0b
 char_ff			equ 0x0c
 char_cr			equ 0x0d
 char_escape		equ 0x1b
-char_space		equ 0x20
 char_del		equ 0x7f
+
+; Escape state machine states.
+escape_none_state	equ 0x00			; No escape yet
+escape_need_first_state	equ 0x01			; Need first char of sequence
+escape_csi_state	equ 0x02			; First char is '['
+escape_csi_d_N_state	equ 0x03			; Accumulating group of digits in CSI
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
 ; screen_handler - read from the uart and update the screen
+;
+; Input none
+; Alters AF, B
+; Output none
+;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 screen_handler:
@@ -36,7 +48,7 @@ screen_handler:
 	; Not in an escape sequence, so treat it as a normal character.
 	;
 	; Printing characters run from 0x20 through 0x7f.
-	cp	char_space
+	cp	' '			; Space character
 	jp	P, screen_normal_char	; Positive means >=
 
 	; There are not too many special characters, so we won't bother
@@ -77,7 +89,13 @@ screen_handler:
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
 ; screen_normal_char - normal printing character.
+;
+; Input B = new character
+; Alters AF, BC, DE, HL
+; Output none
+;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 screen_normal_char:
@@ -89,11 +107,11 @@ screen_normal_char:
 
 	; See if hl is now off screen.  If so, we must scroll up before
 	; placing the cursor.
-	push	hl				; Save potential new cursor position
+	ld	de, hl				; Save potential new cursor position
 	or	a				; Clear carry
 	ld	bc, screen_end			; LWA+1 of screen memory
 	sbc	hl, bc				; Sets borrow if bc > hl
-	pop	hl				; Restore potential new cursor position
+	ld	hl, de				; Restore potential new cursor position
 	jr	C, screen_normal_char_new_cursor; The cursor is still on screen, use it
 
 	; The cursor is off the screen at LWA+1
@@ -111,7 +129,13 @@ screen_normal_char_new_cursor:
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
 ; screen_handle_bs - handle a backspace
+;
+; Input none
+; Alters AF, BC, DE, HL
+; Output none
+;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 screen_handle_bs:
@@ -147,7 +171,13 @@ screen_move_cursor_bs_done:
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
 ; screen_handle_ht - handle a horizontal tab
+;
+; Input none
+; Alters AF, BC, DE, HL
+; Output none
+;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 screen_handle_ht:
@@ -174,11 +204,11 @@ screen_handle_ht:
 
 	; Now we need to make sure we didn't run off the end of the line.
 	ld	l, a			; Save the column into L
-	cp	a, screen_line		; Did we go too far?
+	cp	a, screen_cols		; Did we go too far?
 	jr	C, screen_handle_ht_ok	; No, we are ok
 
 	; We went too far.  Instead, we need to stop at column 79.
-	ld	l, screen_line - 1
+	ld	l, screen_cols - 1
 
 screen_handle_ht_ok:
 
@@ -194,48 +224,41 @@ screen_handle_ht_ok:
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
 ; screen_handle_lf - handle a line feed
+;
+; Input none
+; Alters AF, BC, DE, HL
+; Output none
+;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 screen_handle_lf:
 
-	; line-feed means we move 80 characters forward, but if that would
-	; move us off the screen, then we have to scroll up one line.
-	ld	hl, (screen_cursor_location)
-	ld	bc, screen_line		; bc = 80
-	add	hl, bc			; this will clear carry
-	ld	de, hl			; save the result
-	ld	bc, screen_end		; LWA + 1
-	sbc	hl, bc			; will set borrow if bc > hl
-	jr	C, screen_lf_no_scroll
-
-	; We have to scroll up.  First, put back whatever was under the cursor.
+	; Put back whatever was under the cursor.
 	ld	a, (screen_char_under_cursor)
 	ld	hl, (screen_cursor_location)
 	ld	(hl), a
+
+	; line-feed means we move 80 characters forward, but if that would
+	; move us off the screen, then we have to scroll up one line.
+	ld	hl, (screen_cursor_location); HL = original position
+	ld	bc, screen_cols		; BC = 80
+	add	hl, bc			; HL = proposed new position, clears carry
+	ld	de, hl			; DE = proposed new position
+	ld	bc, screen_end		; BC = LWA+1
+	sbc	hl, bc			; Set borrow if BC (LWA+1) > HL (proposed position)
+	ld	hl, de			; HL = proposed new position
+	jr	C, screen_lf_no_scroll	; proposed new position is ok
 
 	; Now scroll up.
 	call	screen_scroll_up
-
-	; Finally, repaint the cursor.  The new line is blank, so save the
-	; space under the cursor.
 	ld	hl, (screen_cursor_location)
-	ld	a, (hl)
-	ld	(screen_char_under_cursor), a
-	ld	(hl), char_del
-
-	ret
 
 screen_lf_no_scroll:
 
-	; Just move the cursor.  First, replace whatever was under the cursor.
-	ld	a, (screen_char_under_cursor)
-	ld	hl, (screen_cursor_location)
-	ld	(hl), a
-
-	; Now save whatever is under the new cursor, and paint a cursor over it.
+	; Save whatever is under the new cursor, and paint a cursor over it.
 	; And save the location.
-	ld	hl, de
 	ld	a, (hl)
 	ld	(screen_char_under_cursor), a
 	ld	(hl), char_del
@@ -245,7 +268,13 @@ screen_lf_no_scroll:
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
 ; screen_handle_cr - handle a carriage return
+;
+; Input none
+; Alters AF, BC, DE, HL
+; Output none
+;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 screen_handle_cr:
@@ -269,23 +298,26 @@ screen_handle_cr:
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
 ; screen_scroll_up - scroll up one line
 ;
-; Uses af, bc, de, hl
+; Input none
+; Alters F, BC, DE, HL
+; Output none
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 screen_scroll_up:
 
 	; Move 23 lines up.  The top line is lost.
-	ld	hl, screen_base	+ screen_line		; source
+	ld	hl, screen_base	+ screen_cols		; source
 	ld	de, screen_base				; destination
-	ld	bc, screen_line * 23			; all 23 lines
+	ld	bc, screen_cols * 23			; all 23 lines
 	ldir
 	
 	; Now clear the last line, since it is "new".
-	ld	hl, screen_base	+ (23 * screen_line)
-	ld	b, screen_line
+	ld	hl, screen_base	+ (23 * screen_cols)
+	ld	b, screen_cols
 screen_scroll_up_loop:
 	ld	(hl), 0
 	inc	hl
@@ -295,23 +327,26 @@ screen_scroll_up_loop:
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
 ; screen_scroll_down - scroll down one line
 ;
-; Uses af, bc, de, hl
+; Input none
+; Alters F, BC, DE, HL
+; Output none
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 screen_scroll_down:
 
 	; Move 23 lines down.  The bottom line is lost.
-	ld	hl, screen_end - 1 - screen_line	; source
+	ld	hl, screen_end - 1 - screen_cols	; source
 	ld	de, screen_end - 1			; destination
-	ld	bc, screen_line * 23			; all 23 lines
+	ld	bc, screen_cols * 23			; all 23 lines
 	lddr
 	
 	; Now clear the first line, since it is "new".
 	ld	hl, screen_base
-	ld	b, screen_line
+	ld	b, screen_cols
 screen_scroll_down_loop:
 	ld	(hl), 0
 	inc	hl
@@ -321,7 +356,13 @@ screen_scroll_down_loop:
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
 ; screen_initialize - clear our working storage.
+;
+; Input none
+; Alters AF, BC, HL
+; Output none
+;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 screen_initialize:
@@ -334,7 +375,7 @@ screen_initialize_loop:
 	dec	bc
 	ld	a, b
 	or	c
-	jr	nz, screen_initialize_loop
+	jr	NZ, screen_initialize_loop
 	
 	; Initialize the cursor pointer.
 	ld	hl, screen_base
@@ -358,20 +399,22 @@ screen_initialize_loop:
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; screen_cursor_in_line - figure out which line the cursor is in.
 ;
-; Uses af, bc, de, hl
+; screen_cursor_in_line - Figure out which line the cursor is in.
 ;
-; Result in register A, carry will be clear at the end of this routine.
+; Input none
+; Alters AF, BC, DE, HL
+; Output A = line containing cursor (0 to 23), clears carry
+;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 screen_cursor_in_line:
 	xor	a				; Clear register A
 
 	; Start at the beginning.
-	ld	de, screen_line			; de = 80 chars per line
-	ld	hl, screen_base - 1		; hl = base address of video minus 1
-	ld	bc, (screen_cursor_location)	; bc = cursor address in video ram
+	ld	de, screen_cols			; DE = 80 chars per line
+	ld	hl, screen_base - 1		; HL = base address of video minus 1
+	ld	bc, (screen_cursor_location)	; BC = cursor address in video ram
 
 	; Save the screen base for use in the loop.
 	push	hl
@@ -385,7 +428,7 @@ screen_cursor_in_line_again:
 	push	hl
 
 	; See if we are past it.
-	sbc	hl, bc				; Will set borrow if bc > hl, meaning the
+	sbc	hl, bc				; Will set borrow if BC > HL, meaning the
 						; cursor is past the end of this line.
 	jr	NC, screen_cursor_in_line_found	; No borrow.  Cursor is in this line.
 
@@ -401,54 +444,40 @@ screen_cursor_in_line_found:
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
 ; screen_cursor_start_of_line - Find the address of the start of the line containing cursor
 ;
-; Uses AF, BC, DE, HL
+; Input none
+; Alters AF, B, DE, HL
+; Output HL = FWA of the line containing the cursor, clears carry
 ;
-; Result in register HL, carry will be clear at the end of this routine.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 screen_cursor_start_of_line:
 
 	; Find what line we are on.  The call returns 0 to 23 in register A.
 	; As a side effect, it also clears carry.
-	call	screen_cursor_in_line
+	call	screen_cursor_in_line			; A = line number
 
-	; Bump A so we can use sub below.
-	add	a, 1					; Can't set carry
-	ld	hl, screen_base - screen_line		; hl = imaginary line before buffer
-	ld	bc, screen_line				; bc = 80
+	ld	de, screen_cols				; DE = 80
+	call	math_multiply_16x8			; HL = A * DE (0 to 1840)
+	ld	de, screen_base				; DE = start of video buffer
+	add	hl, de					; HL = start of line
 
-	; We essentially need to add (A * 80) to hl.  Since there is no
-	; multiply instruction, we just repeatedly add.
-screen_cursor_start_of_line_again:
-	add	hl, bc					; hl = start of next line, no carry
-	sub	1					; Won't set borrow (carry)
-	jr	NZ, screen_cursor_start_of_line_again
-
-	; HL contains pointer to the first byte of the line.
 	ret
-
-char_lsb		equ '['
-
-; Escape state machine states.
-escape_none_state	equ 0x00			; No escape yet
-escape_need_first_state	equ 0x01			; Need first char of sequence
-escape_csi_state	equ 0x02			; First char is '['
-escape_csi_d_N_state	equ 0x03			; Accumulating group of digits in CSI
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
 ; screen_handle_escape - handle an escape
+;
+; Input none
+; Alters A
+; Output none
+;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-d0: .asciz "screen_handle_escape"
-
 screen_handle_escape:
-
-	ld	hl, d0
-	call	debug_print_string
-	call	debug_print_eol
 
 	; An escape sequence is variable length.  We need a state-machine to
 	; keep track of where we are in a potential sequence.
@@ -467,17 +496,13 @@ screen_handle_escape:
 ;
 ; Called for each new character until the escape sequence ends.
 ;
-; New character is in both registers A and B
+; Input B = new character
+; Alters AF, BC, DE, HL
+; Output none
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-d1: .asciz "screen_escape_handler"
-
 screen_escape_handler:
-
-	ld	hl, d1
-	call	debug_print_string
-	call	debug_print_eol
 
 	; We are in an escape sequence, and we've gotten the next character
 	; of it.
@@ -497,10 +522,10 @@ screen_escape_handler:
 	jr	Z, screen_escape_handler_first		; Got first char after escape
 
 	cp	escape_csi_state
-	jp	Z, screen_escape_handler_in_csi		; Got first char after '['
+	jr	Z, screen_escape_handler_in_csi		; Got first char after '['
 
 	cp	escape_csi_d_N_state
-	jp	Z, screen_escape_handler_in_csi		; Accumulating d0
+	jr	Z, screen_escape_handler_in_csi		; Accumulating d0
 
 	; Eventually there will be more states above.  This is the catch-all,
 	; which we shouldn't ever hit.  So, clear the escape state and give
@@ -511,21 +536,20 @@ screen_escape_handler:
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
 ; screen_escape_handler_first
 ;
 ; We have the first character after an escape.  Based on what we've got,
 ; change states.
 ;
+; Input B = new character
+; Alters AF, BC, DE, HL
+; Output none
+;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-d2: .asciz "screen_escape_handler_first"
 
 screen_escape_handler_first:
 	
-	ld	hl, d2
-	call	debug_print_string
-	call	debug_print_eol
-
 	; Clear our working storage.
 	xor	a
 	ld	(screen_group_0_digits), a
@@ -537,7 +561,7 @@ screen_escape_handler_first:
 	;
 	; Test for '[', the so-called CSI
 	ld	a, b
-	cp	char_lsb
+	cp	'['
 	jr	Z, screen_escape_handler_start_csi
 
 	cp	'7'
@@ -564,15 +588,13 @@ screen_escape_handler_first:
 ;
 ; We received a '['.
 ;
+; Input none
+; Alters A
+; Output none
+;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-d3: .asciz "screen_escape_handler_start_csi"
-
 screen_escape_handler_start_csi:
-
-	ld	hl, d3
-	call	debug_print_string
-	call	debug_print_eol
 
 	; Switch to the CSI state.
 	ld	a, escape_csi_state
@@ -582,34 +604,22 @@ screen_escape_handler_start_csi:
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
 ; screen_escape_handler_in_csi
 ;
-; We received a character following a '['.  Normally, this will be a digit.
+; We received a character following a '['.
+;
+; Input B = new character
+; Alters AF, BC, DE, HL
+; Output none
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-d4: .asciz "screen_escape_handler_in_csi"
-
 screen_escape_handler_in_csi:
 
-	ld	hl, d4
-	call	debug_print_string
-	call	debug_print_eol
+	ld	a, b					; A = new character
 
-	; If this is a digit, go to an "accumulating digits" state, until we
-	; see a non-digit.
-	ld	a, b
-	cp	'0'
-	jr	C, screen_bad_sequence			; < '0' character
-	cp	'9' + 1
-	jr	C, screen_got_group_N_digit		; <= '9' character
-
-	; It is not a digit.  If it is a semicolon, we have collected all the
-	; digits in an argument.  Note that there may be no digits before the
-	; semicolon, which implies zero.
-	;
-	; If it is something else, then we have the whole sequence.
-	
+	; Test for some of the simple commands.
 	cp	'A'
 	jp	Z, screen_move_cursor_up
 	
@@ -631,8 +641,17 @@ screen_escape_handler_in_csi:
 	cp	'K'
 	jp	Z, screen_clear_to_end_of_line
 
+	; If it is a semicolon, we have collected all the digits in an argument.
+	; Note that there may be no digits before the semicolon, which implies zero.
 	cp	';'
 	jp	Z, screen_next_argument
+
+	; If this is a digit, go to an "accumulating digits" state, until we
+	; see a non-digit.
+	cp	'0'
+	jr	C, screen_bad_sequence			; < '0' character
+	cp	'9' + 1
+	jr	C, screen_got_group_N_digit		; <= '9' character
 
 screen_bad_sequence:
 
@@ -643,16 +662,16 @@ screen_bad_sequence:
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
 ; screen_got_group_N_digit
+;
+; Input B = new digit
+; Alters AF, C, HL
+; Output none
+;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-d5: .asciz "screen_got_group_N_digit"
-
 screen_got_group_N_digit:
-
-	ld	hl, d5
-	call	debug_print_string
-	call	debug_print_eol
 
 	; We have a digit.  Go into the group N digits state.
 	ld	a, escape_csi_d_N_state
@@ -681,50 +700,41 @@ screen_got_group_N_digit:
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-d6: .asciz "screen_move_cursor_up"
-
 screen_move_cursor_up:
-
-	ld	hl, d6
-	call	debug_print_string
-	call	debug_print_eol
 
 	; If we are still in the escape_csi_state state, we didn't get any
 	; digits, so we just move the cursor up one line.  Start by assuming
 	; that.
-	ld	b, 1
+	ld	b, 1					; B = 1 line
 	push	bc					; Save the assumed value
 	
 	;  Test the assumption.
 	ld	a, (screen_escape_state)
-	cp	escape_csi_state
-	jr	Z, screen_move_cursor_up_do		; Assumption was correct
+	cp	escape_csi_state			; Were there any digits?
+	jr	Z, screen_move_cursor_up_do		; No, assumption was correct
 
 	; Assumption was wrong; get the distance to move up.  This is tricky
 	; because 0 or 1 means 1.
 	pop	bc					; Discard the assumed value
-	ld	a, (screen_group_0_digits)		; Get the value
+	ld	a, (screen_group_0_digits)		; A = number of lines to move
 	or	a					; Set flags
 	jr	NZ, screen_move_cursor_up_ready		; Non zero - use it directly
-	inc	a					; Change 0 to 1
+	inc	a					; Change A = 0 to A = 1
 screen_move_cursor_up_ready:
 	ld	b, a
 	push	bc					; Save the corrected value
 
 screen_move_cursor_up_do:
 
-	; Move cursor 80 characters backwards, but if that would
+	; Move the cursor 80 characters backwards, but if that would
 	; move us off the screen, then do nothing.
-	;
-	; FIXME - not sure if that is correct, or if we should
-	; scroll down.
-	or	a			; Clear carry
+	or	a					; Clear carry
 	ld	hl, (screen_cursor_location)
-	ld	bc, screen_line		; BC = 80
-	sbc	hl, bc			; this will clear carry
-	ld	de, hl			; save the result
-	ld	bc, screen_base		; FWA
-	sbc	hl, bc			; will set borrow if bc > hl
+	ld	bc, screen_cols				; BC = 80
+	sbc	hl, bc					; HL = proposed new location (clears carry)
+	ld	de, hl					; DE = proposed new location
+	ld	bc, screen_base				; BC = FWA of screen memory
+	sbc	hl, bc					; will set borrow if BC (FWA) > HL (proposed location)
 	jr	C, screen_move_cursor_up_cannot
 
 	; We have room to move the cursor.  Replace what was under the cursor.
@@ -740,7 +750,7 @@ screen_move_cursor_up_do:
 	ld	(hl), char_del
 	ld	(screen_cursor_location), hl
 
-	; See if we are done.
+	; See if we are done.  We cannot use djnz because b gets trashed in the loop.
 	pop	bc					; Retrieve the count
 	dec	b
 	push	bc
@@ -765,32 +775,26 @@ screen_move_cursor_up_cannot:
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-d7: .asciz "screen_move_cursor_down"
-
 screen_move_cursor_down:
-
-	ld	hl, d7
-	call	debug_print_string
-	call	debug_print_eol
 
 	; If we are still in the escape_csi_state state, we didn't get any
 	; digits, so we just move the cursor down one line.  Start by assuming
 	; that.
-	ld	b, 1
-	push	bc				; Save the assumed value
+	ld	b, 1					; B = 1 line
+	push	bc					; Save the assumed value
 	
 	;  Test the assumption.
 	ld	a, (screen_escape_state)
-	cp	escape_csi_state
-	jr	Z, screen_move_cursor_down_do	; Assumption was correct
+	cp	escape_csi_state			; Were there any digits?
+	jr	Z, screen_move_cursor_down_do		; No, assumption was correct
 
 	; Assumption was wrong; get the distance to move up.  This is tricky
 	; because 0 or 1 means 1.
 	pop	bc					; Discard the assumed value
-	ld	a, (screen_group_0_digits)		; Get the value
+	ld	a, (screen_group_0_digits)		; A = number of lines to move
 	or	a					; Set flags
 	jr	NZ, screen_move_cursor_down_ready	; Non zero - use it directly
-	inc	a					; Change 0 to 1
+	inc	a					; Change A = 0 to A = 1
 screen_move_cursor_down_ready:
 	ld	b, a
 	push	bc					; Save the corrected value
@@ -799,15 +803,12 @@ screen_move_cursor_down_do:
 
 	; Move cursor 80 characters forward, but if that would
 	; move us off the screen, then do nothing.
-	;
-	; FIXME - not sure if that is correct, or if we should
-	; scroll up.
-	ld	hl, (screen_cursor_location)
-	ld	bc, screen_line			; BC = 80
-	add	hl, bc				; this will clear carry
-	ld	de, hl				; save the result
-	ld	bc, screen_end			; LWA+1 of screen memory
-	sbc	hl, bc				; Sets borrow if bc > hl
+	ld	hl, (screen_cursor_location)		; HL = current position
+	ld	bc, screen_cols				; BC = 80
+	add	hl, bc					; HL = proposed new location (clears carry)
+	ld	de, hl					; DE = proposed new location
+	ld	bc, screen_end				; BC = LWA+1 of screen memory
+	sbc	hl, bc					; Sets borrow if BC (LWA+1) > HL (proposed location)
 	jr	NC, screen_move_cursor_down_cannot
 
 	; We have room to move the cursor.  Replace what was under the cursor.
@@ -823,7 +824,7 @@ screen_move_cursor_down_do:
 	ld	(hl), char_del
 	ld	(screen_cursor_location), hl
 
-	; See if we are done.
+	; See if we are done.  We cannot use djnz because b gets trashed in the loop.
 	pop	bc					; Retrieve the count
 	dec	b
 	push	bc
@@ -843,18 +844,12 @@ screen_move_cursor_down_cannot:
 ; screen_move_cursor_right
 ;
 ; Input none
-; Alters HL, BC, DE, AF
+; Alters AF, BC, DE, HL
 ; Output none
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-d8: .asciz "screen_move_cursor_right"
-
 screen_move_cursor_right:
-
-	ld	hl, d8
-	call	debug_print_string
-	call	debug_print_eol
 
 	; Restore the character under the old cursor.
 	ld	a, (screen_char_under_cursor)
@@ -871,7 +866,7 @@ screen_move_cursor_right:
 	;  Test the assumption.
 	ld	a, (screen_escape_state)
 	cp	escape_csi_state
-	jr	Z, screen_move_cursor_right_do	; Assumption was correct
+	jr	Z, screen_move_cursor_right_do		; Assumption was correct
 
 	; Assumption was wrong; get the distance to move right.  This is tricky
 	; because 0 or 1 means 1.
@@ -889,21 +884,21 @@ screen_move_cursor_right_do:
 	; HL still contains the current position.  Increment HL to the proposed
 	; new position and save it on the stack.  We will pop it into DE.
 	add	hl, bc
-	push	hl				; push proposal
+	push	hl					; push proposal
 
 	; Find the end of the line, so we don't move too far.
-	call	screen_cursor_start_of_line	; HL = FWA of this line
-	ld	de, screen_line - 1		; DE = 79
-	add	hl, de				; HL = LWA of this line, clears carry
+	call	screen_cursor_start_of_line		; HL = FWA of this line
+	ld	de, screen_cols - 1			; DE = 79
+	add	hl, de					; HL = LWA of this line, clears carry
 
 	; Retrieve the proposed location and see if we can move that far.
-	pop	de				; DE = proposal
-	push	hl				; push LWA
-	sbc	hl, de				; Sets borrow if DE (proposal) > HL (LWA)
-	pop	hl				; HL = LWA
-	jr	C, screen_move_cursor_right_go	; The move is bad, use LWA, alread in HL
+	pop	de					; DE = proposal
+	push	hl					; push LWA
+	sbc	hl, de					; Sets borrow if DE (proposal) > HL (LWA)
+	pop	hl					; HL = LWA
+	jr	C, screen_move_cursor_right_go		; The move is bad, use LWA, alread in HL
 
-	; THe proposed move is good.  Get it into HL.
+	; The proposed move is good.  Get it into HL.
 	ex	de, hl
 
 screen_move_cursor_right_go:
@@ -925,18 +920,12 @@ screen_move_cursor_right_go:
 ; screen_move_cursor_left
 ;
 ; Input none
-; Alters HL, BC, DE, AF
+; Alters AF, BC, DE, HL
 ; Output none
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-d9: .asciz "screen_move_cursor_left"
-
 screen_move_cursor_left:
-
-	ld	hl, d9
-	call	debug_print_string
-	call	debug_print_eol
 
 	; Restore the character under the old cursor.
 	ld	a, (screen_char_under_cursor)
@@ -953,7 +942,7 @@ screen_move_cursor_left:
 	;  Test the assumption.
 	ld	a, (screen_escape_state)
 	cp	escape_csi_state
-	jr	Z, screen_move_cursor_left_do	; Assumption was correct
+	jr	Z, screen_move_cursor_left_do		; Assumption was correct
 
 	; Assumption was wrong; get the distance to move left.  This is tricky
 	; because 0 or 1 means 1.
@@ -970,23 +959,23 @@ screen_move_cursor_left_do:
 
 	; HL still contains the current position.  Decrement HL to the proposed
 	; new position and save it on the stack.  We will pop it into DE.
-	or	a				; Clear carry
+	or	a					; Clear carry
 	sbc	hl, bc
-	push	hl				; push proposal
+	push	hl					; push proposal
 
 	; Find the beginning of the line, so we don't move too far.
-	call	screen_cursor_start_of_line	; HL = FWA of this line
+	call	screen_cursor_start_of_line		; HL = FWA of this line
 
 	; Retrieve the proposed location and see if we can move that far.
-	pop	de				; DE = proposal
-	push	de				; push proposal
-	ex	de, hl				; DE = FWA, HL = proposal
-	sbc	hl, de				; Sets borrow if DE (FWA) > HL (proposal)
-	ex	de, hl				; HL = FWA, DE = garbage
-	pop	de				; DE = proposal
-	jr	C, screen_move_cursor_left_go	; The move is bad, use FWA, alread in HL
+	pop	de					; DE = proposal
+	push	de					; push proposal
+	ex	de, hl					; DE = FWA, HL = proposal
+	sbc	hl, de					; Sets borrow if DE (FWA) > HL (proposal)
+	ex	de, hl					; HL = FWA, DE = garbage
+	pop	de					; DE = proposal
+	jr	C, screen_move_cursor_left_go		; The move is bad, use FWA, alread in HL
 
-	; THe proposed move is good.  Get it into HL.
+	; The proposed move is good.  Get it into HL.
 	ex	de, hl
 
 screen_move_cursor_left_go:
@@ -1008,40 +997,33 @@ screen_move_cursor_left_go:
 ; screen_clear_to_end_of_screen
 ;
 ; Input none
-; Alters HL, DE, AF
+; Alters AF, DE, HL
 ; Output none
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-d10: .asciz "screen_clear_to_end_of_screen"
-
 screen_clear_to_end_of_screen:
 
-	ld	hl, d10
-	call	debug_print_string
-	call	debug_print_eol
-
 	; Clear the character under the cursor
-	; FIXME - not sure if this is correct.
-	xor	a				; Clear A
+	xor	a					; Clear A
 	ld	(screen_char_under_cursor), a
 
-	ld	hl, (screen_cursor_location)	; HL = cursor location
-	ld	de, screen_end			; DE = LWA+1
+	ld	hl, (screen_cursor_location)		; HL = cursor location
+	ld	de, screen_end				; DE = LWA+1
 
-	; We will clear with space characters.
-	ld	a, char_space
+	; We will clear with nulls.
+	xor	a
 
 screen_clear_to_end_of_screen_loop:
-	inc	hl				; Next position to clear
+	inc	hl					; Next position to clear
 
 	; Make sure we haven't gone off the end.
-	or	a				; Clear carry
-	push	hl				; Save HL on the stack
-	sbc	hl, de				; Sets borrow if DE > HL
-	pop	hl				; HL = position to clear
+	or	a					; Clear carry
+	push	hl					; Save HL on the stack
+	sbc	hl, de					; Sets borrow if DE > HL
+	pop	hl					; HL = position to clear
 	jr	NC, screen_clear_to_end_of_screen_done
-	ld	(hl), a				; Clear the character
+	ld	(hl), a					; Clear the character
 	jr	screen_clear_to_end_of_screen_loop
 
 screen_clear_to_end_of_screen_done:
@@ -1057,44 +1039,37 @@ screen_clear_to_end_of_screen_done:
 ; screen_clear_to_end_of_screen
 ;
 ; Input none
-; Alters HL, BC, DE, AF
+; Alters AF, BC, DE, HL
 ; Output none
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-d11: .asciz "screen_clear_to_end_of_line"
-
 screen_clear_to_end_of_line:
 
-	ld	hl, d11
-	call	debug_print_string
-	call	debug_print_eol
-
 	; Clear the character under the cursor
-	; FIXME - not sure if this is correct.
-	xor	a				; Clear A
+	xor	a					; Clear A
 	ld	(screen_char_under_cursor), a
 
 	; Find the end of the line, so we don't move too far.
-	call	screen_cursor_start_of_line	; HL = FWA of this line
-	ld	de, screen_line			; DE = 80
-	add	hl, de				; HL = LWA+1 of this line, clears carry
-	ex	de, hl				; DE = LWA+1, HL=80
-	ld	hl, (screen_cursor_location)	; HL = cursor location
+	call	screen_cursor_start_of_line		; HL = FWA of this line
+	ld	de, screen_cols				; DE = 80
+	add	hl, de					; HL = LWA+1 of this line, clears carry
+	ex	de, hl					; DE = LWA+1, HL=80
+	ld	hl, (screen_cursor_location)		; HL = cursor location
 
-	; We will clear with space characters.
-	ld	a, char_space
+	; We will clear with nulls.
+	xor	a
 
 screen_clear_to_end_of_line_loop:
-	inc	hl				; Next position to clear
+	inc	hl					; Next position to clear
 
 	; Make sure we haven't gone off the end.  Carry is already clear.
-	or	a				; Clear carry
-	push	hl				; Save HL on the stack
-	sbc	hl, de				; Sets borrow if DE > HL
-	pop	hl				; HL = position to clear
+	or	a					; Clear carry
+	push	hl					; Save HL on the stack
+	sbc	hl, de					; Sets borrow if DE > HL
+	pop	hl					; HL = position to clear
 	jr	NC, screen_clear_to_end_of_line_done
-	ld	(hl), a				; Clear the character
+	ld	(hl), a					; Clear the character
 	jr	screen_clear_to_end_of_line_loop
 
 screen_clear_to_end_of_line_done:
@@ -1106,43 +1081,42 @@ screen_clear_to_end_of_line_done:
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; screen_next_argument
+;
+; screen_next_argument - we got a semicolon, so there may be a second argument
+;
+; Input none
+; Alters HL
+; Output none
+;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-d12: .asciz "screen_next_argument"
 
 screen_next_argument:
 
-	ld	hl, d12
-	call	debug_print_string
-	call	debug_print_eol
-
-	; I think there can only be two arguments.  So, just switch to
-	; group 1.
-	ld	hl, screen_group_1_digits	; Pointer to the group_1 buffer
-	ld	(screen_group_pointer), hl	; Save the pointer
+	; We only handle up to two arguments.  So, just switch to group 1.
+	ld	hl, screen_group_1_digits		; Pointer to the group_1 buffer
+	ld	(screen_group_pointer), hl		; Save the pointer
 
 	ret
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
 ; screen_move_cursor_numeric
+;
+; Input none
+; Alters AF, BC, DE, HL
+; Output none
+;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-d13: .asciz "screen_move_cursor_numeric"
-
 screen_move_cursor_numeric:
-
-	ld	hl, d13
-	call	debug_print_string
-	call	debug_print_eol
 
 	; There may be digits or not, but it doesn't matter.  If there are
 	; no digits, our numeric buffers have 0,0 which means the same thing
 	; as if there were no digits; i.e. go to the upper left corner.
 	;
 	; HOWEVER, in VT100 escape sequences, the lines and columns are
-	; numbered from 1, and the spec says that either 0 or 1 are to be
+	; numbered from 1, and the spec says that both 0 and 1 are to be
 	; interpreted as 1.  We number lines and columns from 0, so we need
 	; to make some adjustments.
 	;
@@ -1154,44 +1128,44 @@ screen_move_cursor_numeric:
 	ld	hl, (screen_cursor_location)
 	ld	(hl), a
 
-	; Zero D for use in the multiplies and adds.
+	; Zero D for use when we multiply and add.
 	xor	a
 	ld	d, a
 
 	; Get the line parameter, and multiply it by 80.
 	ld	a, (screen_group_0_digits)
-	or	a				; See if it needs adjustment
-	jr	Z, screen_move_cursor_numeric_no_decrement_group_0
-	dec	a				; Yes - convert to 0-based
+	or	a					; First see if it needs adjustment
+	jr	Z, screen_move_cursor_numeric_no_decrement_group_0 ; No, leave it zero
+	dec	a					; Yes - convert to 0-based
 screen_move_cursor_numeric_no_decrement_group_0:
 
 	; We also need to limit the line parameter to a maximum of 23.
-	cp	24				; sets borrow if A = 23 or less
-	jr	C, screen_move_cursor_numeric_no_overflow_group_0
-	ld	a, 23				; Overflow, so limit it
+	cp	screen_lines				; sets borrow if A = 23 or less
+	jr	C, screen_move_cursor_numeric_no_overflow_group_0 ; Good
+	ld	a, screen_lines - 1			; Overflow, so limit it
 screen_move_cursor_numeric_no_overflow_group_0:
-	ld	e, a
-	ld	a, 80
-	call	math_multiply_16x8
+	ld	e, a					; D still 0, E = new row
+	ld	a, screen_cols				; A = 80
+	call	math_multiply_16x8			; HL = new row * 80
 
 	; Get the column parameter and add it in.
 	ld	a, (screen_group_1_digits)
-	or	a				; See if it needs adjustment
+	or	a					; First see if it needs adjustment
 	jr	Z, screen_move_cursor_numeric_no_decrement_group_1
-	dec	a				; Yes - convert to 0-based
+	dec	a					; Yes - convert to 0-based
 screen_move_cursor_numeric_no_decrement_group_1:
 
 	; We also need to limit the column parameter to a maximum of 79.
-	cp	80				; sets borrow if A = 79 or less
+	cp	screen_cols				; sets borrow if A = 79 or less
 	jr	C, screen_move_cursor_numeric_no_overflow_group_1
-	ld	a, 79				; Overflow, so limit it
+	ld	a, screen_cols - 1			; Overflow, so limit it
 screen_move_cursor_numeric_no_overflow_group_1:
-	ld	e, a
-	add	hl, de
+	ld	e, a					; D still 0, E = new column
+	add	hl, de					; HL = (new row * 80) + new column
 
 	; Get the start of the screen and combine.
-	ld	de, screen_base
-	add	hl, de
+	ld	de, screen_base				; DE = video FWA
+	add	hl, de					; HL = new address in video ram
 
 	; Paint a new cursor, but first save whatever is there.
 	ld	a, (hl)
@@ -1206,16 +1180,16 @@ screen_move_cursor_numeric_no_overflow_group_1:
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
 ; screen_save_cursor_position
+;
+; Input none
+; Alters A, HL
+; Output none
+;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-d14: .asciz "screen_save_cursor_position"
-
 screen_save_cursor_position:
-
-	ld	hl, d14
-	call	debug_print_string
-	call	debug_print_eol
 
 	; Save the cursor position
 	ld	hl, (screen_cursor_location)
@@ -1228,16 +1202,16 @@ screen_save_cursor_position:
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
 ; screen_restore_cursor_position
+;
+; Input none
+; Alters A, HL
+; Output none
+;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-d15: .asciz "screen_restore_cursor_position"
-
 screen_restore_cursor_position:
-
-	ld	hl, d15
-	call	debug_print_string
-	call	debug_print_eol
 
 	; Restore the character under the old cursor.
 	ld	a, (screen_char_under_cursor)
@@ -1260,7 +1234,13 @@ screen_restore_cursor_position:
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
 ; screen_handle_reverse_scroll
+;
+; Input none
+; Alters AF, BC, DE, HL
+; Output none
+;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 screen_handle_reverse_scroll:
@@ -1272,19 +1252,19 @@ screen_handle_reverse_scroll:
 
 	; reverse-scroll means we move 80 characters backward, but if that would
 	; move us off the screen, then we have to scroll down one line.
-	ld	hl, (screen_cursor_location)
-	ld	bc, screen_line		; BC = 80
-	or	a			; clear carry
-	sbc	hl, bc			; HL = proposed new position
-	ld	de, hl			; DE = proposed new position
-	ld	bc, screen_base		; BC = FWA
-	sbc	hl, bc			; will set borrow if BC (FWA) > HL (proposed position)
-	ld	hl, de			; HL = proposed new position
-	jr	NC, screen_reverse_no_scroll
+	ld	hl, (screen_cursor_location)		; HL = current position
+	ld	bc, screen_cols				; BC = 80
+	or	a					; Clear carry
+	sbc	hl, bc					; HL = proposed new position
+	ld	de, hl					; DE = proposed new position
+	ld	bc, screen_base				; BC = FWA
+	sbc	hl, bc					; Set borrow if BC (FWA) > HL (proposed position)
+	ld	hl, de					; HL = proposed new position
+	jr	NC, screen_reverse_no_scroll		; No borrow, so no scroll is needed
 
 	; We have to scroll down.
 	call	screen_scroll_down
-	ld	hl, (screen_cursor_location); HL = original position
+	ld	hl, (screen_cursor_location)		; HL = original position
 
 screen_reverse_no_scroll:
 
@@ -1305,20 +1285,26 @@ screen_reverse_no_scroll:
 screen_cursor_location:
 	ds	2
 
+; A place to save the cursor for ESC-7 and ESC-8
 screen_cursor_location_save:
 	ds	2
 
+; Pointer into the group that we are accumulating digits for.
 screen_group_pointer:
 	ds	2
 
+; Preserved character under the cursor so we can replace it when the cursor moves.
 screen_char_under_cursor:
 	ds	1
 
+; State machine variable.
 screen_escape_state:
 	ds	1
 
+; Group 0 accumulated digits.
 screen_group_0_digits:
 	ds	1
 
+; Group 1 accumulated digits.
 screen_group_1_digits:
 	ds	1

@@ -1,11 +1,12 @@
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
 ; math_multiply_10 - multiply A by ten and return the result in A
 ;
 ; This is used for processing escape numbers.  The largest value
 ; produced would be 80.
 ;
-; Uses A, C
+; Uses AF, C
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -25,6 +26,7 @@ math_multiply_10:
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
 ; math_multiply_16x8 - multiply DE by A and return the result in HL
 ;
 ; This is used for finding positions in the video buffer.  The largest
@@ -43,7 +45,7 @@ math_multiply_16x8:
 math_multiply_16x8_loop:
 	add	hl, hl			; Shift HL one bit to the left
 	add	a, a			; Shift A one bit to the left
-	jr	nc, math_multiply_16x8_no_add ; skip the addition
+	jr	NC, math_multiply_16x8_no_add ; skip the addition
 	add	hl, de			; Add DE into HL
 
 math_multiply_16x8_no_add:
