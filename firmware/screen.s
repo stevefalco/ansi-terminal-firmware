@@ -316,6 +316,7 @@ screen_initialize_loop:
 	; Initialize the cursor pointer.
 	ld	hl, screen_base
 	ld	(screen_cursor_location), hl
+	ld	(screen_cursor_location_save), hl
 
 	; Put up a cursor with a space under it.
 	ld	a, (hl)
@@ -515,6 +516,12 @@ screen_escape_handler_first:
 	ld	a, b
 	cp	char_lsb
 	jr	Z, screen_escape_handler_start_csi
+
+	cp	'7'
+	jp	Z, screen_save_cursor_position
+
+	cp	'8'
+	jp	Z, screen_restore_cursor_position
 
 	; Eventually there may be additional first chars.  This is the
 	; catch-all, which we shouldn't ever hit.  So, clear the escape
@@ -1171,10 +1178,67 @@ screen_move_cursor_numeric_no_overflow_group_1:
 	ld	(screen_escape_state), a
 	ret
 
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; screen_save_cursor_position
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+d14: .asciz "screen_save_cursor_position"
+
+screen_save_cursor_position:
+
+	ld	hl, d14
+	call	debug_print_string
+	call	debug_print_eol
+
+	; Save the cursor position
+	ld	hl, (screen_cursor_location)
+	ld	(screen_cursor_location_save), hl
+
+	; Escape sequence complete.
+	ld	a, escape_none_state
+	ld	(screen_escape_state), a
+	ret
+
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; screen_restore_cursor_position
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+d15: .asciz "screen_restore_cursor_position"
+
+screen_restore_cursor_position:
+
+	ld	hl, d15
+	call	debug_print_string
+	call	debug_print_eol
+
+	; Restore the character under the old cursor.
+	ld	a, (screen_char_under_cursor)
+	ld	hl, (screen_cursor_location)
+	ld	(hl), a
+
+	; Restore the cursor position
+	ld	hl, (screen_cursor_location_save)
+	ld	(screen_cursor_location), hl
+
+	; Paint a new cursor, but first save whatever is there.
+	ld	a, (hl)
+	ld	(screen_char_under_cursor), a
+	ld	(hl), char_del
+
+	; Escape sequence complete.
+	ld	a, escape_none_state
+	ld	(screen_escape_state), a
+	ret
+
 #data RAM
 
 ; Pointer into video memory.
 screen_cursor_location:
+	ds	2
+
+screen_cursor_location_save:
 	ds	2
 
 screen_group_pointer:
