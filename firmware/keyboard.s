@@ -218,6 +218,10 @@ keyboard_get_char_none:
 ;
 ; keyboard_handler - process any keystrokes we may have received.
 ;
+; Input none
+; Alters AF, BC, D, HL
+; Output none
+;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 keyboard_handler:
@@ -232,13 +236,8 @@ keyboard_handler:
 	or	a		; set flags
 	ret	Z		; toss it
 
-	; Dump the scan code and ascii code.
-	call	debug_show_bc
-
-	; Dump the status.
-	call	debug_show_de
-
-	call	debug_print_eol
+	ld	b, a		; Send it out the uart
+	call	uart_transmit
 
 	ret
 
