@@ -141,11 +141,11 @@ module ps2_keyboard_interface (
 // Parameters
 
 // The timer value can be up to (2^bits) inclusive.
-parameter TIMER_60USEC_VALUE_PP = 2950; // Number of sys_clks for 60usec.
-parameter TIMER_60USEC_BITS_PP  = 12;   // Number of bits needed for timer
-parameter TIMER_5USEC_VALUE_PP = 186;   // Number of sys_clks for debounce
-parameter TIMER_5USEC_BITS_PP  = 8;     // Number of bits needed for timer
-parameter TRAP_SHIFT_KEYS_PP = 0;       // Default: No shift key trap.
+parameter TIMER_60USEC_VALUE_PP = 774;  // Number of sys_clks for 60usec.
+parameter TIMER_60USEC_BITS_PP  = 10;   // Number of bits needed for timer
+parameter TIMER_5USEC_VALUE_PP = 63;    // Number of sys_clks for debounce
+parameter TIMER_5USEC_BITS_PP  = 6;     // Number of bits needed for timer
+parameter TRAP_SHIFT_KEYS_PP = 1;       // Trap shift keys - i.e. don't output scan codes for them.
 
 // State encodings, provided as parameters
 // for flexibility to the one instantiating the module.
@@ -684,7 +684,7 @@ begin
     12'h15b : ascii <= 8'h7d;  // }
     12'h10e : ascii <= 8'h7e;  // ~
     12'h?71 : ascii <= 8'h7f;  // (Delete OR DEL on numeric keypad)
-    default : ascii <= 8'h2e;  // '.' used for unlisted characters.
+    default : ascii <= 8'h00;  // NULL used for unlisted characters.
   endcase
 end
 
