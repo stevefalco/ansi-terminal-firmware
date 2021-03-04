@@ -56,6 +56,7 @@ start:
 	
 	call	uart_initialize
 	call	screen_initialize
+	call	keyboard_initialize
 
 	; Ready for interrupts
 	ei

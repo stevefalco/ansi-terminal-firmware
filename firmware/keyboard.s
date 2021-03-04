@@ -12,6 +12,31 @@ keyboard_Key_Released	equ 1				; Key has been released
 keyboard_Extended	equ 2				; Extended code prefix
 keyboard_Interrupt	equ 3				; Interrupt received
 
+keyboard_depth		equ 32				; Buffer depth.
+							; Warning: must multiply
+							; by 4 and still fit in A!
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; keyboard_initialize - get the keyboard ready
+;
+; Input none
+; Alters A
+; Output none
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+keyboard_initialize:
+	
+	xor	a
+
+	; Clear the scan code receive buffer
+	ld	(keyboard_rb_input), a
+	ld	(keyboard_rb_output), a
+	ld	(keyboard_rb_count), a
+
+	ret
+
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -55,20 +80,31 @@ keyboard_store_char:
 
 	; See if there is room in the buffer
 	ld	a, (keyboard_rb_count)
-	sub	128
+	sub	keyboard_depth
 	jp	P, keyboard_store_char_no_room
 
 	; Find the place to store the character.  We use a tricky
 	; way to add an 8 and 16 bit register together.
 	ld	a, (keyboard_rb_input)	; offset into buffer
+	add	a			; a = keyboard_rb_input * 2
+	add	a			; a = keyboard_rb_input * 4
 	ld	hl, keyboard_rb		; start of buffer
 	add	a, l			; a = a + l
 	ld	l, a			; l = a + l
 	adc	a, h			; a = a + l + h + carry
 	sub	l			; a = a + h + carry
 	ld	h, a			; h = h + carry
+
 	ld	a, (keyboard_SCAN_CODE)	; read from the keyboard
-	ld	(hl), a			; store the character
+	ld	(hl), a			; store the scan code
+	inc	hl			; move to the next byte
+
+	ld	a, (keyboard_ASCII_CODE); read from the keyboard
+	ld	(hl), a			; store the ascii code
+	inc	hl			; move to the next byte
+
+	ld	a, (keyboard_STATUS)	; read from the keyboard
+	ld	(hl), a			; store the status
 
 	; Increment the count
 	ld	a, (keyboard_rb_count)
@@ -87,9 +123,10 @@ keyboard_store_char_no_room:
 #data RAM
 
 ; Circular receive buffer
+;
+; We store the scan code, ascii code, and status byte.
 keyboard_rb:
-	ds	128
-keyboard_rb_end:
+	ds	keyboard_depth * 4
 
 ; Input offset into receive buffer.
 keyboard_rb_input:
@@ -112,8 +149,10 @@ keyboard_rb_count:
 ; keyboard_test_interrupt routine.
 ;
 ; Input none
-; Alters AF, HL
-; Output B = character, or -1 if nothing available.
+; Alters AF, BC, D, HL
+; Output B = scan code, or -1 if nothing available.
+;        C = ascii code
+;        D = status
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -131,13 +170,20 @@ keyboard_receive:
 	; Find the place to get the character.  We use a tricky
 	; way to add an 8 and 16 bit register together.
 	ld	a, (keyboard_rb_output)	; offset into buffer
+	add	a			; a = keyboard_rb_output * 2
+	add	a			; a = keyboard_rb_output * 4
 	ld	hl, keyboard_rb		; start of buffer
 	add	a, l			; a = a + l
 	ld	l, a			; l = a + l
 	adc	a, h			; a = a + l + h + carry
 	sub	l			; a = a + h + carry
 	ld	h, a			; h = h + carry
-	ld	b, (hl)			; read from the buffer
+
+	ld	b, (hl)			; read scan code
+	inc	hl
+	ld	c, (hl)			; read ascii code
+	inc	hl
+	ld	d, (hl)			; read status
 
 	; Decrement the count.
 	ld	a, (keyboard_rb_count)
@@ -168,8 +214,13 @@ keyboard_handler:
 	cp	-1		; -1 means "nothing available"
 	ret	Z		; No characters in our receive buffer.
 
-	; Dump the scan code
-	call	debug_show_a
+	; Dump the scan code and ascii code.
+	call	debug_show_bc
+
+	; Dump the status.
+	call	debug_show_de
+
+	call	debug_print_eol
 
 	ret
 

@@ -226,7 +226,6 @@ uart_store_char_no_room:
 ; Circular receive buffer
 uart_rb:
 	ds	128
-uart_rb_end:
 
 ; Input offset into receive buffer.
 uart_rb_input:
