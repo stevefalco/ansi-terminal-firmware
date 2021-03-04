@@ -231,10 +231,6 @@ keyboard_handler:
 	cp	-1		; -1 means "nothing available"
 	ret	Z		; No characters in our receive buffer.
 
- call debug_show_a
- call debug_show_bc
- call debug_show_de
-
 	; If the ascii code is 0, then toss the character.
 	ld	a, c		; ASCII code
 	or	a		; set flags
