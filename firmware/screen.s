@@ -56,25 +56,25 @@ screen_handler:
 
 	; Is it a backspace?
 	cp	char_bs
-	jr	Z, screen_handle_bs
+	jp	Z, screen_handle_bs
 
 	; Is it a horizontal tab?
 	cp	char_ht
-	jr	Z, screen_handle_ht
+	jp	Z, screen_handle_ht
 
 	; Is it a line feed?
 	cp	char_lf
-	jr	Z, screen_handle_lf
+	jp	Z, screen_handle_lf
 
 	; Is it a vertical tab?  This is handled like a line-feed according to a
 	; VT102 document I found.
 	cp	char_vt
-	jr	Z, screen_handle_lf
+	jp	Z, screen_handle_lf
 
 	; Is it a form feed?  This is handled like a line-feed according to a
 	; VT102 document I found.
 	cp	char_ff
-	jr	Z, screen_handle_lf
+	jp	Z, screen_handle_lf
 
 	; Is it a carriage return?
 	cp	char_cr
@@ -101,29 +101,96 @@ screen_handler:
 screen_normal_char:
 
 	; Put the character in B on the screen at the current position.
-	ld	hl, (screen_cursor_location)
+	; There is one tricky bit.  If the column is 0 through 78, then
+	; we place the character and advance the cursor one column.
+	;
+	; But, if we are in column 79, we don't advance the cursor until
+	; we get one more character.  That new character goes into column
+	; 0 on the next line, with scrolling if needed, and the cursor
+	; winds up in column 1.
+	;
+	; Before we do anything else, save B on the stack.
+	push	bc
+
+	; If the column 79 flag is set, this character needs special
+	; handling.
+	ld	a, (screen_col79_flag)
+	or	a
+	jr	NZ, screen_normal_char_col79
+
+	; Find the end of the line, so we don't move too far.
+	call	screen_cursor_start_of_line		; HL = FWA of this line
+	ld	de, screen_cols - 1			; DE = 79
+	add	hl, de					; HL = LWA of this line, clears carry
+	ex	de, hl					; DE = LWA of this line
+	ld	hl, (screen_cursor_location)		; HL = current location
+	sbc	hl, de					; Sets borrow if de (LWA) > hl (curr pos)
+	jr	C, screen_normal_char_not_last_col	; We are not at the last column
+
+	; This is the special case.  Instead of placing the character on the
+	; screen, we place it in the "save under" buffer.
+	pop	bc					; Get the new char back
+	ld	a, b					; New character
+	ld	(screen_char_under_cursor), a		; Store it.
+
+	; Set a flag so we know we are in the special case.
+	ld	a, 1
+	ld	(screen_col79_flag), a
+
+	; We don't move the cursor, so we are done.
+	ret
+
+screen_normal_char_not_last_col:
+	; This is the normal case.  Place the character on the screen and
+	; move the cursor.
+	pop	bc					; Get the new char back
+	ld	hl, (screen_cursor_location)		; HL = current location
 	ld	(hl), b
 	inc	hl
 
-	; See if hl is now off screen.  If so, we must scroll up before
-	; placing the cursor.
-	ld	de, hl				; Save potential new cursor position
-	or	a				; Clear carry
-	ld	bc, screen_end			; LWA+1 of screen memory
-	sbc	hl, bc				; Sets borrow if bc > hl
-	ld	hl, de				; Restore potential new cursor position
-	jr	C, screen_normal_char_new_cursor; The cursor is still on screen, use it
-
-	; The cursor is off the screen at LWA+1
-	call	screen_scroll_up		; Scroll up
-	ld	hl, screen_last_line_start	; Cursor now at col=0, row=23
-
-screen_normal_char_new_cursor:
-	; Paint a new cursor, but first save whatever is there.
+	; We know that the cursor must still be on this line, so save under,
+	; and paint the cursor.
 	ld	a, (hl)
 	ld	(screen_char_under_cursor), a
 	ld	(screen_cursor_location), hl
 	ld	(hl), char_del
+
+	ret
+
+screen_normal_char_col79:
+	; First, take the hidden character out of the "save under" buffer
+	; and place it on the screen.
+	ld	a, (screen_char_under_cursor)
+	ld	hl, (screen_cursor_location)		; HL = current location
+	ld	(hl), a
+	inc	hl					; HL = proposed cursor
+
+	; HL may now be pointing to column 0 of a line on the screen, or
+	; it may be pointing to the LWA+1; i.e. off screen  If so, we must
+	; scroll up before doing anything further.
+	ld	de, hl					; Save potential new cursor position
+	or	a					; Clear carry
+	ld	bc, screen_end				; LWA+1 of screen memory
+	sbc	hl, bc					; Sets borrow if bc > hl
+	ld	hl, de					; Restore potential new cursor position
+	jr	C, screen_normal_char_new_cursor	; The cursor is still on screen, use it
+
+	; The cursor is off the screen at LWA+1
+	call	screen_scroll_up			; Scroll up
+	ld	hl, screen_last_line_start		; Cursor now at col=0, row=23
+
+screen_normal_char_new_cursor:
+	; Place the new character in column 0.
+	pop	bc					; Get the new char back
+	ld	(hl), b
+	inc	hl					; HL now in column 1.
+	ld	a, (hl)
+	ld	(screen_char_under_cursor), a		; Save under
+	ld	(screen_cursor_location), hl
+	ld	(hl), char_del				; Paint the new cursor
+
+	xor	a
+	ld	(screen_col79_flag), a			; Clear the col 79 flag
 
 	ret
 
@@ -142,15 +209,21 @@ screen_handle_bs:
 	
 	; We want to move the cursor backwards one position, but we cannot
 	; go before col=0 of the row.
-	;
+	; 
+	; Also, if we happen to be in column 79, we will land in column 78,
+	; meaning that we must clear the col79 flag.  It is always safe to
+	; do this.
+	xor	a
+	ld	(screen_col79_flag), a			; Clear the col 79 flag
+	
 	; Find the beginning of the line, so we don't move too far.
-	call	screen_cursor_start_of_line	; HL = FWA of this line
-	ex	de, hl				; DE = FWA of this line
-	ld	hl, (screen_cursor_location)	; HL = current position
-	dec	hl				; HL = proposed new position
-	xor	a				; Clear carry
-	sbc	hl, de				; Sets borrow if DE (FWA) > HL (proposal)
-	jr	C, screen_move_cursor_bs_done	; The move is bad, we cannot move
+	call	screen_cursor_start_of_line		; HL = FWA of this line
+	ex	de, hl					; DE = FWA of this line
+	ld	hl, (screen_cursor_location)		; HL = current position
+	dec	hl					; HL = proposed new position
+	xor	a					; Clear carry
+	sbc	hl, de					; Sets borrow if DE (FWA) > HL (proposal)
+	jr	C, screen_move_cursor_bs_done		; The move is bad, we cannot move
 
 	; The move is good.  Restore the character under the old cursor.
 	ld	a, (screen_char_under_cursor)
@@ -279,6 +352,11 @@ screen_lf_no_scroll:
 
 screen_handle_cr:
 
+	; No matter what, we will land in colunm 0, meaning that we must clear
+	; the col79 flag.  It is always safe to do this.
+	xor	a
+	ld	(screen_col79_flag), a			; Clear the col 79 flag
+
 	; Replace the existing cursor with whatever should be under it.
 	ld	a, (screen_char_under_cursor)
 	ld	hl, (screen_cursor_location)
@@ -394,6 +472,10 @@ screen_initialize_loop:
 	ld	(screen_group_1_digits), a
 	ld	hl, screen_group_0_digits	; Pointer to the group_0 buffer
 	ld	(screen_group_pointer), hl	; Save the pointer
+
+	; Clear the column 79 flag
+	xor	a
+	ld	(screen_col79_flag), a			; Clear the col 79 flag
 
 	ret
 
@@ -927,6 +1009,11 @@ screen_move_cursor_right_go:
 
 screen_move_cursor_left:
 
+	; No matter what, we cannot land in colunm 79, meaning that we must clear
+	; the col79 flag.  It is always safe to do this.
+	xor	a
+	ld	(screen_col79_flag), a			; Clear the col 79 flag
+
 	; Restore the character under the old cursor.
 	ld	a, (screen_char_under_cursor)
 	ld	hl, (screen_cursor_location)
@@ -1156,6 +1243,16 @@ screen_move_cursor_numeric_no_overflow_group_0:
 screen_move_cursor_numeric_no_decrement_group_1:
 
 	; We also need to limit the column parameter to a maximum of 79.
+	cp	screen_cols - 1				; sets borrow if A = 78 or less
+	jr	NC, screen_move_cursor_numeric_col79_group_1
+
+	; We are moving to a column other than 79.  We must clear the flag.
+	push	af
+	xor	a
+	ld	(screen_col79_flag), a			; Clear the col 79 flag
+	pop	af
+
+screen_move_cursor_numeric_col79_group_1:
 	cp	screen_cols				; sets borrow if A = 79 or less
 	jr	C, screen_move_cursor_numeric_no_overflow_group_1
 	ld	a, screen_cols - 1			; Overflow, so limit it
@@ -1307,4 +1404,8 @@ screen_group_0_digits:
 
 ; Group 1 accumulated digits.
 screen_group_1_digits:
+	ds	1
+
+; Column 79 flag.
+screen_col79_flag:
 	ds	1
