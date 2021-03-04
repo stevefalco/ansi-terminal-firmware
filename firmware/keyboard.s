@@ -1,5 +1,5 @@
 ; Keyboard registers
-keyboard_base		equ 0xc000
+keyboard_base		equ 0xc020
 keyboard_SCAN_CODE	equ (keyboard_base + 0x00)	; Scan Code register
 keyboard_ASCII_CODE	equ (keyboard_base + 0x01)	; ASCII Code register
 keyboard_STATUS		equ (keyboard_base + 0x02)	; Status register

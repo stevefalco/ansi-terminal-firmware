@@ -108,6 +108,8 @@ set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to KBD_CLK
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to KBD_DATA
 set_location_assignment PIN_K15 -to KBD_CLK
 set_location_assignment PIN_K16 -to KBD_DATA
+set_global_assignment -name ENABLE_SIGNALTAP OFF
+set_global_assignment -name USE_SIGNALTAP_FILE stp1.stp
 set_global_assignment -name VERILOG_FILE kb/ps2_keyboard.v
 set_global_assignment -name VHDL_FILE kb/keyboard.vhd
 set_global_assignment -name VHDL_FILE uart/gh_uart_Tx_8bit.vhd
@@ -185,4 +187,5 @@ set_global_assignment -name QIP_FILE frame_ram.qip
 set_global_assignment -name QIP_FILE z80Ram.qip
 set_global_assignment -name QIP_FILE z80Rom.qip
 set_global_assignment -name QIP_FILE cpu_clock.qip
+set_global_assignment -name SIGNALTAP_FILE stp1.stp
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

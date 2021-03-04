@@ -33,6 +33,8 @@ entity terminal is
 
 		UART_RX			: in std_logic;
 		UART_TX			: out std_logic
+
+		-- SC			: out std_logic
 	);
 end terminal;
 
@@ -304,6 +306,8 @@ architecture a of terminal is
 
 	signal romAddr			: std_logic_vector (10 downto 0);
 
+	signal slow_clock		: std_logic := '0';
+
 begin
 
 	-- Create a 25.2 MHz dot clock from the 12 MHz oscillator.
@@ -349,6 +353,19 @@ begin
 			end case;
 		end if;
 	end process;
+
+--	-- Slow clock for debug
+--	slowClk: process(cpuClock)
+--		variable divide_it : unsigned(7 downto 0) := (others => '0');
+--	begin
+--		if(rising_edge(cpuClock)) then
+--			divide_it := divide_it + 1;
+--			if(divide_it = 0) then
+--				slow_clock <= not slow_clock;
+--			end if;
+--		end if;
+--	end process;
+--	SC <= slow_clock;
 
 	-- Cross clock domains.
 	cpuResetProcess: process(cpuClock)

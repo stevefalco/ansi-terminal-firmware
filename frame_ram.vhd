@@ -74,7 +74,6 @@ BEGIN
 		clock_enable_output_a => "BYPASS",
 		clock_enable_output_b => "BYPASS",
 		indata_reg_b => "CLOCK1",
-		init_file => "frame.mif",
 		intended_device_family => "Cyclone 10 LP",
 		lpm_type => "altsyncram",
 		numwords_a => 1920,
@@ -122,7 +121,7 @@ END SYN;
 -- Retrieval info: PRIVATE: BYTE_ENABLE_A NUMERIC "0"
 -- Retrieval info: PRIVATE: BYTE_ENABLE_B NUMERIC "0"
 -- Retrieval info: PRIVATE: BYTE_SIZE NUMERIC "8"
--- Retrieval info: PRIVATE: BlankMemory NUMERIC "0"
+-- Retrieval info: PRIVATE: BlankMemory NUMERIC "1"
 -- Retrieval info: PRIVATE: CLOCK_ENABLE_INPUT_A NUMERIC "0"
 -- Retrieval info: PRIVATE: CLOCK_ENABLE_INPUT_B NUMERIC "0"
 -- Retrieval info: PRIVATE: CLOCK_ENABLE_OUTPUT_A NUMERIC "0"
@@ -181,7 +180,6 @@ END SYN;
 -- Retrieval info: CONSTANT: CLOCK_ENABLE_OUTPUT_A STRING "BYPASS"
 -- Retrieval info: CONSTANT: CLOCK_ENABLE_OUTPUT_B STRING "BYPASS"
 -- Retrieval info: CONSTANT: INDATA_REG_B STRING "CLOCK1"
--- Retrieval info: CONSTANT: INIT_FILE STRING "frame.mif"
 -- Retrieval info: CONSTANT: INTENDED_DEVICE_FAMILY STRING "Cyclone 10 LP"
 -- Retrieval info: CONSTANT: LPM_TYPE STRING "altsyncram"
 -- Retrieval info: CONSTANT: NUMWORDS_A NUMERIC "1920"
