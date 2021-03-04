@@ -104,6 +104,12 @@ set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to DIP_SW[2]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to DIP_SW[1]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to DIP_SW[0]
 
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to KBD_CLK
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to KBD_DATA
+set_location_assignment PIN_K15 -to KBD_CLK
+set_location_assignment PIN_K16 -to KBD_DATA
+set_global_assignment -name VERILOG_FILE kb/ps2_keyboard.v
+set_global_assignment -name VHDL_FILE kb/keyboard.vhd
 set_global_assignment -name VHDL_FILE uart/gh_uart_Tx_8bit.vhd
 set_global_assignment -name VHDL_FILE uart/gh_uart_Rx_8bit.vhd
 set_global_assignment -name VHDL_FILE uart/gh_uart_16550.vhd

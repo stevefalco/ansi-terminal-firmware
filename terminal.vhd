@@ -28,6 +28,9 @@ entity terminal is
 		HSYNC			: out std_logic;
 		VSYNC			: out std_logic;
 
+		KBD_CLK			: inout std_logic;
+		KBD_DATA		: inout std_logic;
+
 		UART_RX			: in std_logic;
 		UART_TX			: out std_logic
 	);
@@ -163,6 +166,11 @@ architecture a of terminal is
 			cpuUartQ	: in std_logic_vector (7 downto 0);
 			cpuUartInt	: in std_logic;
 
+			-- Keyboard Interface
+			cpuKbCS		: out std_logic;
+			cpuKbQ		: in std_logic_vector (7 downto 0);
+			cpuKbInt	: in std_logic;
+
 			-- DIP Switch Interface
 			cpuDipQ		: in std_logic_vector (3 downto 0)
 		);
@@ -198,6 +206,22 @@ architecture a of terminal is
 		);
 	end component;
 
+	component keyboard is
+		port (
+			-- CPU interface
+			clk		: in std_logic;
+			reset		: in std_logic;
+			addrIn		: in std_logic_vector(2 downto 0);
+			dataOut		: out std_logic_vector(7 downto 0);
+			kbCS		: in std_logic;
+			irq		: out std_logic;
+
+			-- Keyboard interface
+			ps2_clk		: inout std_logic;
+			ps2_data	: inout std_logic
+		);
+	end component;
+
 	-- Z80 Interface.
 	signal nM1			: std_logic;
 	signal nMREQ			: std_logic;
@@ -221,6 +245,10 @@ architecture a of terminal is
 	signal cpuUartWR		: std_logic;
 	signal cpuUartQ			: std_logic_vector (7 downto 0);
 	signal cpuUartInt		: std_logic;
+
+	signal cpuKbCS			: std_logic;
+	signal cpuKbQ			: std_logic_vector (7 downto 0);
+	signal cpuKbInt			: std_logic;
 
 	type resetFSM_type is (
 		resetIdle_state,
@@ -397,6 +425,23 @@ begin
 			DCDn => '0' -- dcd, active low
 		);
 
+	-- Z80 Keyboard
+	z80kb: keyboard
+		port map
+		(
+			-- CPU
+			clk => cpuClock,
+			reset => clear,
+			addrIn => cpuAddrBus(2 downto 0),
+			dataOut => cpuKbQ,
+			kbCS => cpuKbCS,
+			irq => cpuKbInt,
+
+			-- KB
+			ps2_clk => KBD_CLK,
+			ps2_data => KBD_DATA
+		);
+
 	-- Z80 Bus
 	z80Bus: z80_bus
 		port map (
@@ -425,6 +470,11 @@ begin
 			cpuUartQ => cpuUartQ,
 			cpuUartInt => cpuUartInt,
 			
+			-- Keyboard Interface
+			cpuKbCS => cpuKbCS,
+			cpuKbQ => cpuKbQ,
+			cpuKbInt => cpuKbInt,
+
 			-- DIP Switch Interface
 			cpuDipQ => DIP_SW
 		);

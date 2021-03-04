@@ -30,6 +30,11 @@ entity z80_bus is
 		cpuUartQ	: in std_logic_vector (7 downto 0);
 		cpuUartInt	: in std_logic;
 
+		-- Keyboard Interface
+		cpuKbCS		: out std_logic;
+		cpuKbQ		: in std_logic_vector (7 downto 0);
+		cpuKbInt	: in std_logic;
+
 		-- DIP Switch Interface
 		cpuDipQ		: in std_logic_vector (3 downto 0)
 	);
@@ -40,6 +45,9 @@ architecture a of z80_bus is
 	signal cpuUartCS_D0	: std_logic;
 	signal cpuUartCS_D1	: std_logic;
 
+	signal cpuKbCS_D0	: std_logic;
+	signal cpuKbCS_D1	: std_logic;
+
 begin
 	z80_bus_process: process(all)
 	begin
@@ -48,6 +56,7 @@ begin
 		videoRamWren <= '0';
 		cpuUartCS_D0 <= '0';
 		cpuUartWR <= '0';
+		cpuKbCS_D0 <= '0';
 		cpuData <= (others => 'Z');
 
 		case to_integer(unsigned(cpuAddr(15 downto 0))) is
@@ -91,6 +100,13 @@ begin
 					cpuData <= "0000" & cpuDipQ;
 				end if;
 
+			when 16#C020# to 16#C027# =>
+				-- Keyboard
+				if(cpuRden = '0') then
+					cpuKbCS_D0 <= '1';
+					cpuData <= cpuKbQ;
+				end if;
+
 			when others =>
 				null;
 		end case;
@@ -129,9 +145,22 @@ begin
 	end process;
 	cpuUartCS <= cpuUartCS_D0 and cpuUartCS_D1 when cpuRden = '0' else cpuUartCS_D0;
 
+	-- Similar to the UART case, we want to assert the KB CS on the second
+	-- cycle.  The keyboard register interface will capture the various
+	-- data, so they will persist until the next "data ready".
+	kbDelay: process(cpuClock)
+	begin
+		if (rising_edge(cpuClock)) then
+			cpuKbCS_D1 <= cpuKbCS_D0;
+		end if;
+	end process;
+	cpuKbCS <= cpuKbCS_D0 and cpuKbCS_D1;
+
+	-- We have one interrupt to the CPU, and only two devices that generate
+	-- interrupts.  So, we just let the CPU poll both devices.
 	z80_int_process: process(all)
 	begin
-		if(cpuUartInt = '1') then
+		if(cpuUartInt = '1' or cpuKbInt = '1') then
 			cpuInt_n <= '0';
 		else
 			cpuInt_n <= '1';

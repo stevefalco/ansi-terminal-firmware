@@ -25,6 +25,9 @@ architecture a of testbench is
 			HSYNC			: out std_logic;
 			VSYNC			: out std_logic;
 
+			KBD_CLK			: in std_logic;
+			KBD_DATA		: in std_logic;
+
 			UART_RX			: in std_logic;
 			UART_TX			: out std_logic
 		    );
@@ -36,13 +39,20 @@ architecture a of testbench is
 
 	signal dipSwitches			: std_logic_vector(3 downto 0);
 
+	signal kbdClock				: std_logic;
+	signal kbdData				: std_logic;
+
 begin
 	term: terminal
 	port map
 	(
 		CLK12M => CLK12M,
+
 		UART_RX => loopback,
 		UART_TX => loopback,
+
+		KBD_CLK => kbdClock,
+		KBD_DATA => kbdData,
 
 		DIP_SW => dipSwitches
 	);

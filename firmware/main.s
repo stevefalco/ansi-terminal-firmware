@@ -62,15 +62,22 @@ start:
 
 	; Main loop
 main_loop:
-	; Get any waiting characters and process them.
+	; Get any waiting uart characters and process them.
 	call	screen_handler
+
+	; Get any waiting keyboard characters and process them.
+	call	keyboard_handler
 
 	jr	main_loop
 
 isr:
 	; See what caused this interrupt.  It could be the keyboard,
 	; the uart, or both.
-	;
+
+	; Check the keyboard.  The routine will read any available data
+	; and clear the interrupt.
+	call	keyboard_test_interrupt
+
 	; Check the uart.  The routine will read any available data
 	; and clear the interrupt.
 	call	uart_test_interrupt
@@ -82,5 +89,6 @@ str:
 
 #include "uart.s"
 #include "screen.s"
+#include "keyboard.s"
 #include "math.s"
 #include "debug.s"
