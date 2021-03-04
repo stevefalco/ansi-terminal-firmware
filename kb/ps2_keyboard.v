@@ -113,11 +113,12 @@
 `resetall
 `timescale 1ns/100ps
 
-`define TOTAL_BITS   11
-`define EXTEND_CODE  16'hE0
-`define RELEASE_CODE 16'hF0
-`define LEFT_SHIFT   16'h12
-`define RIGHT_SHIFT  16'h59
+`define TOTAL_BITS     11
+`define EXTEND_CODE    16'hE0
+`define RELEASE_CODE   16'hF0
+`define LEFT_SHIFT     16'h12
+`define RIGHT_SHIFT    16'h59
+`define LEFT_CONTROL   16'h14
 
 
 module ps2_keyboard_interface (
@@ -128,6 +129,7 @@ module ps2_keyboard_interface (
   rx_extended,
   rx_released,
   rx_shift_key_on,
+  rx_control_key_on,
   rx_scan_code,
   rx_ascii,
   rx_data_ready,       // rx_read_o
@@ -146,6 +148,7 @@ parameter TIMER_60USEC_BITS_PP  = 10;   // Number of bits needed for timer
 parameter TIMER_5USEC_VALUE_PP = 63;    // Number of sys_clks for debounce
 parameter TIMER_5USEC_BITS_PP  = 6;     // Number of bits needed for timer
 parameter TRAP_SHIFT_KEYS_PP = 1;       // Trap shift keys - i.e. don't output scan codes for them.
+parameter TRAP_CONTROL_KEYS_PP = 1;     // Trap control keys - i.e. don't output scan codes for them.
 
 // State encodings, provided as parameters
 // for flexibility to the one instantiating the module.
@@ -187,6 +190,7 @@ inout ps2_data;
 output rx_extended;
 output rx_released;
 output rx_shift_key_on;
+output rx_control_key_on;
 output [7:0] rx_scan_code;
 output [7:0] rx_ascii;
 output rx_data_ready;
@@ -209,6 +213,7 @@ wire timer_5usec_done;
 wire extended;
 wire released;
 wire shift_key_on;
+wire control_key_on;
 
                          // NOTE: These two signals used to be one.  They
                          //       were split into two signals because of
@@ -238,6 +243,7 @@ reg [TIMER_5USEC_BITS_PP-1:0] timer_5usec_count;
 reg [7:0] ascii;      // "REG" type only because a case statement is used.
 reg left_shift_key;
 reg right_shift_key;
+reg left_control_key;
 reg hold_extended;    // Holds prior value, cleared at rx_output_strobe
 reg hold_released;    // Holds prior value, cleared at rx_output_strobe
 reg ps2_clk_s;        // Synchronous version of this input
@@ -537,6 +543,18 @@ end
 
 assign rx_shift_key_on = left_shift_key || right_shift_key;
 
+// These bits contain the status of the two control keys
+always @(posedge clk)
+begin
+  if (reset) left_control_key <= 0;
+  else if ((q[8:1] == `LEFT_CONTROL) && rx_shifting_done && ~hold_released)
+    left_control_key <= 1;
+  else if ((q[8:1] == `LEFT_CONTROL) && rx_shifting_done && hold_released)
+    left_control_key <= 0;
+end
+
+assign rx_control_key_on = left_control_key;
+
 // Output the special scan code flags, the scan code and the ascii
 always @(posedge clk)
 begin
@@ -573,6 +591,7 @@ assign rx_output_strobe = (rx_shifting_done
                                     &&(q[8:1] != `LEFT_SHIFT)
                                   )
                              )
+                          && ( (TRAP_CONTROL_KEYS_PP == 0) || (q[8:1] != `LEFT_CONTROL))
                           );
 
 // This part translates the scan code into an ASCII value...
@@ -580,14 +599,45 @@ assign rx_output_strobe = (rx_shifting_done
 // if you want more, just add the appropriate case statement lines...
 // (You will need to know the keyboard scan codes you wish to assign.)
 // The entries are listed in ascending order of ASCII value.
-assign shift_key_plus_code = {3'b0,rx_shift_key_on,q[8:1]};
+assign shift_key_plus_code = {2'b0,rx_control_key_on,rx_shift_key_on,q[8:1]};
 always @(shift_key_plus_code)
 begin
   casez (shift_key_plus_code)
+    12'h21c : ascii <= 8'h01;  // ^a
+    12'h232 : ascii <= 8'h02;  // ^b
+    12'h221 : ascii <= 8'h03;  // ^c
+    12'h223 : ascii <= 8'h04;  // ^d
+    12'h224 : ascii <= 8'h05;  // ^e
+    12'h22b : ascii <= 8'h06;  // ^f
+    12'h234 : ascii <= 8'h07;  // ^g
     12'h?66 : ascii <= 8'h08;  // Backspace ("backspace" key)
+    12'h233 : ascii <= 8'h08;  // ^h
     12'h?0d : ascii <= 8'h09;  // Horizontal Tab
+    12'h243 : ascii <= 8'h09;  // ^i
+    12'h23b : ascii <= 8'h0a;  // ^j
+    12'h242 : ascii <= 8'h0b;  // ^k
+    12'h24b : ascii <= 8'h0c;  // ^l
     12'h?5a : ascii <= 8'h0d;  // Carriage return ("enter" key)
+    12'h23a : ascii <= 8'h0d;  // ^m
+    12'h231 : ascii <= 8'h0e;  // ^n
+    12'h244 : ascii <= 8'h0f;  // ^o
+    12'h24d : ascii <= 8'h10;  // ^p
+    12'h215 : ascii <= 8'h11;  // ^q
+    12'h22d : ascii <= 8'h12;  // ^r
+    12'h21b : ascii <= 8'h13;  // ^s
+    12'h22c : ascii <= 8'h14;  // ^t
+    12'h23c : ascii <= 8'h15;  // ^u
+    12'h22a : ascii <= 8'h16;  // ^v
+    12'h21d : ascii <= 8'h17;  // ^w
+    12'h222 : ascii <= 8'h18;  // ^x
+    12'h235 : ascii <= 8'h19;  // ^y
+    12'h21a : ascii <= 8'h1a;  // ^z
     12'h?76 : ascii <= 8'h1b;  // Escape ("esc" key)
+    12'h254 : ascii <= 8'h1b;  // ^[
+    12'h25d : ascii <= 8'h1c;  // ^\
+    12'h25b : ascii <= 8'h1d;  // ^]
+    12'h236 : ascii <= 8'h1e;  // ^^
+    12'h24e : ascii <= 8'h1f;  // ^_
     12'h?29 : ascii <= 8'h20;  // Space
     12'h116 : ascii <= 8'h21;  // !
     12'h152 : ascii <= 8'h22;  // "
