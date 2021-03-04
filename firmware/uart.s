@@ -220,7 +220,12 @@ uart_store_char:
 	and	uart_depth - 1		; keep it in range
 	ld	(uart_rb_input), a
 
+	ret
+
 uart_store_char_no_room:
+	; There is no room, but we still have to read the character to
+	; retire the interrupt.
+	ld	a, (uart_RBR)		; read from the uart
 	ret
 
 #data RAM

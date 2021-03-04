@@ -86,12 +86,7 @@ keyboard_test_interrupt_flush:
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-db1: .asciz "keyboard_store_char"
 keyboard_store_char:
-
- ld hl, db1
- call debug_print_string
- call debug_print_eol
 
 	; See if there is room in the buffer
 	ld	a, (keyboard_rb_count)
@@ -111,33 +106,31 @@ keyboard_store_char:
 	ld	h, a			; h = h + carry
 
 	ld	a, (keyboard_STATUS)	; read status
- call debug_show_a
 	ld	(hl), a			; store status code
 	inc	hl			; move to the next byte
 
 	ld	a, (keyboard_ASCII_CODE); read ascii
- call debug_show_a
 	ld	(hl), a			; store ascii code
 	inc	hl			; move to the next byte
 
 	ld	a, (keyboard_SCAN_CODE)	; read scan code (retires interrupt)
- call debug_show_a
 	ld	(hl), a			; store scan code
 
 	; Increment the count
 	ld	a, (keyboard_rb_count)
 	inc	a
 	ld	(keyboard_rb_count), a
- call debug_show_a
 
 	; Bump the input pointer for next time.
 	ld	a, (keyboard_rb_input)
 	inc	a
 	and	keyboard_depth - 1	; keep it in range
 	ld	(keyboard_rb_input), a
- call debug_show_a
 
 keyboard_store_char_no_room:
+	; There is no room, but we still have to read the scan code to
+	; retire the interrupt.
+	ld	a, (keyboard_SCAN_CODE)
 	ret
 
 #data RAM
@@ -176,7 +169,6 @@ keyboard_rb_count:
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-db2: .asciz "keyboard_receive"
 keyboard_receive:
 	di
 
@@ -187,10 +179,6 @@ keyboard_receive:
 	ld	a, (keyboard_rb_count)
 	or	a
 	jr	Z, keyboard_get_char_none
-
- ld hl, db2
- call debug_print_string
- call debug_print_eol
 
 	; Find the place to get the character.  We use a tricky
 	; way to add an 8 and 16 bit register together.
@@ -209,22 +197,17 @@ keyboard_receive:
 	ld	c, (hl)			; read ascii code
 	inc	hl
 	ld	b, (hl)			; read scan code
- call debug_show_bc
- call debug_show_de
 
 	; Decrement the count.
 	ld	a, (keyboard_rb_count)
 	dec	a
 	ld	(keyboard_rb_count), a
- call debug_show_a
 
 	; Bump the output pointer for next time.
 	ld	a, (keyboard_rb_output)
 	inc	a
 	and	keyboard_depth - 1	; keep it in range
 	ld	(keyboard_rb_output), a
- call debug_show_a
- call debug_print_eol
 
 keyboard_get_char_none:
 	ei
@@ -244,13 +227,18 @@ keyboard_handler:
 	cp	-1		; -1 means "nothing available"
 	ret	Z		; No characters in our receive buffer.
 
+	; If the ascii code is 0, then toss the character.
+	ld	a, c		; ASCII code
+	or	a		; set flags
+	ret	Z		; toss it
+
 	; Dump the scan code and ascii code.
-	;call	debug_show_bc
+	call	debug_show_bc
 
 	; Dump the status.
-	;call	debug_show_de
+	call	debug_show_de
 
-	;call	debug_print_eol
+	call	debug_print_eol
 
 	ret
 
