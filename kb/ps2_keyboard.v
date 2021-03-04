@@ -119,6 +119,7 @@
 `define LEFT_SHIFT     16'h12
 `define RIGHT_SHIFT    16'h59
 `define LEFT_CONTROL   16'h14
+`define LEFT_ALT       16'h11
 
 
 module ps2_keyboard_interface (
@@ -130,6 +131,7 @@ module ps2_keyboard_interface (
   rx_released,
   rx_shift_key_on,
   rx_control_key_on,
+  rx_alt_key_on,
   rx_scan_code,
   rx_ascii,
   rx_data_ready,       // rx_read_o
@@ -149,6 +151,7 @@ parameter TIMER_5USEC_VALUE_PP = 63;    // Number of sys_clks for debounce
 parameter TIMER_5USEC_BITS_PP  = 6;     // Number of bits needed for timer
 parameter TRAP_SHIFT_KEYS_PP = 1;       // Trap shift keys - i.e. don't output scan codes for them.
 parameter TRAP_CONTROL_KEYS_PP = 1;     // Trap control keys - i.e. don't output scan codes for them.
+parameter TRAP_ALT_KEYS_PP = 1;         // Trap alt keys - i.e. don't output scan codes for them.
 
 // State encodings, provided as parameters
 // for flexibility to the one instantiating the module.
@@ -191,6 +194,7 @@ output rx_extended;
 output rx_released;
 output rx_shift_key_on;
 output rx_control_key_on;
+output rx_alt_key_on;
 output [7:0] rx_scan_code;
 output [7:0] rx_ascii;
 output rx_data_ready;
@@ -214,6 +218,7 @@ wire extended;
 wire released;
 wire shift_key_on;
 wire control_key_on;
+wire alt_key_on;
 
                          // NOTE: These two signals used to be one.  They
                          //       were split into two signals because of
@@ -244,6 +249,7 @@ reg [7:0] ascii;      // "REG" type only because a case statement is used.
 reg left_shift_key;
 reg right_shift_key;
 reg left_control_key;
+reg left_alt_key;
 reg hold_extended;    // Holds prior value, cleared at rx_output_strobe
 reg hold_released;    // Holds prior value, cleared at rx_output_strobe
 reg ps2_clk_s;        // Synchronous version of this input
@@ -543,7 +549,7 @@ end
 
 assign rx_shift_key_on = left_shift_key || right_shift_key;
 
-// These bits contain the status of the two control keys
+// These bits contain the status of the control key
 always @(posedge clk)
 begin
   if (reset) left_control_key <= 0;
@@ -554,6 +560,18 @@ begin
 end
 
 assign rx_control_key_on = left_control_key;
+
+// These bits contain the status of the alt key
+always @(posedge clk)
+begin
+  if (reset) left_alt_key <= 0;
+  else if ((q[8:1] == `LEFT_ALT) && rx_shifting_done && ~hold_released)
+    left_alt_key <= 1;
+  else if ((q[8:1] == `LEFT_ALT) && rx_shifting_done && hold_released)
+    left_alt_key <= 0;
+end
+
+assign rx_alt_key_on = left_alt_key;
 
 // Output the special scan code flags, the scan code and the ascii
 always @(posedge clk)
@@ -591,7 +609,8 @@ assign rx_output_strobe = (rx_shifting_done
                                     &&(q[8:1] != `LEFT_SHIFT)
                                   )
                              )
-                          && ( (TRAP_CONTROL_KEYS_PP == 0) || (q[8:1] != `LEFT_CONTROL))
+                          && ((TRAP_CONTROL_KEYS_PP == 0) || (q[8:1] != `LEFT_CONTROL))
+                          && ((TRAP_ALT_KEYS_PP == 0) || (q[8:1] != `LEFT_ALT))
                           );
 
 // This part translates the scan code into an ASCII value...
@@ -599,7 +618,7 @@ assign rx_output_strobe = (rx_shifting_done
 // if you want more, just add the appropriate case statement lines...
 // (You will need to know the keyboard scan codes you wish to assign.)
 // The entries are listed in ascending order of ASCII value.
-assign shift_key_plus_code = {2'b0,rx_control_key_on,rx_shift_key_on,q[8:1]};
+assign shift_key_plus_code = {rx_extended,rx_alt_key_on,rx_control_key_on,rx_shift_key_on,q[8:1]};
 always @(shift_key_plus_code)
 begin
   casez (shift_key_plus_code)
