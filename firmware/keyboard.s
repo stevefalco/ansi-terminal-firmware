@@ -95,16 +95,16 @@ keyboard_store_char:
 	sub	l			; a = a + h + carry
 	ld	h, a			; h = h + carry
 
-	ld	a, (keyboard_SCAN_CODE)	; read from the keyboard
-	ld	(hl), a			; store the scan code
+	ld	a, (keyboard_STATUS)	; read status
+	ld	(hl), a			; store status code
 	inc	hl			; move to the next byte
 
-	ld	a, (keyboard_ASCII_CODE); read from the keyboard
-	ld	(hl), a			; store the ascii code
+	ld	a, (keyboard_ASCII_CODE); read ascii
+	ld	(hl), a			; store ascii code
 	inc	hl			; move to the next byte
 
-	ld	a, (keyboard_STATUS)	; read from the keyboard
-	ld	(hl), a			; store the status
+	ld	a, (keyboard_SCAN_CODE)	; read scan code (retires interrupt)
+	ld	(hl), a			; store scan code
 
 	; Increment the count
 	ld	a, (keyboard_rb_count)
@@ -124,7 +124,7 @@ keyboard_store_char_no_room:
 
 ; Circular receive buffer
 ;
-; We store the scan code, ascii code, and status byte.
+; We store the status byte, ascii code, and scan code.
 keyboard_rb:
 	ds	keyboard_depth * 4
 
@@ -179,11 +179,11 @@ keyboard_receive:
 	sub	l			; a = a + h + carry
 	ld	h, a			; h = h + carry
 
-	ld	b, (hl)			; read scan code
+	ld	d, (hl)			; read status
 	inc	hl
 	ld	c, (hl)			; read ascii code
 	inc	hl
-	ld	d, (hl)			; read status
+	ld	b, (hl)			; read scan code
 
 	; Decrement the count.
 	ld	a, (keyboard_rb_count)
