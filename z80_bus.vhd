@@ -150,7 +150,7 @@ begin
 	-- data, so they will persist until the next "data ready".
 	kbDelay: process(cpuClock)
 	begin
-		if (rising_edge(cpuClock)) then
+		if (falling_edge(cpuClock)) then
 			cpuKbCS_D1 <= cpuKbCS_D0;
 		end if;
 	end process;

@@ -12,9 +12,8 @@ keyboard_Key_Released	equ 1				; Key has been released
 keyboard_Extended	equ 2				; Extended code prefix
 keyboard_Interrupt	equ 3				; Interrupt received
 
-keyboard_depth		equ 32				; Buffer depth.
-							; Warning: must multiply
-							; by 4 and still fit in A!
+keyboard_depth		equ 128				; Buffer depth.
+
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -58,10 +57,21 @@ keyboard_test_interrupt:
 	bit	keyboard_Interrupt, a
 	jr	Z, keyboard_test_interrupt_done
 
+	; Bit 1 = 1 indicates that this is a key release event, which
+	; we don't need to store.  But we still have to access the scan
+	; code register to clear the interrupt.
+	bit	keyboard_Key_Released, a
+	jr	NZ, keyboard_test_interrupt_flush
+
 	call	keyboard_store_char
+	jr	keyboard_test_interrupt	; See if there is anything more
 
 keyboard_test_interrupt_done:
 	ret
+
+keyboard_test_interrupt_flush:
+	ld	a, (keyboard_SCAN_CODE)
+	jr	keyboard_test_interrupt	; See if there is anything more
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -76,7 +86,12 @@ keyboard_test_interrupt_done:
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+db1: .asciz "keyboard_store_char"
 keyboard_store_char:
+
+ ld hl, db1
+ call debug_print_string
+ call debug_print_eol
 
 	; See if there is room in the buffer
 	ld	a, (keyboard_rb_count)
@@ -96,26 +111,31 @@ keyboard_store_char:
 	ld	h, a			; h = h + carry
 
 	ld	a, (keyboard_STATUS)	; read status
+ call debug_show_a
 	ld	(hl), a			; store status code
 	inc	hl			; move to the next byte
 
 	ld	a, (keyboard_ASCII_CODE); read ascii
+ call debug_show_a
 	ld	(hl), a			; store ascii code
 	inc	hl			; move to the next byte
 
 	ld	a, (keyboard_SCAN_CODE)	; read scan code (retires interrupt)
+ call debug_show_a
 	ld	(hl), a			; store scan code
 
 	; Increment the count
 	ld	a, (keyboard_rb_count)
 	inc	a
 	ld	(keyboard_rb_count), a
+ call debug_show_a
 
 	; Bump the input pointer for next time.
 	ld	a, (keyboard_rb_input)
 	inc	a
-	and	0x7f			; keep it in range
+	and	keyboard_depth - 1	; keep it in range
 	ld	(keyboard_rb_input), a
+ call debug_show_a
 
 keyboard_store_char_no_room:
 	ret
@@ -156,6 +176,7 @@ keyboard_rb_count:
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+db2: .asciz "keyboard_receive"
 keyboard_receive:
 	di
 
@@ -166,6 +187,10 @@ keyboard_receive:
 	ld	a, (keyboard_rb_count)
 	or	a
 	jr	Z, keyboard_get_char_none
+
+ ld hl, db2
+ call debug_print_string
+ call debug_print_eol
 
 	; Find the place to get the character.  We use a tricky
 	; way to add an 8 and 16 bit register together.
@@ -184,17 +209,22 @@ keyboard_receive:
 	ld	c, (hl)			; read ascii code
 	inc	hl
 	ld	b, (hl)			; read scan code
+ call debug_show_bc
+ call debug_show_de
 
 	; Decrement the count.
 	ld	a, (keyboard_rb_count)
 	dec	a
 	ld	(keyboard_rb_count), a
+ call debug_show_a
 
 	; Bump the output pointer for next time.
 	ld	a, (keyboard_rb_output)
 	inc	a
-	and	0x7f			; keep it in range
+	and	keyboard_depth - 1	; keep it in range
 	ld	(keyboard_rb_output), a
+ call debug_show_a
+ call debug_print_eol
 
 keyboard_get_char_none:
 	ei
@@ -215,12 +245,12 @@ keyboard_handler:
 	ret	Z		; No characters in our receive buffer.
 
 	; Dump the scan code and ascii code.
-	call	debug_show_bc
+	;call	debug_show_bc
 
 	; Dump the status.
-	call	debug_show_de
+	;call	debug_show_de
 
-	call	debug_print_eol
+	;call	debug_print_eol
 
 	ret
 

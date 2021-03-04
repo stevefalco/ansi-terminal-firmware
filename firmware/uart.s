@@ -90,6 +90,8 @@ uart_LSR_THRE_v		equ (1 << uart_LSR_THRE_b)
 ; Baud rate dip switches
 dipSW			equ 0xc010
 
+uart_depth		equ 128				; SW receiver fifo depth
+
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -134,7 +136,7 @@ uart_receive:
 	; Bump the output pointer for next time.
 	ld	a, (uart_rb_output)
 	inc	a
-	and	0x7f			; keep it in range
+	and	uart_depth - 1		; keep it in range
 	ld	(uart_rb_output), a
 
 uart_get_char_none:
@@ -192,7 +194,7 @@ uart_store_char:
 
 	; See if there is room in the buffer
 	ld	a, (uart_rb_count)
-	sub	128
+	sub	uart_depth
 	jp	P, uart_store_char_no_room
 
 	; Find the place to store the character.  We use a tricky
@@ -215,7 +217,7 @@ uart_store_char:
 	; Bump the input pointer for next time.
 	ld	a, (uart_rb_input)
 	inc	a
-	and	0x7f			; keep it in range
+	and	uart_depth - 1		; keep it in range
 	ld	(uart_rb_input), a
 
 uart_store_char_no_room:
@@ -225,7 +227,7 @@ uart_store_char_no_room:
 
 ; Circular receive buffer
 uart_rb:
-	ds	128
+	ds	uart_depth
 
 ; Input offset into receive buffer.
 uart_rb_input:
