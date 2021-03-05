@@ -455,7 +455,7 @@ screen_initialize_loop:
 	ld	a, b
 	or	c
 	jr	NZ, screen_initialize_loop
-	
+
 	; Initialize the cursor pointer.
 	ld	hl, screen_base
 	ld	(screen_cursor_location), hl
@@ -773,10 +773,10 @@ screen_escape_handler_in_csi:
 	jp	Z, screen_move_cursor_numeric
 
 	cp	'J'
-	jp	Z, screen_clear_to_end_of_screen
+	jp	Z, screen_clear_rows
 
 	cp	'K'
-	jp	Z, screen_clear_to_end_of_line
+	jp	Z, screen_clear_columns
 
 	cp	'?'
 	jp	Z, screen_set_dec_flag
@@ -1197,7 +1197,7 @@ screen_move_cursor_left_go:
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
-; screen_clear_to_end_of_screen
+; screen_clear_rows
 ;
 ; Input none
 ; Alters AF, DE, HL
@@ -1205,19 +1205,47 @@ screen_move_cursor_left_go:
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-screen_clear_to_end_of_screen:
+screen_clear_rows
 
 	; Clear the character under the cursor
 	xor	a					; Clear A
 	ld	(screen_char_under_cursor), a
 
+	; There are three subsets:
+	; 0 = erase below
+	; 1 = erase above
+	; 2 = erase all
+	ld	a, (screen_group_0_digits)		; A = number of lines to move
+	cp	0					; Erase below
+	jr	Z, screen_clear_rows_below
+	cp	1					; Erase above
+	jr	Z, screen_clear_rows_above
+	
+	; Clear everything.
+	ld	hl, screen_base
+	ld	bc, screen_length
+screen_clear_all_loop:
+	ld	(hl), 0
+	inc	hl
+	dec	bc
+	ld	a, b
+	or	c
+	jr	NZ, screen_clear_all_loop
+
+	; Put the cursor back on screen.
+	ld	hl, (screen_cursor_location)
+	ld	(hl), char_del
+	
+	jr	screen_clear_rows_done
+
+screen_clear_rows_below:
 	ld	hl, (screen_cursor_location)		; HL = cursor location
 	ld	de, screen_end				; DE = LWA+1
 
 	; We will clear with nulls.
 	xor	a
 
-screen_clear_to_end_of_screen_loop:
+screen_clear_rows_below_loop:
 	inc	hl					; Next position to clear
 
 	; Make sure we haven't gone off the end.
@@ -1225,11 +1253,30 @@ screen_clear_to_end_of_screen_loop:
 	push	hl					; Save HL on the stack
 	sbc	hl, de					; Sets borrow if DE > HL
 	pop	hl					; HL = position to clear
-	jr	NC, screen_clear_to_end_of_screen_done
+	jr	NC, screen_clear_rows_done
 	ld	(hl), a					; Clear the character
-	jr	screen_clear_to_end_of_screen_loop
+	jr	screen_clear_rows_below_loop
 
-screen_clear_to_end_of_screen_done:
+screen_clear_rows_above:
+	ld	hl, (screen_cursor_location)		; HL = cursor location
+	ld	de, screen_base				; DE = FWA
+
+	; We will clear with nulls.
+	xor	a
+
+screen_clear_rows_above_loop:
+	dec	hl					; Next position to clear
+
+	; Make sure we haven't gone off the end.
+	or	a					; Clear carry
+	push	hl					; Save HL on the stack
+	sbc	hl, de					; Sets borrow if DE > HL
+	pop	hl					; HL = position to clear
+	jr	C, screen_clear_rows_done
+	ld	(hl), a					; Clear the character
+	jr	screen_clear_rows_above_loop
+
+screen_clear_rows_done:
 
 	; Escape sequence complete.
 	ld	a, escape_none_state
@@ -1239,7 +1286,7 @@ screen_clear_to_end_of_screen_done:
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
-; screen_clear_to_end_of_screen
+; screen_clear_columns
 ;
 ; Input none
 ; Alters AF, BC, DE, HL
@@ -1247,7 +1294,7 @@ screen_clear_to_end_of_screen_done:
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-screen_clear_to_end_of_line:
+screen_clear_columns
 
 	; Clear the character under the cursor
 	xor	a					; Clear A
