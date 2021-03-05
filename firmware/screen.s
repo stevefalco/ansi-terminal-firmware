@@ -461,7 +461,7 @@ screen_initialize_loop:
 	ld	(screen_cursor_location), hl
 	ld	(screen_cursor_location_save), hl
 
-	; Put up a cursor with a space under it.
+	; Put up a cursor with a null under it.
 	ld	a, (hl)
 	ld	(screen_char_under_cursor), a
 	ld	(hl), char_del
@@ -478,7 +478,6 @@ screen_initialize_loop:
 	xor	a
 	ld	(screen_col79_flag), a		; Clear the col 79 flag
 	ld	(screen_dec_flag), a		; Clear the DEC flag
-	ld	(screen_sharp_flag), a		; Clear the sharp flag
 
 	ret
 
@@ -612,6 +611,9 @@ screen_escape_handler:
 	cp	escape_csi_d_N_state
 	jr	Z, screen_escape_handler_in_csi		; Accumulating d0
 
+	cp	escape_sharp_state
+	jp	Z, screen_escape_in_sharp		; Got first char after '#'
+	
 	; Eventually there will be more states above.  This is the catch-all,
 	; which we shouldn't ever hit.  So, clear the escape state and give
 	; up.
@@ -643,19 +645,22 @@ screen_escape_handler_first:
 	ld	(screen_group_pointer), hl	; Save the pointer
 	
 	; This is the first character after an escape.
-	;
-	; Test for '[', the so-called CSI
 	ld	a, b
+
 	cp	'['
 	jr	Z, screen_escape_handler_start_csi
 
 	cp	'#'
 	jr	Z, screen_start_sharp
+
 	cp	'7'
 	jp	Z, screen_save_cursor_position
 
 	cp	'8'
 	jp	Z, screen_restore_cursor_position
+
+	cp	'E'
+	jp	Z, screen_handle_next_line
 
 	cp	'M'
 	jp	Z, screen_handle_reverse_scroll
@@ -703,9 +708,10 @@ screen_escape_handler_start_csi:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 screen_start_sharp:
-	; Mark that this is a special '#' sequence.
-	ld	a, 1
-	ld	(screen_sharp_flag), a
+
+	; Switch to the sharp state.
+	ld	a, escape_sharp_state
+	ld	(screen_escape_state), a
 
 	ret
 
@@ -746,16 +752,14 @@ screen_escape_handler_in_csi:
 	or	a
 	jp	NZ, screen_parse_dec_command
 	
-	; If the '#' flag is set, go to an alternate parser.
-	ld	a, (screen_sharp_flag)
-	or	a
-	jp	NZ, screen_parse_sharp_command
-	
 	ld	a, b					; A = new character
 
 	; Test for some of the simple commands.
 	cp	'c'
 	jp	Z, screen_send_primary_device_attributes
+
+	cp	'f'
+	jp	Z, screen_move_cursor_numeric
 
 	cp	'A'
 	jp	Z, screen_move_cursor_up
@@ -815,7 +819,7 @@ screen_parse_dec_command:
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
-; screen_parse_sharp_command
+; screen_escape_in_sharp
 ;
 ; Input B = new character
 ; Alters
@@ -823,17 +827,38 @@ screen_parse_dec_command:
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-screen_parse_sharp_command:
+screen_escape_in_sharp:
 
-	; Currently, we expect a digit, which sets things like line
-	; height or width, but we don't support these, so clear the
-	; sharp flag and terminate the sequence.
-	xor	a
-	ld	(screen_sharp_flag), a
-	
+	ld	a, b					; A = new character
+	cp	'8'					; Screen alignment test
+	jr	Z, screen_align
+
+screen_parse_sharp_command_done:
 	ld	a, escape_none_state
 	ld	(screen_escape_state), a
 	ret
+
+screen_align:
+	; Fill the screen with the letter 'E'.
+	ld	hl, screen_base
+	ld	bc, screen_length
+screen_align_loop:
+	ld	(hl), 'E'
+	inc	hl
+	dec	bc
+	ld	a, b
+	or	c
+	jr	NZ, screen_align_loop
+
+	; Initialize the cursor pointer.
+	ld	hl, screen_base
+	ld	(screen_cursor_location), hl
+
+	; Put up a cursor with an 'E' under it.
+	ld	a, (hl)
+	ld	(screen_char_under_cursor), a
+	ld	(hl), char_del
+	jr	screen_parse_sharp_command_done
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1598,6 +1623,27 @@ screen_set_dec_flag:
 
 	ret
 
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; screen_handle_next_line
+;
+; Input none
+; Alters 
+; Output none
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+screen_handle_next_line:
+
+	; This seems to be like <CR>
+	call screen_handle_cr
+
+	; Escape sequence complete.
+	ld	a, escape_none_state
+	ld	(screen_escape_state), a
+	ret
+
 #data RAM
 
 ; Pointer into video memory.
@@ -1633,7 +1679,4 @@ screen_col79_flag:
 	ds	1
 
 screen_dec_flag:
-	ds	1
-
-screen_sharp_flag:
 	ds	1
