@@ -22,7 +22,7 @@ debug_print_string_again:
 	or	a		; set flags
 	jr	Z, debug_printf_done
 
-	ld	b, a
+	ld	c, a
 
 	push	hl
 	call	uart_transmit
@@ -43,9 +43,9 @@ debug_printf_done:
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
-; debug_print_hex_nibble - print the hex value of the lower 4 bits in register B
+; debug_print_hex_nibble - print the hex value of the lower 4 bits in register C
 ;
-; Input B
+; Input C
 ; Alters none
 ; Output none
 ;
@@ -58,7 +58,7 @@ debug_print_hex_nibble:
 	push	de
 	push	hl
 
-	ld	a, b
+	ld	a, c
 	and	a, 0xf
 
 	; Is it >= 0xa
@@ -72,7 +72,7 @@ debug_print_hex_nibble_ge:
 	add	a, 'A' - 0xa
 
 debug_print_hex_nibble_ready:
-	ld	b, a
+	ld	c, a
 	call	uart_transmit
 
 	pop	hl
@@ -85,9 +85,9 @@ debug_print_hex_nibble_ready:
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
-; debug_print_hex - print the hex value in register B
+; debug_print_hex - print the hex value in register C
 ;
-; Input B
+; Input C
 ; Alters none
 ; Output none
 ;
@@ -100,19 +100,19 @@ debug_print_hex:
 	push	de
 	push	hl
 
-	ld	a, b
-	ld	c, b
+	ld	a, c
+	ld	b, c
 
 	; Get high nibble
 	rr	a
 	rr	a
 	rr	a
 	rr	a
-	ld	b, a
+	ld	c, a
 	call	debug_print_hex_nibble
 
 	; Get low nibble
-	ld	b, c
+	ld	c, b
 	call	debug_print_hex_nibble
 
 	pop	hl
@@ -140,10 +140,10 @@ debug_print_eol:
 	push	de
 	push	hl
 
-	ld	b, 0x0d
+	ld	c, 0x0d
 	call	uart_transmit
 
-	ld	b, 0x0a
+	ld	c, 0x0a
 	call	uart_transmit
 
 	pop	hl
@@ -174,7 +174,7 @@ debug_show_a:
 	call	debug_print_string
 	pop	af
 	push	af
-	ld	b, a
+	ld	c, a
 	call	debug_print_hex
 	call	debug_print_eol
  
@@ -208,11 +208,11 @@ debug_show_bc:
 	call	debug_print_string
 	pop	bc
 	push	bc
-	; ld	b, b
+	ld	c, b
 	call	debug_print_hex
 	pop	bc
 	push	bc
-	ld	b, c
+	; ld	c, c
 	call	debug_print_hex
 	call	debug_print_eol
 
@@ -246,11 +246,11 @@ debug_show_de:
 	call	debug_print_string
 	pop	de
 	push	de
-	ld	b, d
+	ld	c, d
 	call	debug_print_hex
 	pop	de
 	push	de
-	ld	b, e
+	ld	c, e
 	call	debug_print_hex
 	call	debug_print_eol
 
@@ -284,11 +284,11 @@ debug_show_hl:
 	call	debug_print_string
 	pop	hl
 	push	hl
-	ld	b, h
+	ld	c, h
 	call	debug_print_hex
 	pop	hl
 	push	hl
-	ld	b, l
+	ld	c, l
 	call	debug_print_hex
 	call	debug_print_eol
 
@@ -327,10 +327,10 @@ debug_show_sp:
 	ld	hl, s_sp
 	call	debug_print_string
 	ld	hl, (debug_get_sp)
-	ld	b, h
+	ld	c, h
 	call	debug_print_hex
 	ld	hl, (debug_get_sp)
-	ld	b, l
+	ld	c, l
 	call	debug_print_hex
 	call	debug_print_eol
 

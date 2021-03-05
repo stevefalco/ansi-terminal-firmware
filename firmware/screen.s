@@ -702,6 +702,9 @@ screen_escape_handler_in_csi:
 	ld	a, b					; A = new character
 
 	; Test for some of the simple commands.
+	cp	'c'
+	jp	Z, screen_send_primary_device_attributes
+
 	cp	'A'
 	jp	Z, screen_move_cursor_up
 	
@@ -731,11 +734,11 @@ screen_escape_handler_in_csi:
 	; If this is a digit, go to an "accumulating digits" state, until we
 	; see a non-digit.
 	cp	'0'
-	jr	C, screen_bad_sequence			; < '0' character
+	jr	C, screen_bad_csi_sequence		; < '0' character
 	cp	'9' + 1
-	jr	C, screen_got_group_N_digit		; <= '9' character
+	jr	C, screen_got_csi_group_N_digit		; <= '9' character
 
-screen_bad_sequence:
+screen_bad_csi_sequence:
 
 	; This is not a sequence we handle yet.
 	ld	a, escape_none_state
@@ -745,7 +748,7 @@ screen_bad_sequence:
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
-; screen_got_group_N_digit
+; screen_got_csi_group_N_digit
 ;
 ; Input B = new digit
 ; Alters AF, C, HL
@@ -753,7 +756,7 @@ screen_bad_sequence:
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-screen_got_group_N_digit:
+screen_got_csi_group_N_digit:
 
 	; We have a digit.  Go into the group N digits state.
 	ld	a, escape_csi_d_N_state
@@ -769,6 +772,27 @@ screen_got_group_N_digit:
 	sub	'0'					; Correct it to be numeric
 	ld	(hl), a		; Save the result
 
+	ret
+
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; screen_send_primary_device_attributes
+;
+; Input none
+; Alters HL, BC, DE, AF
+; Output none
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+screen_send_primary_device_attributes_string: .ascii "1;2c"
+
+screen_send_primary_device_attributes:
+	; This is a request for our attributes.  Claim that we are a VT100.
+	ld	b, 5
+	ld	hl, screen_send_primary_device_attributes_string
+	call	uart_transmit_string
+	
 	ret
 	
 #code ROM

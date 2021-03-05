@@ -249,23 +249,42 @@ uart_rb_count:
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
-; uart_transmit - transmit the character in register B
+; uart_transmit_string - transmit the string in HL, where B is the length
 ;
-; Input B
-; Alters AF, HL
+; Input B, HL
+; Alters AF, BC, HL
+; Output none
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+uart_transmit_string:
+
+	ld	c, (hl)
+	call	uart_transmit		; send a character
+	inc	hl
+	djnz	uart_transmit_string	; go back for more
+
+	ret
+
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; uart_transmit - transmit the character in register C
+;
+; Input C
+; Alters AF
 ; Output none
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 uart_transmit:
 
-	ld	hl, uart_LSR		; read line status
-	ld	a, (hl)
+	ld	a, (uart_LSR)		; read line status
 	bit	uart_LSR_THRE_b, a	; wait until uart can accept a byte
 	jr	z, uart_transmit
 
-	ld	hl, uart_THR		; write the byte
-	ld	(hl), b
+	ld	a, c
+	ld	(uart_THR), a		; write the byte
 
 	ret
 

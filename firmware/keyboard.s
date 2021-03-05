@@ -236,8 +236,7 @@ keyboard_handler:
 	or	a		; set flags
 	ret	Z		; toss it
 
-	ld	b, a		; Send it out the uart
-	call	uart_transmit
+	call	uart_transmit	; Send it out the uart
 
 	ret
 
