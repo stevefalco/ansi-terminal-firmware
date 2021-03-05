@@ -20,6 +20,7 @@ escape_none_state	equ 0x00			; No escape yet
 escape_need_first_state	equ 0x01			; Need first char of sequence
 escape_csi_state	equ 0x02			; First char is '['
 escape_csi_d_N_state	equ 0x03			; Accumulating group of digits in CSI
+escape_sharp_state	equ 0x04			; First char is '#'
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -473,9 +474,11 @@ screen_initialize_loop:
 	ld	hl, screen_group_0_digits	; Pointer to the group_0 buffer
 	ld	(screen_group_pointer), hl	; Save the pointer
 
-	; Clear the column 79 flag
+	; Clear the column 79 and DEC flags.
 	xor	a
-	ld	(screen_col79_flag), a			; Clear the col 79 flag
+	ld	(screen_col79_flag), a		; Clear the col 79 flag
+	ld	(screen_dec_flag), a		; Clear the DEC flag
+	ld	(screen_sharp_flag), a		; Clear the sharp flag
 
 	ret
 
@@ -646,6 +649,8 @@ screen_escape_handler_first:
 	cp	'['
 	jr	Z, screen_escape_handler_start_csi
 
+	cp	'#'
+	jr	Z, screen_start_sharp
 	cp	'7'
 	jp	Z, screen_save_cursor_position
 
@@ -687,6 +692,26 @@ screen_escape_handler_start_csi:
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
+; screen_start_sharp
+;
+; We received a '['.
+;
+; Input none
+; Alters
+; Output none
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+screen_start_sharp:
+	; Mark that this is a special '#' sequence.
+	ld	a, 1
+	ld	(screen_sharp_flag), a
+
+	ret
+
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
 ; screen_escape_handler_in_csi
 ;
 ; We received a character following a '['.
@@ -699,6 +724,33 @@ screen_escape_handler_start_csi:
 
 screen_escape_handler_in_csi:
 
+	ld	a, b					; A = new character
+
+	; Semicolon and digits are common to DEC and ANSI, so handle them
+	; before checking the DEC flag.
+
+	; If it is a semicolon, we have collected all the digits in an argument.
+	; Note that there may be no digits before the semicolon, which implies zero.
+	cp	';'
+	jp	Z, screen_next_argument
+
+	; If this is a digit, go to an "accumulating digits" state, until we
+	; see a non-digit.
+	cp	'0'
+	jr	C, screen_bad_csi_sequence		; < '0' character
+	cp	'9' + 1
+	jr	C, screen_got_csi_group_N_digit		; <= '9' character
+
+	; If the DEC flag is set, go to an alternate parser.
+	ld	a, (screen_dec_flag)
+	or	a
+	jp	NZ, screen_parse_dec_command
+	
+	; If the '#' flag is set, go to an alternate parser.
+	ld	a, (screen_sharp_flag)
+	or	a
+	jp	NZ, screen_parse_sharp_command
+	
 	ld	a, b					; A = new character
 
 	; Test for some of the simple commands.
@@ -726,21 +778,59 @@ screen_escape_handler_in_csi:
 	cp	'K'
 	jp	Z, screen_clear_to_end_of_line
 
-	; If it is a semicolon, we have collected all the digits in an argument.
-	; Note that there may be no digits before the semicolon, which implies zero.
-	cp	';'
-	jp	Z, screen_next_argument
-
-	; If this is a digit, go to an "accumulating digits" state, until we
-	; see a non-digit.
-	cp	'0'
-	jr	C, screen_bad_csi_sequence		; < '0' character
-	cp	'9' + 1
-	jr	C, screen_got_csi_group_N_digit		; <= '9' character
+	cp	'?'
+	jp	Z, screen_set_dec_flag
 
 screen_bad_csi_sequence:
 
 	; This is not a sequence we handle yet.
+	ld	a, escape_none_state
+	ld	(screen_escape_state), a
+	ret
+
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; screen_parse_dec_command
+;
+; Input B = new character
+; Alters
+; Output none
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+screen_parse_dec_command:
+
+	; Currently, we just expect 'l' to clear a mode flag or 'h'
+	; to set a modeflag.  But, we really don't do anything with
+	; mode flags, so we can just clear the DEC flag, and consider
+	; that the sequence is complete.
+	xor	a
+	ld	(screen_dec_flag), a
+	
+	ld	a, escape_none_state
+	ld	(screen_escape_state), a
+	ret
+
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; screen_parse_sharp_command
+;
+; Input B = new character
+; Alters
+; Output none
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+screen_parse_sharp_command:
+
+	; Currently, we expect a digit, which sets things like line
+	; height or width, but we don't support these, so clear the
+	; sharp flag and terminate the sequence.
+	xor	a
+	ld	(screen_sharp_flag), a
+	
 	ld	a, escape_none_state
 	ld	(screen_escape_state), a
 	ret
@@ -793,6 +883,8 @@ screen_send_primary_device_attributes:
 	ld	hl, screen_send_primary_device_attributes_string
 	call	uart_transmit_string
 	
+	ld	a, escape_none_state
+	ld	(screen_escape_state), a
 	ret
 	
 #code ROM
@@ -1400,6 +1492,24 @@ screen_reverse_no_scroll:
 	ld	(screen_escape_state), a
 	ret
 
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; screen_set_dec_flag
+;
+; Input none
+; Alters 
+; Output none
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+screen_set_dec_flag:
+	; Mark that this is a special DEC sequence.
+	ld	a, 1
+	ld	(screen_dec_flag), a
+
+	ret
+
 #data RAM
 
 ; Pointer into video memory.
@@ -1432,4 +1542,10 @@ screen_group_1_digits:
 
 ; Column 79 flag.
 screen_col79_flag:
+	ds	1
+
+screen_dec_flag:
+	ds	1
+
+screen_sharp_flag:
 	ds	1
