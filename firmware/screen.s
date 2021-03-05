@@ -1215,7 +1215,7 @@ screen_clear_rows
 	; 0 = erase below
 	; 1 = erase above
 	; 2 = erase all
-	ld	a, (screen_group_0_digits)		; A = number of lines to move
+	ld	a, (screen_group_0_digits)		; A = type of clear
 	cp	0					; Erase below
 	jr	Z, screen_clear_rows_below
 	cp	1					; Erase above
@@ -1300,6 +1300,32 @@ screen_clear_columns
 	xor	a					; Clear A
 	ld	(screen_char_under_cursor), a
 
+	; There are three subsets:
+	; 0 = erase to the right
+	; 1 = erase to the left
+	; 2 = erase the whole line
+	ld	a, (screen_group_0_digits)		; A = type of clear
+	cp	0					; Erase to the right
+	jr	Z, screen_clear_cols_right
+	cp	1					; Erase to the left
+	jr	Z, screen_clear_cols_left
+	
+	; Clear everything on the line.
+	call	screen_cursor_start_of_line		; HL = FWA of this line
+	ld	b, screen_cols				; DE = 80
+	xor	a					; Clear A and clear carry
+screen_clear_cols_all:
+	ld	(hl), a					; Clear the character
+	inc	hl					; Next position to clear
+	djnz	screen_clear_cols_all
+
+	; Put the cursor back on screen.
+	ld	hl, (screen_cursor_location)
+	ld	(hl), char_del
+		
+	jr	screen_clear_cols_done
+
+screen_clear_cols_right:
 	; Find the end of the line, so we don't move too far.
 	call	screen_cursor_start_of_line		; HL = FWA of this line
 	ld	de, screen_cols				; DE = 80
@@ -1307,22 +1333,37 @@ screen_clear_columns
 	ex	de, hl					; DE = LWA+1, HL=80
 	ld	hl, (screen_cursor_location)		; HL = cursor location
 
-	; We will clear with nulls.
-	xor	a
-
-screen_clear_to_end_of_line_loop:
+screen_clear_right_loop:
 	inc	hl					; Next position to clear
 
-	; Make sure we haven't gone off the end.  Carry is already clear.
-	or	a					; Clear carry
+	; Make sure we haven't gone off the end.
+	xor	a					; Clear A and clear carry
 	push	hl					; Save HL on the stack
 	sbc	hl, de					; Sets borrow if DE > HL
 	pop	hl					; HL = position to clear
-	jr	NC, screen_clear_to_end_of_line_done
+	jr	NC, screen_clear_cols_done
 	ld	(hl), a					; Clear the character
-	jr	screen_clear_to_end_of_line_loop
+	jr	screen_clear_right_loop
 
-screen_clear_to_end_of_line_done:
+screen_clear_cols_left:
+	; Find the start of the line, so we don't move too far.
+	call	screen_cursor_start_of_line		; HL = FWA of this line
+	ex	de, hl					; DE = FWA
+	ld	hl, (screen_cursor_location)		; HL = cursor location
+
+screen_clear_left_loop:
+	dec	hl					; Next position to clear
+
+	; Make sure we haven't gone off the end.
+	xor	a					; Clear A and clear carry
+	push	hl					; Save HL on the stack
+	sbc	hl, de					; Sets borrow if DE > HL
+	pop	hl					; HL = position to clear
+	jr	C, screen_clear_cols_done
+	ld	(hl), a					; Clear the character
+	jr	screen_clear_left_loop
+
+screen_clear_cols_done:
 
 	; Escape sequence complete.
 	ld	a, escape_none_state
