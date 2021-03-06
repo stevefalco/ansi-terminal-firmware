@@ -310,21 +310,38 @@ screen_handle_ht_ok:
 
 screen_handle_lf:
 
+	; There are two cases.  If we are within the scroll region, we move
+	; down or scroll.  But if we are not within the scroll region, we
+	; do an absolute move.
+	ld	a, (screen_dec_top_margin)	; A = top of scroll region
+	ld	b, a				; B = top of scroll region
+	push	bc
+	call	screen_cursor_in_line		; A = row number of cursor
+	pop	bc
+	cp	b				; Borrow if A (cursor) < B (top)
+	jr	C, screen_handle_lf_above_sr	; Cursor is above top of region
+
+	ld	b, a				; B = row number of cursor
+	ld	a, (screen_dec_bottom_margin)	; A = bottom of scroll region
+	cp	b				; Borrow if B (cursor) > A (bottom)
+	jr	C, screen_handle_lf_below_sr	; Cursor is below bottom of region
+
 	; Put back whatever was under the cursor.
 	ld	a, (screen_char_under_cursor)
 	ld	hl, (screen_cursor_location)
 	ld	(hl), a
 
-	; line-feed means we move 80 characters forward, but if that would
-	; move us off the screen, then we have to scroll up one line.
-	ld	hl, (screen_cursor_location); HL = original position
-	ld	bc, screen_cols		; BC = 80
-	add	hl, bc			; HL = proposed new position, clears carry
-	ld	de, hl			; DE = proposed new position
-	ld	bc, screen_end		; BC = LWA+1
-	sbc	hl, bc			; Set borrow if BC (LWA+1) > HL (proposed position)
-	ld	hl, de			; HL = proposed new position
-	jr	C, screen_lf_no_scroll	; proposed new position is ok
+	; We are within the scroll region.  In this case, line-feed means we
+	; move 80 characters forward, but if that would move us out of the
+	; scroll region, then we have to scroll up one line.
+	ld	hl, (screen_cursor_location)	; HL = original position
+	ld	bc, screen_cols			; BC = 80
+	add	hl, bc				; HL = proposed new position, clears carry
+	ld	de, hl				; DE = proposed new position
+	ld	bc, (screen_current_lwa_p1)	; BC = LWA+1
+	sbc	hl, bc				; Set borrow if BC (LWA+1) > HL (proposed position)
+	ld	hl, de				; HL = proposed new position
+	jr	C, screen_lf_no_scroll		; proposed new position is ok
 
 	; Now scroll up.
 	call	screen_scroll_up
@@ -339,6 +356,26 @@ screen_lf_no_scroll:
 	ld	(hl), char_del
 	ld	(screen_cursor_location), hl
 
+	ret
+
+screen_handle_lf_above_sr:
+screen_handle_lf_below_sr:
+	; Absolute move, bounded by screen dimensions.  No scrolling.
+	call	screen_cursor_in_line		; A = row number of cursor
+	inc	a				; A = where we would land
+	ld	b, a				; B = where we would land
+	ld	a, screen_lines - 1		; A = 23
+	cp	b				; Set borrow if B (new pos) > A (last row)
+	ret	C				; We would land past the row - do nothing
+
+	ld	a, (screen_char_under_cursor)	; A = character under cursor
+	ld	hl, (screen_cursor_location)	; HL = current cursor position
+	ld	(hl), a				; paint the character 
+	ld	bc, screen_cols			; BC = 80
+	add	hl, bc				; HL = new position, known good
+	ld	(hl), char_del
+	ld	(screen_cursor_location), hl	; Store new position
+	
 	ret
 
 #code ROM
@@ -468,7 +505,6 @@ screen_scroll_down:
 	call	math_multiply_16x8			; HL = (bottom line number + 1) * 80
 	ld	bc, screen_base				; BC = FWA of the screen
 	add	hl, bc					; HL = FWA of the line after the destination line
-							; Note that this clears carry
 	dec	hl					; HL = LWA of the destination line
 	push	hl					; Save LWA of destinaion on stack
 							; DE still = 80, carry is clear from "add" above
@@ -544,6 +580,12 @@ screen_initialize_loop:
 	ld	(screen_dec_top_margin), a
 	ld	a, screen_lines - 1
 	ld	(screen_dec_bottom_margin), a
+
+	; Start off with the screen start and end properly set.
+	ld	hl, screen_base
+	ld	(screen_current_fwa), hl
+	ld	hl, screen_end
+	ld	(screen_current_lwa_p1), hl
 
 	ret
 
@@ -829,6 +871,9 @@ screen_escape_handler_in_csi:
 
 	cp	'f'
 	jp	Z, screen_move_cursor_numeric
+
+	cp	'r'
+	jp	Z, screen_set_margins
 
 	cp	'A'
 	jp	Z, screen_move_cursor_up
@@ -1657,13 +1702,13 @@ screen_handle_reverse_scroll:
 	ld	(hl), a
 
 	; reverse-scroll means we move 80 characters backward, but if that would
-	; move us off the screen, then we have to scroll down one line.
+	; move us above the scroll region, then we have to scroll down one line.
 	ld	hl, (screen_cursor_location)		; HL = current position
 	ld	bc, screen_cols				; BC = 80
 	or	a					; Clear carry
 	sbc	hl, bc					; HL = proposed new position
 	ld	de, hl					; DE = proposed new position
-	ld	bc, screen_base				; BC = FWA
+	ld	bc, (screen_current_fwa)		; BC = FWA
 	sbc	hl, bc					; Set borrow if BC (FWA) > HL (proposed position)
 	ld	hl, de					; HL = proposed new position
 	jr	NC, screen_reverse_no_scroll		; No borrow, so no scroll is needed
@@ -1746,6 +1791,71 @@ screen_handle_esc_lf:
 	ld	(screen_escape_state), a
 	ret
 
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; screen_set_margins
+;
+; Input none
+; Alters 
+; Output none
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+screen_set_margins:
+
+	ld	de, screen_cols					; DE = 80
+	ld	bc, screen_base					; BC = screen FWA
+
+	; Get top row number.  Note that row numbers are 1-based, so we have 
+	; to decrement, but cannot go below zero.
+	ld	a, (screen_group_0_digits)			; A = top row
+	or	a						; Set flags
+	jr	Z, screen_set_margins_top_ok
+	dec	a						; row now 0-based
+screen_set_margins_top_ok:
+	ld	(screen_dec_top_margin), a			; Set the top margin
+	call	math_multiply_16x8				; HL = row * 80
+	ld	bc, screen_base					; BC = screen FWA
+	add	hl, bc						; HL = row FWA
+	ld	(screen_current_fwa), hl
+
+	; Get bottom row number.
+	ld	a, (screen_group_1_digits)			; A = bottom row
+	or	a						; Set flags
+	jr	Z, screen_set_margins_bottom_ok
+	dec	a						; row now 0-based
+screen_set_margins_bottom_ok:
+	ld	(screen_dec_bottom_margin), a			; Set the bottom margin
+	inc	a						; row + 1
+	call	math_multiply_16x8				; HL = row+1 * 80
+	ld	bc, screen_base					; BC = screen FWA
+	add	hl, bc						; HL = row+1 FWA = row LWA+1
+	ld	(screen_current_lwa_p1), hl
+
+	; Restore the character under the old cursor.
+	ld	a, (screen_char_under_cursor)
+	ld	hl, (screen_cursor_location)
+	ld	(hl), a
+
+	; Move the cursor to the upper left.
+	ld	hl, screen_base
+	ld	(screen_cursor_location), hl
+
+	; Put up a cursor with a null under it.
+	ld	a, (hl)
+	ld	(screen_char_under_cursor), a
+	ld	(hl), char_del
+
+	; Any move means we must clear the col79 flag.
+	xor	a
+	ld	(screen_col79_flag), a				; Clear the col 79 flag
+
+	; Escape sequence complete.
+	ld	a, escape_none_state
+	ld	(screen_escape_state), a
+	ret
+
 #data RAM
 
 ; Pointer into video memory.
@@ -1758,6 +1868,14 @@ screen_cursor_location_save:
 
 ; Pointer into the group that we are accumulating digits for.
 screen_group_pointer:
+	ds	2
+
+; FWA changes with scroll region
+screen_current_fwa:
+	ds	2
+
+; LWA+1 changes with scroll region
+screen_current_lwa_p1:
 	ds	2
 
 ; Preserved character under the cursor so we can replace it when the cursor moves.

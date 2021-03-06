@@ -1,6 +1,21 @@
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
+; debug_print_string_nl - print the string pointed to by HL then a CR-LF
+;
+; Input HL
+; Alters none
+; Output none
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+debug_print_string_nl:
+	call	debug_print_string
+	jr	debug_print_eol
+
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
 ; debug_print_string - print the string pointed to by HL
 ;
 ; Input HL
