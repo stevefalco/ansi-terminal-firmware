@@ -748,7 +748,7 @@ screen_escape_handler_in_csi:
 	cp	'0'
 	jr	C, screen_bad_csi_sequence		; < '0' character
 	cp	'9' + 1
-	jr	C, screen_got_csi_group_N_digit		; <= '9' character
+	jp	C, screen_got_csi_group_N_digit		; <= '9' character
 
 	; If the DEC flag is set, go to an alternate parser.
 	ld	a, (screen_dec_flag)
@@ -807,14 +807,25 @@ screen_bad_csi_sequence:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 screen_parse_dec_command:
+	; We don't handle most of these, but DECCOLM has the side-effect of
+	; reinitializing the screen, and we need that to pass vttest.
 
-	; Currently, we just expect 'l' to clear a mode flag or 'h'
-	; to set a modeflag.  But, we really don't do anything with
-	; mode flags, so we can just clear the DEC flag, and consider
-	; that the sequence is complete.
+	ld	a, (screen_group_0_digits)
+	cp	3
+	jr	NZ, screen_parse_dec_command_done
+
+	; We don't care if the last character is "l" or 'h', because we don't
+	; support 132 column mode.  So there is no need to test what is in
+	; register B here.
+	call	screen_initialize
+
+screen_parse_dec_command_done:
+
+	; Clear the DEC flag.
 	xor	a
 	ld	(screen_dec_flag), a
 	
+	; Done with this escape sequence
 	ld	a, escape_none_state
 	ld	(screen_escape_state), a
 	ret
@@ -1244,12 +1255,14 @@ screen_clear_rows
 	; 1 = erase above
 	; 2 = erase all
 	ld	a, (screen_group_0_digits)		; A = type of clear
+
 	cp	0					; Erase below
 	jr	Z, screen_clear_rows_below
+
 	cp	1					; Erase above
 	jr	Z, screen_clear_rows_above
 	
-	; Clear everything.
+	; cp	2					; Erase all
 	ld	hl, screen_base
 	ld	bc, screen_length
 screen_clear_all_loop:
