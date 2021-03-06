@@ -659,8 +659,11 @@ screen_escape_handler_first:
 	cp	'8'
 	jp	Z, screen_restore_cursor_position
 
+	cp	'D'
+	jp	Z, screen_handle_esc_lf
+
 	cp	'E'
-	jp	Z, screen_handle_next_line
+	jp	Z, screen_handle_esc_cr
 
 	cp	'M'
 	jp	Z, screen_handle_reverse_scroll
@@ -1475,12 +1478,6 @@ screen_move_cursor_numeric_no_decrement_group_1:
 	cp	screen_cols - 1				; sets borrow if A = 78 or less
 	jr	NC, screen_move_cursor_numeric_col79_group_1
 
-	; We are moving to a column other than 79.  We must clear the flag.
-	push	af
-	xor	a
-	ld	(screen_col79_flag), a			; Clear the col 79 flag
-	pop	af
-
 screen_move_cursor_numeric_col79_group_1:
 	cp	screen_cols				; sets borrow if A = 79 or less
 	jr	C, screen_move_cursor_numeric_no_overflow_group_1
@@ -1498,6 +1495,10 @@ screen_move_cursor_numeric_no_overflow_group_1:
 	ld	(screen_char_under_cursor), a
 	ld	(screen_cursor_location), hl
 	ld	(hl), char_del
+
+	; Any move means we must clear the col79 flag.
+	xor	a
+	ld	(screen_col79_flag), a			; Clear the col 79 flag
 
 	; Escape sequence complete.
 	ld	a, escape_none_state
@@ -1626,7 +1627,7 @@ screen_set_dec_flag:
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
-; screen_handle_next_line
+; screen_handle_esc_cr
 ;
 ; Input none
 ; Alters 
@@ -1634,10 +1635,31 @@ screen_set_dec_flag:
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-screen_handle_next_line:
+screen_handle_esc_cr:
 
 	; This seems to be like <CR>
 	call screen_handle_cr
+
+	; Escape sequence complete.
+	ld	a, escape_none_state
+	ld	(screen_escape_state), a
+	ret
+
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; screen_handle_esc_lf
+;
+; Input none
+; Alters 
+; Output none
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+screen_handle_esc_lf:
+
+	; This seems to be like <LF>
+	call screen_handle_lf
 
 	; Escape sequence complete.
 	ld	a, escape_none_state
