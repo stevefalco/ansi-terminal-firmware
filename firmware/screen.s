@@ -663,7 +663,7 @@ screen_escape_handler_first:
 	jp	Z, screen_handle_esc_lf
 
 	cp	'E'
-	jp	Z, screen_handle_esc_cr
+	jp	Z, screen_handle_esc_cr_lf
 
 	cp	'M'
 	jp	Z, screen_handle_reverse_scroll
@@ -1627,7 +1627,7 @@ screen_set_dec_flag:
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
-; screen_handle_esc_cr
+; screen_handle_esc_cr_lf
 ;
 ; Input none
 ; Alters 
@@ -1635,10 +1635,11 @@ screen_set_dec_flag:
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-screen_handle_esc_cr:
+screen_handle_esc_cr_lf:
 
-	; This seems to be like <CR>
+	; This seems to be like <CR><LF>
 	call screen_handle_cr
+	call screen_handle_lf
 
 	; Escape sequence complete.
 	ld	a, escape_none_state
