@@ -5,6 +5,7 @@ screen_lines		equ 24					; Number of lines
 screen_length		equ 1920				; Length of whole screen
 screen_end		equ (screen_base + screen_length)	; LWA+1
 screen_last_line_start	equ (screen_end - screen_cols)		; Address of col=0, row=23
+screen_last_line_end	equ (screen_end - 1)			; Address of col=79, row=23
 
 char_bs			equ 0x08
 char_ht			equ 0x09
@@ -388,17 +389,43 @@ screen_handle_cr:
 
 screen_scroll_up:
 
-	; Move 23 lines up.  The top line is lost.
-	ld	hl, screen_base	+ screen_cols		; source
-	ld	de, screen_base				; destination
-	ld	bc, screen_cols * 23			; all 23 lines
-	ldir
+	; We have to respect the scroll regions.  Figure out how many
+	; lines are to be scrolled.
+	;
+	; If we are unlimited, the top line is 0, the bottom line is 23.
+	; and the difference is 23, which is the correct number of lines
+	; to scroll.
+	ld	a, (screen_dec_top_margin)		; A = top line
+	ld	c, a					; C = top line
+	ld	a, (screen_dec_bottom_margin)		; A = bottom line
+	sub	c					; A = bottom - top
+
+	; Calculate the number of cells to move.
+	ld	de, screen_cols				; DE = 80
+	call	math_multiply_16x8			; HL = (bottom - top) * 80
+	push	hl					; Push number of cells to move on stack
+
+	; Calculate the starting destination line FWA.  The top line number
+	; is still in C, and DE still has 80.
+	ld	a, c					; A = top line number
+	call	math_multiply_16x8			; HL = top line number * 80
+	ld	bc, screen_base				; BC = FWA of the screen
+	add	hl, bc					; HL = FWA of the destination line
+	ex	de, hl					; DE = FWA of the destination line, HL = 80
+	add	hl, de					; HL = FWA of the source line
+	pop	bc					; BC = Number of cells to move
+	ldir						; Move the cells
 	
 	; Now clear the last line, since it is "new".
-	ld	hl, screen_base	+ (23 * screen_cols)
-	ld	b, screen_cols
+	ld	a, (screen_dec_bottom_margin)		; A = bottom line number
+	ld	de, screen_cols				; DE = 80
+	call	math_multiply_16x8			; HL = bottom line number * 80
+	ld	bc, screen_base				; BC = FWA of the screen
+	add	hl, bc					; HL = FWA of bottom line
+	ld	b, screen_cols				; B = 80
+	xor	a					; A = 0
 screen_scroll_up_loop:
-	ld	(hl), 0
+	ld	(hl), a
 	inc	hl
 	djnz	screen_scroll_up_loop
 
@@ -417,17 +444,49 @@ screen_scroll_up_loop:
 
 screen_scroll_down:
 
-	; Move 23 lines down.  The bottom line is lost.
-	ld	hl, screen_end - 1 - screen_cols	; source
-	ld	de, screen_end - 1			; destination
-	ld	bc, screen_cols * 23			; all 23 lines
-	lddr
+	; We have to respect the scroll regions.  Figure out how many
+	; lines are to be scrolled.
+	;
+	; If we are unlimited, the top line is 0, the bottom line is 23.
+	; and the difference is 23, which is the correct number of lines
+	; to scroll.
+	ld	a, (screen_dec_bottom_margin)		; A = bottom line
+	ld	c, a					; C = bottom line
+	ld	a, (screen_dec_top_margin)		; A = top line
+	sub	c					; A = top - bottom
+	neg						; A = bottom - top
+
+	; Calculate the number of cells to move.
+	ld	de, screen_cols				; DE = 80
+	call	math_multiply_16x8			; HL = (bottom - top) * 80
+	push	hl					; Push number of cells to move on stack
+
+	; Calculate the starting destination line LWA.  The bottom line number
+	; is still in C, and DE still has 80.
+	ld	a, c					; A = bottom line number
+	inc	a					; A = bottom line number + 1
+	call	math_multiply_16x8			; HL = (bottom line number + 1) * 80
+	ld	bc, screen_base				; BC = FWA of the screen
+	add	hl, bc					; HL = FWA of the line after the destination line
+							; Note that this clears carry
+	dec	hl					; HL = LWA of the destination line
+	push	hl					; Save LWA of destinaion on stack
+							; DE still = 80, carry is clear from "add" above
+	sbc	hl, de					; HL = LWA of the source line
+	pop	de					; DE = LWA of the destination line
+	pop	bc					; BC = Number of cells to move
+	lddr						; Move the cells
 	
-	; Now clear the first line, since it is "new".
-	ld	hl, screen_base
-	ld	b, screen_cols
+	; Now clear the top line, since it is "new".
+	ld	a, (screen_dec_top_margin)		; A = top line
+	ld	de, screen_cols				; DE = 80
+	call	math_multiply_16x8			; HL = top line number * 80
+	ld	bc, screen_base				; BC = FWA of the screen
+	add	hl, bc					; HL = FWA of top line
+	ld	b, screen_cols				; B = 80
+	xor	a					; A = 0
 screen_scroll_down_loop:
-	ld	(hl), 0
+	ld	(hl), a
 	inc	hl
 	djnz	screen_scroll_down_loop
 
@@ -478,6 +537,13 @@ screen_initialize_loop:
 	xor	a
 	ld	(screen_col79_flag), a		; Clear the col 79 flag
 	ld	(screen_dec_flag), a		; Clear the DEC flag
+
+	; Top margin starts out as 0, bottom margin starts out as 23.
+	;
+	; A is still zero from above.
+	ld	(screen_dec_top_margin), a
+	ld	a, screen_lines - 1
+	ld	(screen_dec_bottom_margin), a
 
 	ret
 
@@ -1714,5 +1780,14 @@ screen_group_1_digits:
 screen_col79_flag:
 	ds	1
 
+; Processing a DEC escape sequence.
 screen_dec_flag:
+	ds	1
+
+; Prevent scrolling above the top margin.
+screen_dec_top_margin:
+	ds	1
+
+; Prevent scrolling below the bottom margin.
+screen_dec_bottom_margin:
 	ds	1
