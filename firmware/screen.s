@@ -26,6 +26,67 @@ escape_sharp_state	equ 0x04			; First char is '#'
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
+; screen_dump_hex
+;
+; Input B
+; Alters none
+; Output none
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+screen_dump_hex:
+	push	hl
+	push	de
+	push	af
+	push	bc
+
+	; MSB
+	ld	a, b
+	rr	a					; select upper nibble
+	rr	a
+	rr	a
+	rr	a
+	and	a, 0xf					; chop off the upper junk
+	cp	0xa					; Is it >= 0xa
+	jp	P, screen_print_hex_nibble_ge_l		; yes - convert to A-F
+	add	a, '0'					; no - convert to 0-9
+	jr	screen_print_hex_nibble_ready_l
+screen_print_hex_nibble_ge_l:
+	add	a, 'A' - 0xa
+screen_print_hex_nibble_ready_l:
+	ld	b, a
+	call	screen_normal_char
+	pop	bc
+	push	bc
+
+	; LSB
+	ld	a, b
+	and	a, 0xf
+	; Is it >= 0xa
+	cp	0xa
+	jp	P, screen_print_hex_nibble_ge_r
+	add	a, '0'
+	jr	screen_print_hex_nibble_ready_r
+screen_print_hex_nibble_ge_r:
+	add	a, 'A' - 0xa
+screen_print_hex_nibble_ready_r:
+	ld	b, a
+	call	screen_normal_char
+
+	; Print a space separator
+	ld	a, ' '
+	ld	b, a
+	call	screen_normal_char
+
+	pop	bc
+	pop	af
+	pop	de
+	pop	hl
+	ret
+
+#code ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
 ; screen_handler - read from the uart and update the screen
 ;
 ; Input none
@@ -39,6 +100,8 @@ screen_handler:
 	ld	a, b
 	cp	-1		; -1 means "nothing available"
 	ret	Z		; No characters in our receive buffer.
+
+ ;jr screen_dump_hex
 
 	; We first have to determine if we are collecting an escape
 	; sequence.
@@ -84,7 +147,7 @@ screen_handler:
 
 	; Is it an escape?
 	cp	char_escape
-	jp	Z, screen_handle_escape
+	jp	Z, screen_begin_escape
 
 	; Nothing we care about.  Toss it.
 	ret
@@ -661,7 +724,7 @@ screen_cursor_start_of_line:
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
-; screen_handle_escape - handle an escape
+; screen_begin_escape - begin an escape sequence
 ;
 ; Input none
 ; Alters A
@@ -669,7 +732,7 @@ screen_cursor_start_of_line:
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-screen_handle_escape:
+screen_begin_escape:
 
 	; An escape sequence is variable length.  We need a state-machine to
 	; keep track of where we are in a potential sequence.
@@ -717,7 +780,7 @@ screen_escape_handler:
 	jr	Z, screen_escape_handler_in_csi		; Got first char after '['
 
 	cp	escape_csi_d_N_state
-	jr	Z, screen_escape_handler_in_csi		; Accumulating d0
+	jr	Z, screen_escape_handler_in_csi		; Accumulating d0 or d1
 
 	cp	escape_sharp_state
 	jp	Z, screen_escape_in_sharp		; Got first char after '#'
@@ -1804,9 +1867,24 @@ screen_handle_esc_lf:
 
 screen_set_margins:
 
-	ld	de, screen_cols					; DE = 80
-	ld	bc, screen_base					; BC = screen FWA
+	; Special case - if screen_group_0_digits and screen_group_1_digits
+	; are both zero, set the full range.
+	;
+	; Do this test first; it is the only time A = B is allowed - i.e. when
+	; A and B are both zero.
+	ld	a, (screen_group_1_digits)			; A = bottom row
+	ld	b, a						; B = bottom row
+	ld	a, (screen_group_0_digits)			; A = top row
+	or	b
+	jr	NZ, screen_set_margins_set_full
 
+	; For all other cases, the top margin must be strictly less than the bottom margin.
+	ld	a, (screen_group_1_digits)			; A = bottom row
+	ld	b, a						; B = bottom row
+	ld	a, (screen_group_0_digits)			; A = top row
+	cp	b						; Borrow if A (top) < B (bottom)
+	jr	NC, screen_set_margins_done			; A >= B is illegal
+	
 	; Get top row number.  Note that row numbers are 1-based, so we have 
 	; to decrement, but cannot go below zero.
 	ld	a, (screen_group_0_digits)			; A = top row
@@ -1815,6 +1893,7 @@ screen_set_margins:
 	dec	a						; row now 0-based
 screen_set_margins_top_ok:
 	ld	(screen_dec_top_margin), a			; Set the top margin
+	ld	de, screen_cols					; DE = 80
 	call	math_multiply_16x8				; HL = row * 80
 	ld	bc, screen_base					; BC = screen FWA
 	add	hl, bc						; HL = row FWA
@@ -1828,6 +1907,7 @@ screen_set_margins_top_ok:
 screen_set_margins_bottom_ok:
 	ld	(screen_dec_bottom_margin), a			; Set the bottom margin
 	inc	a						; row + 1
+	ld	de, screen_cols					; DE = 80
 	call	math_multiply_16x8				; HL = row+1 * 80
 	ld	bc, screen_base					; BC = screen FWA
 	add	hl, bc						; HL = row+1 FWA = row LWA+1
@@ -1842,10 +1922,12 @@ screen_set_margins_bottom_ok:
 	ld	hl, screen_base
 	ld	(screen_cursor_location), hl
 
-	; Put up a cursor with a null under it.
+	; Save under the cursor, then paint the curor.
 	ld	a, (hl)
 	ld	(screen_char_under_cursor), a
 	ld	(hl), char_del
+
+screen_set_margins_done:
 
 	; Any move means we must clear the col79 flag.
 	xor	a
@@ -1855,6 +1937,21 @@ screen_set_margins_bottom_ok:
 	ld	a, escape_none_state
 	ld	(screen_escape_state), a
 	ret
+
+screen_set_margins_set_full:
+	; Reset top margin to 0, bottom margin to 23.
+	xor	a						; A = 0
+	ld	(screen_dec_top_margin), a
+	ld	a, screen_lines - 1				; A = 23
+	ld	(screen_dec_bottom_margin), a
+
+	; Reset FWA and LWA+1
+	ld	hl, screen_base					; HL = FWA
+	ld	(screen_current_fwa), hl
+	ld	hl, screen_end					; HL = LWA+1
+	ld	(screen_current_lwa_p1), hl
+
+	jr	screen_set_margins_done
 
 #data RAM
 
@@ -1903,6 +2000,7 @@ screen_dec_flag:
 	ds	1
 
 ; Prevent scrolling above the top margin.
+; Range 0-23
 screen_dec_top_margin:
 	ds	1
 
