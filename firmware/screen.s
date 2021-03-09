@@ -906,6 +906,32 @@ screen_escape_handler_in_csi:
 
 	ld	a, b					; A = new character
 
+	; If a control character appears in the middle of an escape sequence,
+	; we simply execute it.  This is an error recovery behavior, and should
+	; not be sent by an OS.
+	cp	char_bs
+	jp	Z, screen_handle_bs
+
+	cp	char_ht
+	jp	Z, screen_handle_ht
+
+	cp	char_ht
+	jp	Z, screen_handle_lf
+
+	cp	char_vt
+	jp	Z, screen_handle_lf
+
+	cp	char_ff
+	jp	Z, screen_handle_lf
+
+	cp	char_cr
+	jp	Z, screen_handle_cr
+
+	; An escape while handing an escape is also an error condition.  Terminate
+	; the previous sequence and begin a new one.
+	cp	char_escape
+	jp	Z, screen_begin_escape
+	
 	; Semicolon and digits are common to DEC and ANSI, so handle them
 	; before checking the DEC flag.
 
