@@ -63,8 +63,8 @@ set_clock_groups -exclusive \
 	-group  {cpuClockGen|altpll_component|auto_generated|pll1|clk[0]}
 
 # Don't cares
-set_false_path -from [get_ports {UART_RX}] -to *
-set_false_path -from * -to [get_ports {UART_TX}]
+set_false_path -from [get_ports {UART_RX UART_CTS}] -to *
+set_false_path -from * -to [get_ports {UART_TX UART_RTS}]
 
 set_false_path -from [get_ports {KBD_CLK}] -to *
 set_false_path -from * -to [get_ports {KBD_CLK}]

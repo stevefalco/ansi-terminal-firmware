@@ -5,10 +5,10 @@ use ieee.std_logic_unsigned.all;
 
 entity terminal is
 	port (
-		CLK12M			: in std_logic;
+		CLK12M			: in std_logic;				-- M2
 
 		-- DIP switches for baud rate
-		DIP_SW			: in std_logic_vector(3 downto 0);
+		DIP_SW			: in std_logic_vector(3 downto 0);	-- N2, N1, P2, J1
 
 		-- The FPGA can drive 8 mA per pin.  The RGB pins drive a 75 ohm
 		-- load, and we need to get it to 0.7 volts for "white".
@@ -18,21 +18,23 @@ entity terminal is
 		-- separate series resistor.  We could even get some greyscale
 		-- output if desired, by wiring an R-2R ladder.  I've seen people
 		-- use 3 or 4 independent bits per color, but we don't need that.
-		PIXEL_R1		: out std_logic;
-		PIXEL_R2		: out std_logic;
-		PIXEL_G1		: out std_logic;
-		PIXEL_G2		: out std_logic;
-		PIXEL_B1		: out std_logic;
-		PIXEL_B2		: out std_logic;
+		PIXEL_R1		: out std_logic;			-- R12
+		PIXEL_R2		: out std_logic;			-- T13
+		PIXEL_G1		: out std_logic;			-- R13
+		PIXEL_G2		: out std_logic;			-- T14
+		PIXEL_B1		: out std_logic;			-- P14
+		PIXEL_B2		: out std_logic;			-- R14
 
-		HSYNC			: out std_logic;
-		VSYNC			: out std_logic;
+		HSYNC			: out std_logic;			-- T15
+		VSYNC			: out std_logic;			-- N16
 
-		KBD_CLK			: inout std_logic;
-		KBD_DATA		: inout std_logic;
+		KBD_CLK			: inout std_logic;			-- K15
+		KBD_DATA		: inout std_logic;			-- K16
 
-		UART_RX			: in std_logic;
-		UART_TX			: out std_logic
+		UART_RX			: in std_logic;				-- L15
+		UART_TX			: out std_logic;			-- L16
+		UART_RTS		: out std_logic;			-- R1
+		UART_CTS		: in std_logic				-- P1
 
 		-- SC			: out std_logic
 	);
@@ -308,6 +310,9 @@ architecture a of terminal is
 
 	signal slow_clock		: std_logic := '0';
 
+	signal rts_n			: std_logic;
+	signal cts_n			: std_logic;
+
 begin
 
 	-- Create a 25.2 MHz dot clock from the 12 MHz oscillator.
@@ -436,11 +441,15 @@ begin
 			sTx => UART_TX,
 
 			-- modem control signals
-			CTSn => '0', -- cts, active low
-			DSRn => '0', -- dsr, active low
-			RIn => '0',  -- ring indicator, active low
-			DCDn => '0' -- dcd, active low
+			CTSn => cts_n,		-- cts, active low
+			RTSn => rts_n,		-- rts, active low
+			DSRn => '0',		-- dsr, active low
+			RIn => '0',		-- ring indicator, active low
+			DCDn => '0'		-- dcd, active low
 		);
+	
+	cts_n <= UART_CTS;
+	UART_RTS <= rts_n;
 
 	-- Z80 Keyboard
 	z80kb: keyboard

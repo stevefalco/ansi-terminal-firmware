@@ -91,6 +91,7 @@ uart_LSR_THRE_v		equ (1 << uart_LSR_THRE_b)
 dipSW			equ 0xc010
 
 uart_depth		equ 128				; SW receiver fifo depth
+uart_high_water		equ 64
 
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -107,7 +108,7 @@ uart_depth		equ 128				; SW receiver fifo depth
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 uart_receive:
-	di
+	di				; Disable interrupts
 
 	; Assume nothing available.
 	ld	b, -1
@@ -139,8 +140,17 @@ uart_receive:
 	and	uart_depth - 1		; keep it in range
 	ld	(uart_rb_output), a
 
+	ei				; Re-enable interrupts
+	ret
+
 uart_get_char_none:
-	ei
+
+	; If there is nothing available, make sure we haven't blocked
+	; the sender.
+	ld	hl, uart_MCR
+	set	uart_MCR_RTS_b, (hl)
+
+	ei				; Re-enable interrupts
 	ret
 
 #code ROM
@@ -192,10 +202,20 @@ uart_test_interrupt_done:
 
 uart_store_char:
 
-	; See if there is room in the buffer
-	ld	a, (uart_rb_count)
-	sub	uart_depth
+	ld	a, (uart_rb_count)	; A = number of characters in our receive buffer
+	cp	uart_high_water		; Test the high water mark
+	jr	C, uart_store_char_not_too_full ; Below high water
+
+	; Above high water - clear RTS so the sender will pause.
+	ld	hl, uart_MCR
+	res	uart_MCR_RTS_b, (hl)
+
+	; We may of course be way above the high water mark.  See if
+	; there is any room in the buffer
+	cp	uart_depth
 	jp	P, uart_store_char_no_room
+
+uart_store_char_not_too_full:
 
 	; Find the place to store the character.  We use a tricky
 	; way to add an 8 and 16 bit register together.
@@ -333,6 +353,10 @@ uart_initialize:
 	ld	a, uart_IER_INIT
 	ld	(hl), a
 	
+	; Unblock the sender.
+	ld	hl, uart_MCR
+	set	uart_MCR_RTS_b, (hl)
+
 	ret
 
 #code ROM
