@@ -22,6 +22,8 @@ escape_csi_state	equ 0x02			; First char is '['
 escape_csi_d_N_state	equ 0x03			; Accumulating group of digits in CSI
 escape_sharp_state	equ 0x04			; First char is '#'
 
+null_cursor		equ 0x80			; A null character plus cursor
+
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -191,13 +193,9 @@ screen_normal_char:
 	sbc	hl, de					; Sets borrow if de (LWA) > hl (curr pos)
 	jr	C, screen_normal_char_not_last_col	; We are not at the last column
 
-	; This is the special case.  Instead of placing the character on the
-	; screen, we place it in the "save under" buffer.
+	; This is the special case.  Put it on screen, and make it a cursor, but
+	; then set a flag rather than moving the cursor.
 	pop	bc					; Get the new char back
-	ld	a, b					; New character
-	ld	(screen_char_under_cursor), a		; Store it.
-
-	; Put it on screen, and make it a cursor.
 	ld	hl, (screen_cursor_location)		; HL = current location
 	ld	(hl), b
 	set	7, (hl)
@@ -217,22 +215,18 @@ screen_normal_char_not_last_col:
 	ld	(hl), b
 	inc	hl
 
-	; We know that the cursor must still be on this line, so save under,
-	; and paint the cursor.
-	ld	a, (hl)
-	ld	(screen_char_under_cursor), a
+	; We know that the cursor must still be on this line, so save the new
+	; location and make the character at the new location a cursor.
 	ld	(screen_cursor_location), hl
 	set	7, (hl)
 
 	ret
 
 screen_normal_char_col79:
-	; First, take the hidden character out of the "save under" buffer
-	; and place it on the screen.
-	ld	a, (screen_char_under_cursor)
+	; This column is no longer a cursor.
 	ld	hl, (screen_cursor_location)		; HL = current location
-	ld	(hl), a
-	inc	hl					; HL = proposed cursor
+	res	7, (hl)
+	inc	hl					; HL = proposed new cursor
 
 	; HL may now be pointing to column 0 of a line on the screen, or
 	; it may be pointing to the LWA+1; i.e. off screen  If so, we must
@@ -253,8 +247,6 @@ screen_normal_char_new_cursor:
 	pop	bc					; Get the new char back
 	ld	(hl), b
 	inc	hl					; HL now in column 1.
-	ld	a, (hl)
-	ld	(screen_char_under_cursor), a		; Save under
 	ld	(screen_cursor_location), hl
 	set	7, (hl)					; Paint the new cursor
 
@@ -294,17 +286,14 @@ screen_handle_bs:
 	sbc	hl, de					; Sets borrow if DE (FWA) > HL (proposal)
 	jr	C, screen_move_cursor_bs_done		; The move is bad, we cannot move
 
-	; The move is good.  Restore the character under the old cursor.
-	ld	a, (screen_char_under_cursor)
+	; The move is good.  The current position is no longer a cursor.
 	ld	hl, (screen_cursor_location)
-	ld	(hl), a
+	res	7, (hl)
 
 	; Back up one position.
 	dec	hl
 
-	; Save whatever is under the new cursor position and paint a new cursor.
-	ld	a, (hl)
-	ld	(screen_char_under_cursor), a
+	; The new position is a cursor.
 	ld	(screen_cursor_location), hl
 	set	7, (hl)
 
@@ -333,9 +322,8 @@ screen_handle_ht:
 	ld	de, (screen_cursor_location)	; DE = current position, HL = start of line
 	ex	de, hl				; HL = current position, DE = start of line
 
-	; Put back the saved character.
-	ld	a, (screen_char_under_cursor)
-	ld	(hl), a
+	; This position is no longer a cursor.
+	res	7, (hl)
 	
 	; Find the new location.  Note that we must stay in this line, so we
 	; must not go past column 79.
@@ -356,9 +344,7 @@ screen_handle_ht_ok:
 
 	add	hl, de			; HL = new position
 
-	; Save under and paint a new cursor.
-	ld	a, (hl)
-	ld	(screen_char_under_cursor), a
+	; The new position is a cursor.
 	ld	(screen_cursor_location), hl
 	set	7, (hl)
 
@@ -393,10 +379,9 @@ screen_handle_lf:
 	cp	b				; Borrow if B (cursor) > A (bottom)
 	jr	C, screen_handle_lf_below_sr	; Cursor is below bottom of region
 
-	; Put back whatever was under the cursor.
-	ld	a, (screen_char_under_cursor)
+	; This position is no longer a cursor.
 	ld	hl, (screen_cursor_location)
-	ld	(hl), a
+	res	7, (hl)
 
 	; We are within the scroll region.  In this case, line-feed means we
 	; move 80 characters forward, but if that would move us out of the
@@ -416,10 +401,7 @@ screen_handle_lf:
 
 screen_lf_no_scroll:
 
-	; Save whatever is under the new cursor, and paint a cursor over it.
-	; And save the location.
-	ld	a, (hl)
-	ld	(screen_char_under_cursor), a
+	; This is the new cursor.
 	ld	(screen_cursor_location), hl
 	set	7, (hl)
 
@@ -435,13 +417,12 @@ screen_handle_lf_below_sr:
 	cp	b				; Set borrow if B (new pos) > A (last row)
 	ret	C				; We would land past the row - do nothing
 
-	ld	a, (screen_char_under_cursor)	; A = character under cursor
 	ld	hl, (screen_cursor_location)	; HL = current cursor position
-	ld	(hl), a				; paint the character 
+	res	7, (hl)				; No longer a cursor
 	ld	bc, screen_cols			; BC = 80
 	add	hl, bc				; HL = new position, known good
 	ld	(screen_cursor_location), hl	; Store new position
-	set	7, (hl)
+	set	7, (hl)				; Now a cursor
 	
 	ret
 
@@ -463,18 +444,15 @@ screen_handle_cr:
 	xor	a
 	ld	(screen_col79_flag), a			; Clear the col 79 flag
 
-	; Replace the existing cursor with whatever should be under it.
-	ld	a, (screen_char_under_cursor)
+	; No longer a cursor.
 	ld	hl, (screen_cursor_location)
-	ld	(hl), a
+	res	7, (hl)
 	
 	; Find the start of whatever line the cursor is on.  The pointer is
 	; returned in HL.
 	call	screen_cursor_start_of_line
 
-	; Save under, then put the cursor there.
-	ld	a, (hl)
-	ld	(screen_char_under_cursor), a
+	; The new position is a cursor.
 	ld	(screen_cursor_location), hl
 	set	7, (hl)
 
@@ -622,10 +600,6 @@ screen_initialize_loop:
 	ld	hl, screen_base
 	ld	(screen_cursor_location), hl
 	ld	(screen_cursor_location_save), hl
-
-	; Put up a cursor with a null under it.
-	ld	a, (hl)
-	ld	(screen_char_under_cursor), a
 	set	7, (hl)
 
 	; Not handling an escape sequence.
@@ -1071,11 +1045,8 @@ screen_align_loop:
 	; Initialize the cursor pointer.
 	ld	hl, screen_base
 	ld	(screen_cursor_location), hl
-
-	; Put up a cursor with an 'E' under it.
-	ld	a, (hl)
-	ld	(screen_char_under_cursor), a
 	set	7, (hl)
+
 	jr	screen_parse_sharp_command_done
 
 #code ROM
@@ -1178,16 +1149,12 @@ screen_move_cursor_up_do:
 	sbc	hl, bc					; will set borrow if BC (FWA) > HL (proposed location)
 	jr	C, screen_move_cursor_up_cannot
 
-	; We have room to move the cursor.  Replace what was under the cursor.
-	ld	a, (screen_char_under_cursor)
+	; We have room to move the cursor.  The current position is no longer a cursor.
 	ld	hl, (screen_cursor_location)
-	ld	(hl), a
+	res	7, (hl)
 
-	; Now save whatever is under the new cursor, and paint a cursor over it.
-	; And save the location.
+	; The new location is a cursor.
 	ld	hl, de
-	ld	a, (hl)
-	ld	(screen_char_under_cursor), a
 	ld	(screen_cursor_location), hl
 	set	7, (hl)
 
@@ -1252,16 +1219,12 @@ screen_move_cursor_down_do:
 	sbc	hl, bc					; Sets borrow if BC (LWA+1) > HL (proposed location)
 	jr	NC, screen_move_cursor_down_cannot
 
-	; We have room to move the cursor.  Replace what was under the cursor.
-	ld	a, (screen_char_under_cursor)
+	; We have room to move the cursor.  The current position is no longer a cursor.
 	ld	hl, (screen_cursor_location)
-	ld	(hl), a
+	res	7, (hl)
 
-	; Now save whatever is under the new cursor, and paint a cursor over it.
-	; And save the location.
+	; The new position is a cursor.
 	ld	hl, de
-	ld	a, (hl)
-	ld	(screen_char_under_cursor), a
 	ld	(screen_cursor_location), hl
 	set	7, (hl)
 
@@ -1292,10 +1255,9 @@ screen_move_cursor_down_cannot:
 
 screen_move_cursor_right:
 
-	; Restore the character under the old cursor.
-	ld	a, (screen_char_under_cursor)
+	; The current position is no longer a cursor.
 	ld	hl, (screen_cursor_location)
-	ld	(hl), a
+	res	7, (hl)
 
 	; If we are still in the escape_csi_state state, we didn't get any
 	; digits, so we just move the cursor right one character.  Start
@@ -1344,9 +1306,7 @@ screen_move_cursor_right_do:
 
 screen_move_cursor_right_go:
 
-	; Save whatever is under the new cursor position and paint a new cursor.
-	ld	a, (hl)
-	ld	(screen_char_under_cursor), a
+	; The new position is a cursor.
 	ld	(screen_cursor_location), hl
 	set	7, (hl)
 
@@ -1373,10 +1333,9 @@ screen_move_cursor_left:
 	xor	a
 	ld	(screen_col79_flag), a			; Clear the col 79 flag
 
-	; Restore the character under the old cursor.
-	ld	a, (screen_char_under_cursor)
+	; The current position is no longer a cursor.
 	ld	hl, (screen_cursor_location)
-	ld	(hl), a
+	res	7, (hl)
 
 	; If we are still in the escape_csi_state state, we didn't get any
 	; digits, so we just move the cursor left one character.  Start
@@ -1426,9 +1385,7 @@ screen_move_cursor_left_do:
 
 screen_move_cursor_left_go:
 
-	; Save whatever is under the new cursor position and paint a new cursor.
-	ld	a, (hl)
-	ld	(screen_char_under_cursor), a
+	; The new position is a cursor.
 	ld	(screen_cursor_location), hl
 	set	7, (hl)
 
@@ -1450,9 +1407,10 @@ screen_move_cursor_left_go:
 
 screen_clear_rows
 
-	; Clear the character under the cursor
-	xor	a					; Clear A
-	ld	(screen_char_under_cursor), a
+	; Clear the character under the cursor, by painting a null + cursor.
+	ld	a, null_cursor
+	ld	hl, (screen_cursor_location)
+	ld	(hl), a
 
 	; There are three subsets:
 	; 0 = erase below
@@ -1541,12 +1499,10 @@ screen_clear_rows_done:
 
 screen_clear_columns
 
-	; Clear the character under the cursor
-	xor	a					; Clear A
-	ld	(screen_char_under_cursor), a
+	; Clear the character under the cursor, by painting a null + cursor.
+	ld	a, null_cursor
 	ld	hl, (screen_cursor_location)
 	ld	(hl), a
-	set	7, (hl)
 
 	; There are three subsets:
 	; 0 = erase to the right
@@ -1662,10 +1618,9 @@ screen_move_cursor_numeric:
 	; Basically, we have to decrement the parameters to make them 0-based,
 	; but we must not go below zero.
 
-	; Restore the character under the old cursor.
-	ld	a, (screen_char_under_cursor)
+	; The current position is no longer a cursor.
 	ld	hl, (screen_cursor_location)
-	ld	(hl), a
+	res	7, (hl)
 
 	; Zero D for use when we multiply and add.
 	xor	a
@@ -1710,9 +1665,7 @@ screen_move_cursor_numeric_no_overflow_group_1:
 	ld	de, screen_base				; DE = video FWA
 	add	hl, de					; HL = new address in video ram
 
-	; Paint a new cursor, but first save whatever is there.
-	ld	a, (hl)
-	ld	(screen_char_under_cursor), a
+	; The new position is a cursor.
 	ld	(screen_cursor_location), hl
 	set	7, (hl)
 
@@ -1760,18 +1713,15 @@ screen_save_cursor_position:
 
 screen_restore_cursor_position:
 
-	; Restore the character under the old cursor.
-	ld	a, (screen_char_under_cursor)
+	; Remove the old cursor.
 	ld	hl, (screen_cursor_location)
-	ld	(hl), a
+	res	7, (hl)
 
 	; Restore the cursor position
 	ld	hl, (screen_cursor_location_save)
 	ld	(screen_cursor_location), hl
 
-	; Paint a new cursor, but first save whatever is there.
-	ld	a, (hl)
-	ld	(screen_char_under_cursor), a
+	; Make the new position a cursor.
 	set	7, (hl)
 
 	; Escape sequence complete.
@@ -1792,10 +1742,9 @@ screen_restore_cursor_position:
 
 screen_handle_reverse_scroll:
 
-	; First, put back whatever was under the cursor.
-	ld	a, (screen_char_under_cursor)
+	; Current position is not a cursor.
 	ld	hl, (screen_cursor_location)
-	ld	(hl), a
+	res	7, (hl)
 
 	; reverse-scroll means we move 80 characters backward, but if that would
 	; move us above the scroll region, then we have to scroll down one line.
@@ -1815,9 +1764,7 @@ screen_handle_reverse_scroll:
 
 screen_reverse_no_scroll:
 
-	; Save whatever is under the new cursor, and paint a cursor over it.
-	ld	a, (hl)
-	ld	(screen_char_under_cursor), a
+	; The new position is a cursor.
 	ld	(screen_cursor_location), hl
 	set	7, (hl)
 
@@ -1946,18 +1893,15 @@ screen_set_margins_bottom_ok:
 	add	hl, bc						; HL = row+1 FWA = row LWA+1
 	ld	(screen_current_lwa_p1), hl
 
-	; Restore the character under the old cursor.
-	ld	a, (screen_char_under_cursor)
+	; The old position is not a cursor.
 	ld	hl, (screen_cursor_location)
-	ld	(hl), a
+	res	7, (hl)
 
 	; Move the cursor to the upper left.
 	ld	hl, screen_base
 	ld	(screen_cursor_location), hl
 
-	; Save under the cursor, then paint the curor.
-	ld	a, (hl)
-	ld	(screen_char_under_cursor), a
+	; The new position is a cursor.
 	set	7, (hl)
 
 screen_set_margins_done:
@@ -2007,10 +1951,6 @@ screen_current_fwa:
 ; LWA+1 changes with scroll region
 screen_current_lwa_p1:
 	ds	2
-
-; Preserved character under the cursor so we can replace it when the cursor moves.
-screen_char_under_cursor:
-	ds	1
 
 ; State machine variable.
 screen_escape_state:
