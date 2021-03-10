@@ -160,17 +160,12 @@ main()
 
 		// Emit 32 control chars - just blanks.
 		for(n = 0; n < 32; n++) {
-			for(i = 0; i < 15; i++) {
+			for(i = 0; i < 16; i++) {
 				if(i == 0) {
-					printf("%4d : 00000000; -- %s\n", k++, names[n]);
+					printf("%4d : %s; -- %s\n", k++, (m == 1) ? "11111111" : "00000000", names[n]);
 				} else {
-					printf("%4d : 00000000;\n", k++);
+					printf("%4d : %s;\n", k++, (m == 1) ? "11111111" : "00000000");
 				}
-			}
-			if(m == 1) {
-				printf("%4d : 11111111;\n", k++);
-			} else {
-				printf("%4d : 00000000;\n", k++);
 			}
 			printf("\n");
 		}
@@ -181,22 +176,19 @@ main()
 			// shrink the rom, and use 4-bit addressing per character.
 			if(((j - SKIP) % 17) < 16) {
 				printf("%4d : ", k++);
-				if((m == 1) && (((j - SKIP) % 17) == 15)) {
-					MagickImage[j] = 0xff; // Paint in a cursor in the second set.
-				}
 				for(i = 0; i < 8; i++) {
 					if((MagickImage[j] >> (7 - i)) & 1) {
-						printf("1");
+						printf("%d", (m == 1) ? 0 : 1);
 					} else {
-						printf("0");
+						printf("%d", (m == 1) ? 1 : 0);
 					}
 				}
 				printf("; -- ");
 				for(i = 0; i < 8; i++) {
 					if((MagickImage[j] >> (7 - i)) & 1) {
-						printf("@");
+						printf("%c", (m == 1) ? '.' : '@');
 					} else {
-						printf(".");
+						printf("%c", (m == 1) ? '@' : '.');
 					}
 				}
 				if(((j - SKIP) % 17) == 0) {

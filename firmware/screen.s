@@ -1544,6 +1544,9 @@ screen_clear_columns
 	; Clear the character under the cursor
 	xor	a					; Clear A
 	ld	(screen_char_under_cursor), a
+	ld	hl, (screen_cursor_location)
+	ld	(hl), a
+	set	7, (hl)
 
 	; There are three subsets:
 	; 0 = erase to the right

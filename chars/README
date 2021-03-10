@@ -25,10 +25,8 @@ convert it to a .h file.  Command is:
 
 convert flattenedchars.png flattenedchars.h
 
-I made two edits to the generated .h file.
-
-	First - delete two 0x00 at the end of the file.
-	Second - remove the const designator.
+I made one edit to the generated .h file:  Delete two 0x00 at the end of
+the file.
 
 4) Use the genit.c program to create chars.mif.  It turned out that the font
 is 8x17, but I reduced it to 8x16 to make the addressing nicer.  And the
