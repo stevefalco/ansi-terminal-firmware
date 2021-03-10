@@ -70,7 +70,7 @@ architecture a of terminal is
 
 	component char_rom
 		port (
-			address		: in std_logic_vector (10 downto 0);
+			address		: in std_logic_vector (11 downto 0);
 			clock		: in std_logic;
 			q		: out std_logic_vector (7 downto 0)
 		);
@@ -304,7 +304,7 @@ architecture a of terminal is
 	signal pixel			: std_logic;
 	signal pixelBlanked		: std_logic;
 
-	signal romAddr			: std_logic_vector (10 downto 0);
+	signal romAddr			: std_logic_vector (11 downto 0);
 
 	signal slow_clock		: std_logic := '0';
 
@@ -583,11 +583,12 @@ begin
 		end if;
 	end process;
 
-	-- We are using 7-bit ascii, hence we toss frameChar(7).
+	-- We are using the eighth bit to determine if a cursor is
+	-- present.
 	--
 	-- Address and data output are both registered, so scanChar is
 	-- two clocks behind romAddr, or three clocks behind addressA.
-	romAddr <= frameChar(6 downto 0) & lineAddressD1(3 downto 0);
+	romAddr <= frameChar(7 downto 0) & lineAddressD1(3 downto 0);
 	charRom: char_rom
 		port map (
 			address => romAddr,
