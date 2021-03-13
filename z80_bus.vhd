@@ -36,7 +36,7 @@ entity z80_bus is
 		cpuKbInt	: in std_logic;
 
 		-- DIP Switch Interface
-		cpuDipQ		: in std_logic_vector (3 downto 0)
+		cpuDipQ		: in std_logic_vector (7 downto 0)
 	);
 end z80_bus;
 
@@ -97,7 +97,7 @@ begin
 			when 16#C010# =>
 				-- DIP Switches
 				if(cpuRden = '0') then
-					cpuData <= "0000" & cpuDipQ;
+					cpuData <= cpuDipQ;
 				end if;
 
 			when 16#C020# to 16#C027# =>

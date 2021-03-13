@@ -8,7 +8,7 @@ entity terminal is
 		CLK12M			: in std_logic;				-- M2
 
 		-- DIP switches for baud rate
-		DIP_SW			: in std_logic_vector(3 downto 0);	-- J1, P2, N1, N2
+		DIP_SW			: in std_logic_vector(7 downto 0);	-- J14, L2, K2, J2, J1, P2, N1, N2
 
 		-- The FPGA can drive 8 mA per pin.  The RGB pins drive a 75 ohm
 		-- load, and we need to get it to 0.7 volts for "white".
@@ -176,7 +176,7 @@ architecture a of terminal is
 			cpuKbInt	: in std_logic;
 
 			-- DIP Switch Interface
-			cpuDipQ		: in std_logic_vector (3 downto 0)
+			cpuDipQ		: in std_logic_vector (7 downto 0)
 		);
 	end component;
 
