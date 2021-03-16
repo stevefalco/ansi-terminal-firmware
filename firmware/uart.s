@@ -87,8 +87,9 @@ uart_LSR_THRE_b		equ 5				; Transmitter Holding Register Empty
 ; LSR bits as values
 uart_LSR_THRE_v		equ (1 << uart_LSR_THRE_b)
 
-; Baud rate dip switches
+; Baud rate, etc. dip switches
 dipSW			equ 0xc010
+dipBaudMask		equ 0x0f
 
 uart_depth		equ 128				; SW receiver fifo depth
 uart_high_water		equ 64
@@ -372,34 +373,38 @@ uart_initialize:
 
 uart_set_baud:
 
-	; read dip switches into de
-	ld	hl, dipSW
-	ld	d, 0
-	ld	e, (hl)
+	; Read dip switches into A.
+	ld	a, (dipSW)
 
-	; point to the correct entry
+	; We are using bits 0-3 for the baud rate, so mask out the rest.
+	; Put the result into DE.
+	and	dipBaudMask
+	ld	d, 0
+	ld	e, a
+	
+	; Point to the correct entry - add twice because we need to index
+	; into the 16-bit table.
 	ld	hl, baud_table
 	add	hl, de
 	add	hl, de
 
-	; load the entry into bc
-	ld	a, (hl)
+	; Load the entry into BC.
+	ld	c, (hl)
 	inc	hl
 	ld	b, (hl)
-	ld	c, a
 
-	; unlock divisor registers
+	; Unlock divisor registers.
 	ld	hl, uart_LCR
 	set	uart_LCR_DLAB_b, (hl)
 
-	; write the baud rate divisor
+	; Write the baud rate divisor.
 	ld	hl, uart_DLL
 	ld	(hl), c
 
 	ld	hl, uart_DLM
 	ld	(hl), b
 
-	; lock divisor registers
+	; Lock divisor registers.
 	ld	hl, uart_LCR
 	res	uart_LCR_DLAB_b, (hl)
 

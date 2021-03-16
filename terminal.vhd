@@ -31,10 +31,10 @@ entity terminal is
 		KBD_CLK			: inout std_logic;			-- K15
 		KBD_DATA		: inout std_logic;			-- K16
 
-		UART_RX			: in std_logic;				-- L15
-		UART_TX			: out std_logic;			-- L16
-		UART_RTS		: out std_logic;			-- R1
-		UART_CTS		: in std_logic				-- P1
+		UART_RX			: in std_logic;				-- L16
+		UART_TX			: out std_logic;			-- L15
+		UART_RTS		: out std_logic;			-- P1
+		UART_CTS		: in std_logic				-- R1
 
 		-- SC			: out std_logic
 	);
