@@ -8,7 +8,9 @@ usage() {
 	echo "-h (this help message)" 1>&2
 }
 
-U="AR2E0ROO"
+# U="AR2E0ROO" # Breadboard version
+U="AR2E0RHX"
+
 FILE="terminal.cdf"
 
 while getopts "hd:f:" OPTION; do
