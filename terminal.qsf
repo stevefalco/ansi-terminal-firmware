@@ -81,13 +81,13 @@ set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to PIXEL_G2
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to PIXEL_R1
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to PIXEL_R2
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to VSYNC
-set_location_assignment PIN_R12 -to PIXEL_R1
-set_location_assignment PIN_T13 -to PIXEL_R2
+set_location_assignment PIN_P14 -to PIXEL_R1
+set_location_assignment PIN_R14 -to PIXEL_R2
 set_location_assignment PIN_R13 -to PIXEL_G1
 set_location_assignment PIN_T14 -to PIXEL_G2
 set_location_assignment PIN_T15 -to HSYNC
-set_location_assignment PIN_P14 -to PIXEL_B1
-set_location_assignment PIN_R14 -to PIXEL_B2
+set_location_assignment PIN_R12 -to PIXEL_B1
+set_location_assignment PIN_T13 -to PIXEL_B2
 set_location_assignment PIN_N16 -to VSYNC
 
 set_location_assignment PIN_L16 -to UART_RX
