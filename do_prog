@@ -10,6 +10,7 @@ usage() {
 
 # U="AR2E0ROO" # Breadboard version
 U="AR2E0RHX"
+# U="AR2E0OHL" # Second board
 
 FILE="terminal.cdf"
 
