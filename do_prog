@@ -8,9 +8,8 @@ usage() {
 	echo "-h (this help message)" 1>&2
 }
 
-# U="AR2E0ROO" # Breadboard version
-U="AR2E0RHX"
-# U="AR2E0OHL" # Second board
+# U="AR2E0RHX" # Board in box
+U="AR2E0QD2" # Second board
 
 FILE="terminal.cdf"
 
