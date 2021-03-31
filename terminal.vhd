@@ -63,9 +63,9 @@ architecture a of terminal is
 			dotClock	: in std_logic;
 			hSync		: out std_logic;
 			vSync		: out std_logic;
-			columnAddress	: out std_logic_vector (9 downto 0);
-			rowAddress	: out std_logic_vector (9 downto 0);
-			lineAddress	: out std_logic_vector (8 downto 0);
+			columnAddress	: out std_logic_vector (10 downto 0);
+			rowAddress	: out std_logic_vector (10 downto 0);
+			lineAddress	: out std_logic_vector (9 downto 0);
 			blanking	: out std_logic
 		);
 	end component;
@@ -273,16 +273,16 @@ architecture a of terminal is
 	signal videoRamWren		: std_logic;
 	signal videoRamQ		: std_logic_vector (7 downto 0);
 	
-	signal rowAddressD0		: std_logic_vector (9 downto 0);
+	signal rowAddressD0		: std_logic_vector (10 downto 0);
 
-	signal lineAddressD0		: std_logic_vector (8 downto 0);
-	signal lineAddressD1		: std_logic_vector (8 downto 0);
+	signal lineAddressD0		: std_logic_vector (9 downto 0);
+	signal lineAddressD1		: std_logic_vector (9 downto 0);
 	signal frameChar		: std_logic_vector (7 downto 0);
 
-	signal columnAddressD0		: std_logic_vector (9 downto 0);
-	signal columnAddressD1		: std_logic_vector (9 downto 0);
-	signal columnAddressD2		: std_logic_vector (9 downto 0);
-	signal columnAddressD3		: std_logic_vector (9 downto 0);
+	signal columnAddressD0		: std_logic_vector (10 downto 0);
+	signal columnAddressD1		: std_logic_vector (10 downto 0);
+	signal columnAddressD2		: std_logic_vector (10 downto 0);
+	signal columnAddressD3		: std_logic_vector (10 downto 0);
 	signal scanChar			: std_logic_vector (7 downto 0);
 
 	signal hSyncD0			: std_logic;

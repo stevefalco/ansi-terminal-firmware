@@ -3,58 +3,54 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use ieee.std_logic_unsigned.all;
 
--- The FPGA can synthesize a 25.2 MHz clock from the on-board 12 MHz
--- oscillator.  Ideally, we'd choose 25.175 MHz, for a 59.94 Hz frame
--- rate, because that is the industry standard, but we will instead
--- wind up with exactly 60 Hz.  Close enough.
--- 
--- Everything is based off the pixel frequency and an 800x525 raster.
+-- Everything is based off the pixel frequency of 108 MHz and a
+-- 1688x1066 raster.
 -- 
 -- General timing
 -- ==============
--- Pixel freq.		25.2 MHz
--- Line rate		31.500 kHz (25.2E6 / 800 columns)
--- Screen refresh rate	60 Hz (31.5E3 / 525 rows)
--- Pixel period		39.6 ns (1 / 25.2E6)
+-- Pixel freq.		108.0 MHz
+-- Line rate		63.98 kHz (108E6 / 1688 columns)
+-- Screen refresh rate	60.02 Hz (63.981E3 / 1066 rows)
+-- Pixel period		9.2592 ns (1 / 108E6)
 -- 
--- Horizontal timing (horizontal sync pulse is negative)
+-- Horizontal timing (horizontal sync pulse is positive)
 -- 
 -- Scanline part	Pixels	Time [µs]
 -- =======================================
--- Visible area	640	25.3440
--- Front porch	16	 0.6336
--- Sync pulse	96	 3.8016
--- Back porch	48	 1.9008
--- Whole line	800	31.6800
--- Idle time at end of line = 6.3360 us
+-- Visible area	1280	11.8519
+-- Front porch	48	 0.4444
+-- Sync pulse	112	 1.0370
+-- Back porch	248	 2.2963
+-- Whole line	1688	15.6296
+-- Idle time at end of line = 2.2963 us
 -- 
--- Vertical timing (vertical sync pulse is negative)
+-- Vertical timing (vertical sync pulse is positive)
 -- 
 -- Frame part	Lines	Time [ms]
 -- =================================
--- Visible area	480	15.20640
--- Front porch	10	 0.31680
--- Sync pulse	2	 0.06336
--- Back porch	33	 1.04544
--- Whole frame	525	16.63200
--- Idle time at end of frame = 1.42560 ms
+-- Visible area	1024	16.00474
+-- Front porch	1	 0.01563
+-- Sync pulse	3	 0.04689
+-- Back porch	38	 0.59393
+-- Whole frame	1066	16.66119
+-- Idle time at end of frame = 0.5939 ms
 
 entity frame_gen is
 	generic (
-		columnMax		: integer := 799; -- 800 columns, 0 to 799
-		rowMax			: integer := 524; -- 525 rows, 0 to 524
-		lastVisibleRow		: integer := 479; -- 480 visible rows, 0 to 479
-		mod20Max		: integer := 19; -- 0 to 19
+		columnMax		: integer := 1687; -- 1688 columns, 0 to 1687
+		rowMax			: integer := 1065; -- 1066 rows, 0 to 1065
+		lastVisibleRow		: integer := 1279; -- 1280 visible rows, 0 to 1279
+		mod42Max		: integer := 41; -- 0 to 41
 
-		-- One line of active video is 680 pels, 0 to 639
-		hFrontPorchStart	: integer := 640;
-		hSyncStart		: integer := (640 + 16); -- hsync starts after 16-pel front porch
-		hBackPorchStart		: integer := (640 + 16 + 96); -- hsync is 96 pels wide
+		-- One line of active video is 1280 pels, 0 to 1279
+		hFrontPorchStart	: integer := 1280;
+		hSyncStart		: integer := (1280 + 48); -- hsync starts after 48-pel front porch
+		hBackPorchStart		: integer := (1280 + 48 + 112); -- hsync is 112 pels wide
 
-		-- One frame of active video is 480 lines, 0 to 479
-		vFrontPorchStart	: integer := 480;
-		vSyncStart		: integer := (480 + 10); -- vsync starts after 10-line front porch
-		vBackPorchStart		: integer := (480 + 10 + 2) -- vsync is 2 lines wide
+		-- One frame of active video is 1024 lines, 0 to 1023
+		vFrontPorchStart	: integer := 1024;
+		vSyncStart		: integer := (1024 + 1); -- vsync starts after 1-line front porch
+		vBackPorchStart		: integer := (1024 + 1 + 3) -- vsync is 3 lines wide
 	);
 
 	port (
@@ -62,9 +58,9 @@ entity frame_gen is
 		dotClock		: in std_logic;
 		hSync			: out std_logic;
 		vSync			: out std_logic;
-		columnAddress		: out std_logic_vector (9 downto 0);
-		rowAddress		: out std_logic_vector (9 downto 0);
-		lineAddress		: out std_logic_vector (8 downto 0);
+		columnAddress		: out std_logic_vector (10 downto 0);
+		rowAddress		: out std_logic_vector (10 downto 0);
+		lineAddress		: out std_logic_vector (9 downto 0);
 		blanking		: out std_logic
 	);
 end frame_gen;
@@ -74,10 +70,10 @@ begin
 
 	frameProcess: process(dotClock)
 
-	variable columnCounter		: unsigned (9 downto 0); -- 0 to 799
-	variable rowCounter		: unsigned (9 downto 0); -- 0 to 524
-	variable lineCounter		: unsigned (8 downto 0); -- 0 to 383
-	variable mod20Counter		: unsigned (4 downto 0); -- 0 to 19
+	variable columnCounter		: unsigned (10 downto 0); -- 0 to 1687
+	variable rowCounter		: unsigned (10 downto 0); -- 0 to 1065
+	variable lineCounter		: unsigned (9 downto 0); -- 0 to 767
+	variable mod42Counter		: unsigned (5 downto 0); -- 0 to 41
 
 	begin
 		if(rising_edge(dotClock)) then
@@ -85,9 +81,9 @@ begin
 				columnCounter := to_unsigned(0, columnCounter'length);
 				rowCounter := to_unsigned(0, rowCounter'length);
 				lineCounter := to_unsigned(0, lineCounter'length);
-				mod20Counter := "00000";
-				hsync <= '1';
-				vsync <= '1';
+				mod42Counter := "000000";
+				hsync <= '0';
+				vsync <= '0';
 			else
 				if(columnCounter < columnMax) then
 					columnCounter := columnCounter + 1;
@@ -95,15 +91,15 @@ begin
 					-- Completed a line.
 					columnCounter := to_unsigned(0, columnCounter'length);
 
-					-- Characters are 16 rows high, but we want a spacing
-					-- of 4 blank rows between lines of characters.
-					if(mod20Counter < mod20Max) then
-						mod20Counter := mod20Counter + 1;
+					-- Characters are 32 rows high, but we want a spacing
+					-- of 10 blank rows between lines of characters.
+					if(mod42Counter < mod42Max) then
+						mod42Counter := mod42Counter + 1;
 					else
-						mod20Counter := "00000";
+						mod42Counter := "000000";
 					end if;
 
-					if(mod20Counter < 16) then
+					if(mod42Counter < 32) then
 						if(rowCounter < lastVisibleRow) then
 							lineCounter := lineCounter + 1;
 						else
@@ -118,27 +114,27 @@ begin
 						columnCounter := to_unsigned(0, columnCounter'length);
 						rowCounter := to_unsigned(0, rowCounter'length);
 						lineCounter := to_unsigned(0, lineCounter'length);
-						mod20Counter := "00000";
-						hsync <= '1';
-						vsync <= '1';
+						mod42Counter := "000000";
+						hsync <= '0';
+						vsync <= '0';
 					end if;
 				end if;
 
 				if(columnCounter >= hSyncStart and columnCounter < hBackPorchStart) then
-					-- sync is active-low
-					hsync <= '0';
-				else
+					-- sync is active-high
 					hsync <= '1';
+				else
+					hsync <= '0';
 				end if;
 
 				if(rowCounter >= vSyncStart and rowCounter < vBackPorchStart) then
-					-- sync is active-low
-					vsync <= '0';
-				else
+					-- sync is active-high
 					vsync <= '1';
+				else
+					vsync <= '0';
 				end if;
 
-				if(columnCounter < hFrontPorchStart and mod20Counter < 16 and rowCounter < vFrontPorchStart) then
+				if(columnCounter < hFrontPorchStart and mod42Counter < 32 and rowCounter < vFrontPorchStart) then
 					blanking <= '0';
 				else
 					blanking <= '1';
