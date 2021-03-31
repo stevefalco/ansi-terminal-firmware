@@ -2,7 +2,8 @@
 
 #include "flattenedchars.h"
 
-#define SKIP 30
+#define SKIP	32
+#define MOD	64
 
 char *names[] = {
 	"NUL",
@@ -146,8 +147,8 @@ main()
 	printf("-- char\n");
 	printf("-- end_signature\n");
 	printf("\n");
-	printf("WIDTH=8;\n");
-	printf("DEPTH=4096;\n");
+	printf("WIDTH=16;\n");
+	printf("DEPTH=8192;\n");
 	printf("\n");
 	printf("ADDRESS_RADIX=UNS;\n");
 	printf("DATA_RADIX=BIN;\n");
@@ -160,44 +161,58 @@ main()
 
 		// Emit 32 control chars - just blanks.
 		for(n = 0; n < 32; n++) {
-			for(i = 0; i < 16; i++) {
+			for(i = 0; i < 32; i++) {
 				if(i == 0) {
-					printf("%4d : %s; -- %s\n", k++, (m == 1) ? "11111111" : "00000000", names[n]);
+					printf("%4d : %s; -- %s\n", k++, (m == 1) ? "1111111111111111" : "0000000000000000", names[n]);
 				} else {
-					printf("%4d : %s;\n", k++, (m == 1) ? "11111111" : "00000000");
+					printf("%4d : %s;\n", k++, (m == 1) ? "1111111111111111" : "0000000000000000");
 				}
 			}
 			printf("\n");
 		}
 
 		// Emit the printable characters.
-		for(j = SKIP; j < s; j++) {
-			// We skip line 17 as it is always blank.  That lets us
-			// shrink the rom, and use 4-bit addressing per character.
-			if(((j - SKIP) % 17) < 16) {
-				printf("%4d : ", k++);
-				for(i = 0; i < 8; i++) {
-					if((MagickImage[j] >> (7 - i)) & 1) {
-						printf("%d", (m == 1) ? 0 : 1);
-					} else {
-						printf("%d", (m == 1) ? 1 : 0);
-					}
-				}
-				printf("; -- ");
-				for(i = 0; i < 8; i++) {
-					if((MagickImage[j] >> (7 - i)) & 1) {
-						printf("%c", (m == 1) ? '.' : '@');
-					} else {
-						printf("%c", (m == 1) ? '@' : '.');
-					}
-				}
-				if(((j - SKIP) % 17) == 0) {
-					printf(" %s\n", names[n++]);
+		for(j = SKIP; j < s; j += 2) {
+			printf("%4d : ", k++);
+			for(i = 0; i < 8; i++) {
+				if((MagickImage[j] >> (7 - i)) & 1) {
+					printf("%d", (m == 1) ? 0 : 1);
 				} else {
-					printf("\n");
+					printf("%d", (m == 1) ? 1 : 0);
 				}
 			}
-			if(((j - SKIP) % 17) == 16) {
+			for(i = 0; i < 8; i++) {
+				if((MagickImage[j+1] >> (7 - i)) & 1) {
+					printf("%d", (m == 1) ? 0 : 1);
+				} else {
+					printf("%d", (m == 1) ? 1 : 0);
+				}
+			}
+			printf("; -- ");
+			for(i = 0; i < 8; i++) {
+				if((MagickImage[j] >> (7 - i)) & 1) {
+					printf("%c", (m == 1) ? '.' : '@');
+				} else {
+					printf("%c", (m == 1) ? '@' : '.');
+				}
+			}
+			for(i = 0; i < 8; i++) {
+				if((MagickImage[j+1] >> (7 - i)) & 1) {
+					printf("%c", (m == 1) ? '.' : '@');
+				} else {
+					printf("%c", (m == 1) ? '@' : '.');
+				}
+			}
+
+			// Label the first line of each character.
+			if(((j - SKIP) % MOD) == 0) {
+				printf(" %s\n", names[n++]);
+			} else {
+				printf("\n");
+			}
+
+			// Blank line after each character.
+			if(((j - SKIP) % MOD) == (MOD - 2)) {
 				printf("\n");
 			}
 		}

@@ -72,9 +72,9 @@ architecture a of terminal is
 
 	component char_rom
 		port (
-			address		: in std_logic_vector (11 downto 0);
+			address		: in std_logic_vector (12 downto 0);
 			clock		: in std_logic;
-			q		: out std_logic_vector (7 downto 0)
+			q		: out std_logic_vector (15 downto 0)
 		);
 	end component;
 
@@ -96,8 +96,8 @@ architecture a of terminal is
 	component pel_select
 		port (
 			clock		: in std_logic;
-			inByte		: in std_logic_vector (7 downto 0);
-			sel		: in std_logic_vector (2 downto 0);
+			inWord		: in std_logic_vector (15 downto 0);
+			sel		: in std_logic_vector (3 downto 0);
 			outBit		: out std_logic
 		);
 	end component;
@@ -283,7 +283,7 @@ architecture a of terminal is
 	signal columnAddressD1		: std_logic_vector (10 downto 0);
 	signal columnAddressD2		: std_logic_vector (10 downto 0);
 	signal columnAddressD3		: std_logic_vector (10 downto 0);
-	signal scanChar			: std_logic_vector (7 downto 0);
+	signal scanChar			: std_logic_vector (15 downto 0);
 
 	signal hSyncD0			: std_logic;
 	signal hSyncD1			: std_logic;
@@ -306,7 +306,7 @@ architecture a of terminal is
 	signal pixel			: std_logic;
 	signal pixelBlanked		: std_logic;
 
-	signal romAddr			: std_logic_vector (11 downto 0);
+	signal romAddr			: std_logic_vector (12 downto 0);
 
 	signal slow_clock		: std_logic := '0';
 
@@ -506,16 +506,16 @@ begin
 		);
 
 	-- Generate timing and addresses from the dot clock.  The row address
-	-- covers the whole frame (0 to 525).  The column address covers a whole
-	-- scan line (0 to 799).
+	-- covers the whole frame (0 to 1065).  The column address covers a whole
+	-- scan line (0 to 1687).
 	--
-	-- Characters are 8 pels wide and 16 pels high, but each line of text is
-	-- 20 pels high, because we want 24 lines of text to fill the 480 visible
-	-- scan lines.  In other words, there are 4 blank scan lines between each
+	-- Characters are 16 pels wide and 32 pels high, but each line of text is
+	-- 42 pels high, because we want 24 lines of text to fill the 1024 visible
+	-- scan lines.  In other words, there are 10 blank scan lines between each
 	-- line of text.
 	--
 	-- The lineAddress signal just covers the active scan lines.  It does not
-	-- increment during the 4 blank scan lines between each line of text.
+	-- increment during the 10 blank scan lines between each line of text.
        	-- That lets us do simple shifting to address the character ROM.
 	frameGen: frame_gen
 		port map (
@@ -531,11 +531,11 @@ begin
 
 	-- There are 80x24 = 1920 bytes of screen memory.
 	--
-	-- columnAddress runs from 0 to 799, which shifts down 3 (divides by 8) to
-	-- run from 0 to 99.  We map anything 80 and above to 0 so as not to go out
+	-- columnAddress runs from 0 to 1688, which shifts down 4 (divides by 16) to
+	-- run from 0 to 105.  We map anything 80 and above to 0 so as not to go out
 	-- of bounds on the ram address.
 	--
-	-- lineAddress runs from 0 to 383, which shifts down 4 (divides by 16) to
+	-- lineAddress runs from 0 to 767, which shifts down 5 (divides by 32) to
 	-- run from 0 to 23.
 	genFrameAddressA: process(all)
 		variable colA	: unsigned (6 downto 0);
@@ -543,8 +543,8 @@ begin
 		variable addr	: unsigned (11 downto 0);
 		variable addrA	: unsigned (10 downto 0);
 	begin
-		colA := unsigned(columnAddressD0(9 downto 3));
-		lineA := unsigned(lineAddressD0(8 downto 4));
+		colA := unsigned(columnAddressD0(10 downto 4));
+		lineA := unsigned(lineAddressD0(9 downto 5));
 
 		if(colA < 80) then
 			-- lineA ranges from 0 to 23.  Multiplying by 80
@@ -597,7 +597,7 @@ begin
 	--
 	-- Address and data output are both registered, so scanChar is
 	-- two clocks behind romAddr, or three clocks behind addressA.
-	romAddr <= frameChar(7 downto 0) & lineAddressD1(3 downto 0);
+	romAddr <= frameChar(7 downto 0) & lineAddressD1(4 downto 0);
 	charRom: char_rom
 		port map (
 			address => romAddr,
@@ -623,8 +623,8 @@ begin
 	pelSelect: pel_select
 		port map (
 			clock => dotClock,
-			inByte => scanChar,
-			sel => columnAddressD3(2 downto 0),
+			inWord => scanChar,
+			sel => columnAddressD3(3 downto 0),
 			outBit => pixel
 		);
 

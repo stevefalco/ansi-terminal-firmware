@@ -39,7 +39,7 @@ entity frame_gen is
 	generic (
 		columnMax		: integer := 1687; -- 1688 columns, 0 to 1687
 		rowMax			: integer := 1065; -- 1066 rows, 0 to 1065
-		lastVisibleRow		: integer := 1279; -- 1280 visible rows, 0 to 1279
+		lastVisibleRow		: integer := 1023; -- 1024 visible rows, 0 to 1024
 		mod42Max		: integer := 41; -- 0 to 41
 
 		-- One line of active video is 1280 pels, 0 to 1279
