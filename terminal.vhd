@@ -531,7 +531,7 @@ begin
 
 	-- There are 80x24 = 1920 bytes of screen memory.
 	--
-	-- columnAddress runs from 0 to 1688, which shifts down 4 (divides by 16) to
+	-- columnAddress runs from 0 to 1687, which shifts down 4 (divides by 16) to
 	-- run from 0 to 105.  We map anything 80 and above to 0 so as not to go out
 	-- of bounds on the ram address.
 	--
