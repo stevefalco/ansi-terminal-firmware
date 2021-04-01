@@ -178,7 +178,10 @@ architecture a of terminal is
 			cpuKbInt	: in std_logic;
 
 			-- DIP Switch Interface
-			cpuDipQ		: in std_logic_vector (7 downto 0)
+			cpuDipQ		: in std_logic_vector (7 downto 0);
+
+			-- Control Register Interface
+			cpuControlWR	: out std_logic
 		);
 	end component;
 
@@ -228,6 +231,17 @@ architecture a of terminal is
 		);
 	end component;
 
+	component control is
+		port (
+			clk		: in std_logic;
+			reset		: in std_logic;
+			D		: in std_logic_vector (7 downto 0);
+			WR		: in std_logic;
+
+			Q		: out std_logic_vector (7 downto 0)
+		);
+	end component;
+
 	-- Z80 Interface.
 	signal nM1			: std_logic;
 	signal nMREQ			: std_logic;
@@ -255,6 +269,9 @@ architecture a of terminal is
 	signal cpuKbCS			: std_logic;
 	signal cpuKbQ			: std_logic_vector (7 downto 0);
 	signal cpuKbInt			: std_logic;
+
+	signal cpuControlWR		: std_logic;
+	signal cpuControlQ		: std_logic_vector (7 downto 0);
 
 	type resetFSM_type is (
 		resetIdle_state,
@@ -318,6 +335,7 @@ architecture a of terminal is
 begin
 
 	LEDS <= "00000000";
+	-- LEDS <= cpuControlQ;
 
 	-- Create a 25.2 MHz dot clock from the 12 MHz oscillator.
 	dotClockGen: dot_clock
@@ -472,6 +490,20 @@ begin
 			ps2_data => KBD_DATA
 		);
 
+	-- Z80 Control
+	z80control: control
+		port map
+		(
+			-- CPU
+			clk => cpuClock,
+			reset => clear,
+			D => cpuDataBus,
+			WR => cpuControlWR,
+
+			-- Control
+			Q => cpuControlQ
+		);
+
 	-- Z80 Bus
 	z80Bus: z80_bus
 		port map (
@@ -506,7 +538,10 @@ begin
 			cpuKbInt => cpuKbInt,
 
 			-- DIP Switch Interface
-			cpuDipQ => DIP_SW
+			cpuDipQ => DIP_SW,
+
+			-- Control Register Interface
+			cpuControlWR => cpuControlWR
 		);
 
 	-- Generate timing and addresses from the dot clock.  The row address
@@ -672,8 +707,13 @@ begin
 			PIXEL_B1 <= pixelBlanked;
 			PIXEL_B2 <= pixelBlanked;
 
-			HSYNC <= hSyncD4;
-			VSYNC <= vSyncD4;
+			if(cpuControlQ(0) = '1') then
+				HSYNC <= hSyncD4;
+				VSYNC <= vSyncD4;
+			else
+				HSYNC <= '0';
+				VSYNC <= '0';
+			end if;
 		end if;
 	end process;
 

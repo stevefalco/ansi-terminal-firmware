@@ -302,7 +302,7 @@ uart_transmit:
 
 	ld	a, (uart_LSR)		; read line status
 	bit	uart_LSR_THRE_b, a	; wait until uart can accept a byte
-	jr	z, uart_transmit
+	jr	Z, uart_transmit
 
 	ld	a, c
 	ld	(uart_THR), a		; write the byte

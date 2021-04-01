@@ -36,7 +36,10 @@ entity z80_bus is
 		cpuKbInt	: in std_logic;
 
 		-- DIP Switch Interface
-		cpuDipQ		: in std_logic_vector (7 downto 0)
+		cpuDipQ		: in std_logic_vector (7 downto 0);
+
+		-- Control Register Interface
+		cpuControlWR	: out std_logic
 	);
 end z80_bus;
 
@@ -57,6 +60,7 @@ begin
 		cpuUartCS_D0 <= '0';
 		cpuUartWR <= '0';
 		cpuKbCS_D0 <= '0';
+		cpuControlWR <= '0';
 		cpuData <= (others => 'Z');
 
 		case to_integer(unsigned(cpuAddr(15 downto 0))) is
@@ -105,6 +109,12 @@ begin
 				if(cpuRden = '0') then
 					cpuKbCS_D0 <= '1';
 					cpuData <= cpuKbQ;
+				end if;
+
+			when 16#C030# =>
+				-- Control Register Bits
+				if(cpuWren = '0') then
+					cpuControlWR <= '1';
 				end if;
 
 			when others =>

@@ -222,6 +222,9 @@ keyboard_get_char_none:
 ; Alters AF, BC, D, HL
 ; Output none
 ;
+; Returns with Z flag set if no chars processed, or Z flag clear
+; (i.e. NZ) if something was processed.
+;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 keyboard_handler:
@@ -230,13 +233,17 @@ keyboard_handler:
 	ld	a, b
 	cp	-1		; -1 means "nothing available"
 	ret	Z		; No characters in our receive buffer.
+				; Return with Z flag set
 
 	; If the ascii code is 0, then toss the character.
 	ld	a, c		; ASCII code
 	or	a		; set flags
-	ret	Z		; toss it
+	ret	Z		; Return with Z flag set
 
 	call	uart_transmit	; Send it out the uart
 
-	ret
+	xor	a		; Sets Z flag
+	inc	a		; Clears Z flag
+
+	ret			; Return with Z flag clear
 
