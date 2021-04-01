@@ -34,7 +34,9 @@ entity terminal is
 		UART_RX			: in std_logic;				-- L16
 		UART_TX			: out std_logic;			-- L15
 		UART_RTS		: out std_logic;			-- P1
-		UART_CTS		: in std_logic				-- R1
+		UART_CTS		: in std_logic;				-- R1
+
+		LEDS			: out std_logic_vector(7 downto 0)	-- M6, T4, T3, R3, T2, R4, N5, N3
 
 		-- SC			: out std_logic
 	);
@@ -314,6 +316,8 @@ architecture a of terminal is
 	signal cts_n			: std_logic;
 
 begin
+
+	LEDS <= "00000000";
 
 	-- Create a 25.2 MHz dot clock from the 12 MHz oscillator.
 	dotClockGen: dot_clock
