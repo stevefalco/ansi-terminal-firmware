@@ -178,7 +178,7 @@ debug_print_eol:
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
-; debug_show_a - Show contents of a
+; debug_show_af - Show contents of af
 ;
 ; Input none
 ; Alters none
@@ -186,7 +186,7 @@ debug_print_eol:
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-debug_show_a:
+debug_show_af:
 	push	hl
 	push	de
 	push	bc
@@ -194,9 +194,13 @@ debug_show_a:
  
 	ld	hl, s_a
 	call	debug_print_string
-	pop	af
-	push	af
-	ld	c, a
+	pop	de	; use de rather than af so we can access F
+	push	de
+	ld	c, d	; really contains A
+	call	debug_print_hex
+	pop	de	; use de rather than af so we can access F
+	push	de
+	ld	c, e	; really contains F
 	call	debug_print_hex
 	call	debug_print_eol
  
