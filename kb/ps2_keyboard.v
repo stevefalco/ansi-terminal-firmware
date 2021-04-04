@@ -1,3 +1,10 @@
+// This code is slightly modified by Steven A. Falco, to set up the
+// timing for our clock rates, and to add a number of keycodes that
+// I wanted to handle.
+//
+// I also wanted to hide the control and alt keys, similarly to the
+// way the shift keys were handled.
+
 //-------------------------------------------------------------------------------------
 //
 // Author: John Clayton

@@ -1,3 +1,9 @@
+-- ANSI Terminal
+--
+-- (c) 2021 Steven A. Falco
+--
+-- Top level VHDL for the ANSI terminal.
+
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -15,9 +21,7 @@ entity terminal is
 		--
 		-- That requires around 9 mA, which is a bit more than the FPGA
 		-- wants to provide.  We will parallel two outputs, each with a
-		-- separate series resistor.  We could even get some greyscale
-		-- output if desired, by wiring an R-2R ladder.  I've seen people
-		-- use 3 or 4 independent bits per color, but we don't need that.
+		-- separate series resistor.
 		PIXEL_R1		: out std_logic;			-- P14
 		PIXEL_R2		: out std_logic;			-- R14
 		PIXEL_G1		: out std_logic;			-- R13
@@ -37,8 +41,6 @@ entity terminal is
 		UART_CTS		: in std_logic;				-- R1
 
 		LEDS			: out std_logic_vector(7 downto 0)	-- M6, T4, T3, R3, T2, R4, N5, N3
-
-		-- SC			: out std_logic
 	);
 end terminal;
 
@@ -337,12 +339,12 @@ begin
 	LEDS <= "00000000";
 	-- LEDS <= cpuControlQ;
 
-	-- Create a 25.2 MHz dot clock from the 12 MHz oscillator.
+	-- Create a 108.0 MHz dot clock from the 12 MHz oscillator.
 	dotClockGen: dot_clock
 		port map
 		(
 			inclk0 => CLK12M,
-			c0 => dotClock		-- 25.2 MHz
+			c0 => dotClock		-- 108.0 MHz
 		);
 
 	-- Create a 12.9 MHz cpu clock from the 12 MHz oscillator.
@@ -380,19 +382,6 @@ begin
 			end case;
 		end if;
 	end process;
-
---	-- Slow clock for debug
---	slowClk: process(cpuClock)
---		variable divide_it : unsigned(7 downto 0) := (others => '0');
---	begin
---		if(rising_edge(cpuClock)) then
---			divide_it := divide_it + 1;
---			if(divide_it = 0) then
---				slow_clock <= not slow_clock;
---			end if;
---		end if;
---	end process;
---	SC <= slow_clock;
 
 	-- Cross clock domains.
 	cpuResetProcess: process(cpuClock)
@@ -591,8 +580,9 @@ begin
 			-- so the sum ranges from 0 to 1919, which only needs
 			-- 11 bits.
 			--
-			-- But, Quartus thinks addrA has to have 12 bits, so we
-			-- humor it, then toss the junk MSB...
+			-- But, Quartus thinks a 7-bit by 5-bit multiply has
+			-- to have 12 bits, so we use "addr" as a 12-bit temp
+			-- then toss the junk MSB...
 			addr := (to_unsigned(80, 7) * lineA) + colA;
 			addrA := addr(10 downto 0);
 		else
@@ -631,8 +621,12 @@ begin
 		end if;
 	end process;
 
-	-- We are using the eighth bit to determine if a cursor is
-	-- present.
+	-- Our character set is based on 7-bit ASCII, so the MSB (bit 7)
+	-- is not needed.  Instead, we are using bit 7 (of frameChar) to
+	-- indicate where the cursor is positioned.
+	--
+	-- Essentially, bit 7 selects an alternate (reverse-video)
+	-- character set for the cell containing the cursor.
 	--
 	-- Address and data output are both registered, so scanChar is
 	-- two clocks behind romAddr, or three clocks behind addressA.
@@ -654,8 +648,8 @@ begin
 		end if;
 	end process;
 
-	-- The lower three bits of the columnAddress select the bit to be
-	-- displayed.
+	-- The lower four bits of the columnAddress select the bit of
+	-- the character to be displayed.
 	--
 	-- The output is registered, so pixel is one clock behind
 	-- scanChar, or 4 clocks behind addressA.
@@ -697,6 +691,8 @@ begin
 		end if;
 	end process;
 
+	-- We are displaying in white, so just turn on both bits of
+	-- all three "guns".
 	reclockVGA: process(dotCLock)
 	begin
 		if(rising_edge(dotClock)) then

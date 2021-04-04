@@ -1,3 +1,10 @@
+; ANSI Terminal
+;
+; (c) 2021 Steven A. Falco
+;
+; Debug code for displaying register contents, numbers, and strings on the
+; terminal display.
+
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;

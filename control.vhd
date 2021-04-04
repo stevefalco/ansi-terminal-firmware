@@ -1,3 +1,13 @@
+-- ANSI Terminal
+--
+-- (c) 2021 Steven A. Falco
+--
+-- This file contains a control register whereby the Z80 code can control
+-- the hardware.
+--
+-- So far, we are only using this to control a screen saver that is reset by
+-- keyboard input.
+
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;

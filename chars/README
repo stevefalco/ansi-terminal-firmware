@@ -1,13 +1,18 @@
-This process is awkward, but here is what I did:
+This process is a bit convoluted, but here is what I did to create our
+character ROM:
 
-Trying DejaVu LGC Sans Mono at 22 px.
+I'm using the DejaVu LGC Sans Mono font, which has a nice aspect ratio
+for our purposes.
 
-1) Create rawchars.xcf with each character on a separate line, in ascii
-order from char 32 (space) through 127 (del).  The image is wider than needed,
-because the gimp text tool doesn't like to be too constrained.
+1) Using Gimp, create rawchars.xcf with each character on a separate line,
+in ASCII order from char 32 (space) through 127 (del).  The image starts
+out wider than strictly necessary, because the Gimp text tool doesn't like
+to be too constrained.  Note that smoothing is turned off, because we just
+want pure black/white pixels - no grayscale!
 
-I fiddled with the font size, until I got the characters to be 8 pels wide.
-While I didn't expect it, "w" was wider than "M"!
+I fiddled with the font size, until I got the characters to fit in our
+chosen 16x32 per-character raster.  While I didn't expect it, "w" was
+wider than "M"!  It turns out that 22 pt type is the largest size that fits.
 
 I didn't trim the width at this point.
 
@@ -16,20 +21,23 @@ I saw something wrong.  Once flattened, you cannot go back to text edit mode.
 
 Flatten the image, but first set some cursors to remember how tall the
 textbox was.  Then, do a rectangular selection, exactly 16 pels wide, and
-trim the canvas to eliminate the slack.
+trim the canvas to eliminate the slack.  Export the result as
+flattenedchars.png.
 
-The characters seem to be biased to the right, so most have a white column on
-the left, but again, 'w' goes the whole way.  Thus, a string of 'w' characters
-won't have any space between them.  Export the result as flattenedchars.png.
-
-3) Check using "file" to be sure the png is 8 wide then use ImageMagick to
-convert it to a .h file.  Command is:
+3) Check using "file" to be sure the png is 16 bits wide, then use
+ImageMagick to convert it to a .h file.  The command is:
 
 convert flattenedchars.png flattenedchars.h
 
-I made one edit to the generated .h file:  Add one full line of 0x00 at the end
-of the file, plus two more on the partial line.  I.e, the generated file will
-end with:
+At first, we don't know how much of the resulting array we will wind up
+skipping (there is a header that we must remove), and we don't know if we
+have exactly the right number of bytes to just fill the last character.
+I had to adjust the SKIP parameter in genit.c to eliminate the header,
+then I had to tweak flattenedchars.h so exactly 8192 rows were produced.
+
+It turned out that I had to add one full line of 0x00 at the end of the
+file, plus two more 0x00 bytes on the partial line.  I.e, the generated
+file will initially end with this line:
 
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 
@@ -38,20 +46,17 @@ but we replace that line with:
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 
-Without that edit, the last character will be too short.  We need to end up
-with line 8191 in the file created by genit.c in the next step.
+Without that edit, the last character will be too short.  Again, we need to
+end up with line 8191 in the file created by genit.c in the next step.
 
 4) Use the genit.c program to create chars.mif.  It turned out that the font
 is 16x32, which is perfect.
 
-To get 24 lines in 1024 rows, we want 16x42, so our vhdl will have to pad by
-10 lines at the bottom.
+To get 24 lines in 1024 rows, we want 16x42, so our VHDL will have to pad by
+10 lines at the bottom.  That is handled in frame_gen.vhd.
 
-This is also tricky, because most characters have one white row above the
-character, but a few of the accent characters use that row!  The SKIP
-parameter determines how much to throw away.  There is a little metadata
-at the beginning of the PNG file, which we also need to discard.  This could
-change in the future if Gimp changes its comment structure.
+One more consideration for the SKIP parameter: we have to choose SKIP so the
+characters are properly centered vertically.
 
 Here is how the "sharp sign" (#) should come out:
 

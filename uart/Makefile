@@ -1,6 +1,8 @@
-all: divtable
+# ANSI Terminal
+#
+# (c) 2021 Steven A. Falco
 
-divtable: divisors
+all: divisors
 	./divisors > divtable
 
 divisors: divisors.c

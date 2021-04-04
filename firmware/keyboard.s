@@ -1,3 +1,12 @@
+; ANSI Terminal
+;
+; (c) 2021 Steven A. Falco
+;
+; Keyboard driver.  We receive interrupts, and then store incoming ASCII
+; keystrokes in a circular buffer.  We are also called periodically by
+; the main loop, and we transmit any characters in the circular buffer
+; out via the uart.
+
 ; Keyboard registers
 keyboard_base		equ 0xc020
 keyboard_SCAN_CODE	equ (keyboard_base + 0x00)	; Scan Code register

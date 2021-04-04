@@ -1,3 +1,11 @@
+-- ANSI Terminal
+--
+-- (c) 2021 Steven A. Falco
+--
+-- This file contains the logic to generate a 1280x1024 VGA (SXGA) frame.
+-- We also take care of generating the blank scan lines between rows of
+-- text.
+
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;

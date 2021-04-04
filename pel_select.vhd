@@ -1,3 +1,11 @@
+-- ANSI Terminal
+--
+-- (c) 2021 Steven A. Falco
+--
+-- Select a single pel from a character.  The characters are in a
+-- 16x32 matrix.  We are given one 16-bit row of a character, and
+-- we return the correct bit.
+
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -12,7 +20,7 @@ entity pel_select is
 	);
 end pel_select;
 
-architecture pel_select of pel_select is
+architecture a of pel_select is
 begin
 
 	pel: process(clock)
@@ -42,4 +50,4 @@ begin
 		end if;
 	end process;
 
-end pel_select;
+end a;

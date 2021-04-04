@@ -1,3 +1,17 @@
+; ANSI Terminal
+;
+; (c) 2021 Steven A. Falco
+;
+; This file contains the state machines that process incoming characters
+; from the UART, and perform all the escape sequence processing.  We handle
+; a subset of the vt100 escape sequences, sufficient to work properly with
+; 2.11bsd.
+;
+; There is a partial implementation of scroll regions, but it is buggy - at
+; least on Linux, vim doesn't behave properly.  As a workaround, we have a
+; reduced-functionality terminfo file for Linux, which simply eliminates
+; the scroll region escape sequences.
+
 ; Dual-ported video memory - 1920 bytes.
 screen_base		equ 0x8000				; Physical address
 screen_cols		equ 80					; Number of columns

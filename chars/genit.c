@@ -1,3 +1,10 @@
+// ANSI Terminal
+//
+// (c) 2021 Steven A. Falco
+//
+// A tool to convert a font to a MIF file.  This is a bit of a hack, as
+// explained in the README, but it gets the job done.
+
 #include <stdio.h>
 
 #include "flattenedchars.h"

@@ -1,3 +1,17 @@
+; ANSI Terminal
+;
+; (c) 2021 Steven A. Falco
+;
+; UART driver.  We respond to UART receiver interrupts, and store the
+; characters in a circular buffer.  If our circular buffer becomes too
+; full, we deassert the RTS signal to stop the sender (assuming the
+; sender supports hardware flow control).
+;
+; 2.11bsd as implemented via Sytse's FPGA runs the console at 9600
+; baud, and we can keep up with that, even without flow control.  That
+; is good, because by default, Sytse's FPGA doesn't implement hardware
+; flow control, although it can be turned on in his VHDL if needed.
+
 ; UART registers
 uart_base		equ 0xc000
 uart_RBR		equ (uart_base + 0x00)		; Receiver Buffer Register - read-only

@@ -1,3 +1,12 @@
+; ANSI Terminal
+;
+; (c) 2021 Steven A. Falco
+;
+; Main program.
+;
+; Set up memory and registers, initialize all drivers, call the drivers in our
+; main loop, handle the screen saver, and dispatch interrupts.
+
 #target rom
 
 #code ROM, 0x0000, 0x4000

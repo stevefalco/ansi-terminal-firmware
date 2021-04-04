@@ -1,3 +1,13 @@
+-- ANSI Terminal
+--
+-- (c) 2021 Steven A. Falco
+--
+-- The Z80 core that we are using requires a tri-state bus.  This
+-- file controls which peripheral is to drive the bus, and also
+-- generates the necessary peripheral control signals.
+--
+-- We also generate a shared interrupt line.
+
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -136,8 +146,10 @@ begin
 	--
 	-- That is a problem for the UART, because it will pop received characters
 	-- out of its FIFO on each rising edge, and so we would lose a character.
+	--
 	-- When reading from the UART, we therefore shorten UART CS by masking
-	-- out the first half of it.
+	-- out the first half of it.  The keyboard has a similar restriction,
+	-- so we shorten its CS too.
 	--
 	-- WRITE Cycles:
 	--
@@ -158,6 +170,8 @@ begin
 	-- Similar to the UART case, we want to assert the KB CS on the second
 	-- cycle.  The keyboard register interface will capture the various
 	-- data, so they will persist until the next "data ready".
+	--
+	-- We don't support writing to the keyboard, although in theory we could.
 	kbDelay: process(cpuClock)
 	begin
 		if (falling_edge(cpuClock)) then

@@ -1,3 +1,10 @@
+; ANSI Terminal
+;
+; (c) 2021 Steven A. Falco
+;
+; The Z80 doesn't have a multiply instruction, so here are a few simple
+; routines to perform the multiplications that we need.
+
 #code ROM
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;

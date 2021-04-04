@@ -1,3 +1,10 @@
+// ANSI Terminal
+//
+// (c) 2021 Steven A. Falco
+//
+// A tool to read a binary file and output it as a MIF file.  This is used
+// to convert our Z80 machine code into a ROM image for Quartus.
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
