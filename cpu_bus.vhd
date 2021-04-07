@@ -13,22 +13,22 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use ieee.std_logic_unsigned.all;
 
-entity z80_bus is
+entity cpu_bus is
 	port (
 		-- CPU Interface.
 		cpuClock	: in std_logic;
-		cpuAddr		: in std_logic_vector (15 downto 0);
-		cpuData		: inout std_logic_vector (7 downto 0);
-		cpuRden		: in std_logic;
-		cpuWren		: in std_logic;
-		cpuInt_n	: out std_logic;
+		cpuAddr		: in std_logic_vector (23 downto 0);
+		cpuDataIn	: out std_logic_vector (15 downto 0);
+		cpuRWn		: in std_logic;
+		cpuInt		: out std_logic_vector (2 downto 0);
+		cpuDTACKn	: out std_logic;
 
 		-- CPU ROM Interface
-		cpuRomQ		: in std_logic_vector (7 downto 0);
+		cpuRomQ		: in std_logic_vector (15 downto 0);
 
 		-- CPU RAM Interface
 		cpuRamWren	: out std_logic;
-		cpuRamQ		: in std_logic_vector (7 downto 0);
+		cpuRamQ		: in std_logic_vector (15 downto 0);
 
 		-- VIDEO RAM Interface
 		videoRamWren	: out std_logic;
@@ -51,9 +51,9 @@ entity z80_bus is
 		-- Control Register Interface
 		cpuControlWR	: out std_logic
 	);
-end z80_bus;
+end cpu_bus;
 
-architecture a of z80_bus is
+architecture a of cpu_bus is
 
 	signal cpuUartCS_D0	: std_logic;
 	signal cpuUartCS_D1	: std_logic;
@@ -62,7 +62,7 @@ architecture a of z80_bus is
 	signal cpuKbCS_D1	: std_logic;
 
 begin
-	z80_bus_process: process(all)
+	cpu_bus_process: process(all)
 	begin
 		-- Assume no writes, no uart access
 		cpuRamWren <= '0';
@@ -71,59 +71,61 @@ begin
 		cpuUartWR <= '0';
 		cpuKbCS_D0 <= '0';
 		cpuControlWR <= '0';
-		cpuData <= (others => 'Z');
+		cpuDataIn <= (others => '0');
+		cpuDTACKn <= '0';
 
-		case to_integer(unsigned(cpuAddr(15 downto 0))) is
+		case to_integer(unsigned(cpuAddr(23 downto 0))) is
 
-			when 16#0000# to 16#3FFF# =>
+			when 16#000000# to 16#001FFF# =>
 				-- CPU ROM
-				if(cpuRden = '0') then
-					cpuData <= cpuRomQ;
+				if(cpuRWn = '1') then
+					cpuDataIn <= cpuRomQ;
+					cpuDTACKn <= '0';
 				end if;
 
-			when 16#4000# to 16#7FFF# =>
+			when 16#004000# to 16#005FFF# =>
 				-- CPU RAM
-				if(cpuRden = '0') then
-					cpuData <= cpuRamQ;
-				elsif(cpuWren = '0') then
+				if(cpuRWn = '1') then
+					cpuDataIn <= cpuRamQ;
+				elsif(cpuRWn = '0') then
 					cpuRamWren <= '1';
 				end if;
 
-			when 16#8000# to 16#BFFF# =>
+			when 16#008000# to 16#00BFFF# =>
 				-- Video RAM
-				if(cpuRden = '0') then
-					cpuData <= videoRamQ;
-				elsif(cpuWren = '0') then
+				if(cpuRWn = '1') then
+					cpuDataIn(7 downto 0) <= videoRamQ;
+				elsif(cpuRWn = '0') then
 					videoRamWren <= '1';
 				end if;
 
-			when 16#C000# to 16#C007# =>
+			when 16#00C000# to 16#00C007# =>
 				-- UART
-				if(cpuRden = '0') then
+				if(cpuRWn = '1') then
 					cpuUartCS_D0 <= '1';
 					cpuUartWR <= '0';
-					cpuData <= cpuUartQ;
-				elsif(cpuWren = '0') then
+					cpuDataIn(7 downto 0) <= cpuUartQ;
+				elsif(cpuRWn = '0') then
 					cpuUartCS_D0 <= '1';
 					cpuUartWR <= '1';
 				end if;
 
-			when 16#C010# =>
+			when 16#00C010# =>
 				-- DIP Switches
-				if(cpuRden = '0') then
-					cpuData <= cpuDipQ;
+				if(cpuRWn = '1') then
+					cpuDataIn(7 downto 0) <= cpuDipQ;
 				end if;
 
-			when 16#C020# to 16#C027# =>
+			when 16#00C020# to 16#00C027# =>
 				-- Keyboard
-				if(cpuRden = '0') then
+				if(cpuRWn = '1') then
 					cpuKbCS_D0 <= '1';
-					cpuData <= cpuKbQ;
+					cpuDataIn(7 downto 0) <= cpuKbQ;
 				end if;
 
-			when 16#C030# =>
+			when 16#00C030# =>
 				-- Control Register Bits
-				if(cpuWren = '0') then
+				if(cpuRWn = '0') then
 					cpuControlWR <= '1';
 				end if;
 
@@ -165,7 +167,7 @@ begin
 			cpuUartCS_D1 <= cpuUartCS_D0;
 		end if;
 	end process;
-	cpuUartCS <= cpuUartCS_D0 and cpuUartCS_D1 when cpuRden = '0' else cpuUartCS_D0;
+	cpuUartCS <= cpuUartCS_D0 and cpuUartCS_D1 when cpuRWn = '1' else cpuUartCS_D0;
 
 	-- Similar to the UART case, we want to assert the KB CS on the second
 	-- cycle.  The keyboard register interface will capture the various
@@ -180,14 +182,14 @@ begin
 	end process;
 	cpuKbCS <= cpuKbCS_D0 and cpuKbCS_D1;
 
-	-- We have one interrupt to the CPU, and only two devices that generate
+	-- We use one interrupt to the CPU, and only two devices that generate
 	-- interrupts.  So, we just let the CPU poll both devices.
-	z80_int_process: process(all)
+	cpu_int_process: process(all)
 	begin
 		if(cpuUartInt = '1' or cpuKbInt = '1') then
-			cpuInt_n <= '0';
+			cpuInt(0) <= '1';
 		else
-			cpuInt_n <= '1';
+			cpuInt(0) <= '0';
 		end if;
 	end process;
 

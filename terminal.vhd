@@ -106,63 +106,82 @@ architecture a of terminal is
 		);
 	end component;
 
-	component z80_top_direct_n
+	component fx68k
 		port (
-			nM1		: out std_logic;
-			nMREQ		: out std_logic;
-			nIORQ		: out std_logic;
-			nRD		: out std_logic;
-			nWR		: out std_logic;
-			nRFSH		: out std_logic;
-			nHALT		: out std_logic;
-			nBUSACK		: out std_logic;
+			clk		: in std_logic;
+			HALTn		: in std_logic; -- Used for single step only. Force high if not used
+			extReset	: in std_logic; -- External sync reset on emulated system
+			pwrUp		: in std_logic; -- Asserted together with reset on emulated system coldstart	
+			enPhi1		: in std_logic; -- Clock enables. Next cycle is PHI1 or PHI2
+			enPhi2		: in std_logic; -- Clock enables. Next cycle is PHI1 or PHI2
 
-			nWAIT		: in std_logic;
-			nINT		: in std_logic;
-			nNMI		: in std_logic;
-			nRESET		: in std_logic;
-			nBUSRQ		: in std_logic;
+			eRWn		: out std_logic;
+			ASn		: out std_logic;
+			LDSn		: out std_logic;
+			UDSn		: out std_logic;
+			E		: out std_logic;
+			VMAn		: out std_logic;
+	
+			-- Next cycle would be raising/falling edge of E output
+			-- output E_PosClkEn, E_NegClkEn,
 
-			CLK		: in std_logic;
-			A		: out std_logic_vector (15 downto 0);
-			D		: inout std_logic_vector (7 downto 0)
+			FC0		: out std_logic;
+			FC1		: out std_logic;
+			FC2		: out std_logic;
+			BGn		: out std_logic;
+			oRESETn		: out std_logic;
+			oHALTEDn	: out std_logic;
+
+			DTACKn		: in std_logic;
+			VPAn		: in std_logic;
+			BERRn		: in std_logic;
+			BRn		: in std_logic;
+			BGACKn		: in std_logic;
+			IPL0n		: in std_logic;
+			IPL1n		: in std_logic;
+			IPL2n		: in std_logic;
+
+			iEdb		: in std_logic_vector(15 downto 0);
+			oEdb		: out std_logic_vector(15 downto 0);
+			eab		: out std_logic_vector(23 downto 1)
 		);
 	end component;
 
-	component z80Rom
+	component cpu_rom
 		port (
-			address		: in std_logic_vector (13 downto 0);
+			address		: in std_logic_vector (12 downto 0);
 			clock		: in std_logic;
-			q		: out std_logic_vector (7 downto 0)
+			q		: out std_logic_vector (15 downto 0)
 		);
 	end component;
 
-	component z80Ram
+	component cpu_ram
 		port (
-			address		: in std_logic_vector (13 downto 0);
+			address		: in std_logic_vector (12 downto 0);
+			byteena		: in std_logic_vector (1 downto 0);
 			clock		: in std_logic;
-			data		: in std_logic_vector (7 downto 0);
+			data		: in std_logic_vector (15 downto 0);
 			wren		: in std_logic;
-			q		: out std_logic_vector (7 downto 0)
+			q		: out std_logic_vector (15 downto 0)
 		);
 	end component;
 
-	component z80_bus
+	component cpu_bus
 		port (
 			-- CPU Interface.
 			cpuClock	: in std_logic;
-			cpuAddr		: in std_logic_vector (15 downto 0);
-			cpuData		: inout std_logic_vector (7 downto 0);
-			cpuRden		: in std_logic;
-			cpuWren		: in std_logic;
-			cpuInt_n	: out std_logic;
+			cpuAddr		: in std_logic_vector (23 downto 0);
+			cpuDataIn	: out std_logic_vector (15 downto 0);
+			cpuRWn		: in std_logic;
+			cpuInt		: out std_logic_vector(2 downto 0);
+			cpuDTACKn	: out std_logic;
 
 			-- CPU ROM Interface
-			cpuRomQ		: in std_logic_vector (7 downto 0);
+			cpuRomQ		: in std_logic_vector (15 downto 0);
 
 			-- CPU RAM Interface
 			cpuRamWren	: out std_logic;
-			cpuRamQ		: in std_logic_vector (7 downto 0);
+			cpuRamQ		: in std_logic_vector (15 downto 0);
 
 			-- VIDEO RAM Interface
 			videoRamWren	: out std_logic;
@@ -244,24 +263,45 @@ architecture a of terminal is
 		);
 	end component;
 
-	-- Z80 Interface.
-	signal nM1			: std_logic;
-	signal nMREQ			: std_logic;
-	signal nIORQ			: std_logic;
-	signal nRD			: std_logic;
-	signal nWR			: std_logic;
-	signal nRFSH			: std_logic;
-	signal nHALT			: std_logic;
-	signal nBUSACK			: std_logic;
+	-- ----------------------------------------------------------------------------------------------------
 
-	signal cpuAddrBus		: std_logic_vector (15 downto 0);
-	signal cpuDataBus		: std_logic_vector (7 downto 0);
-	signal cpuInt_n			: std_logic;
+	signal cpuClock			: std_logic := '0';
+	signal enPhi1			: std_logic := '0';
+	signal enPhi2			: std_logic := '0';
+	signal extReset			: std_logic := '1';
+	signal DTACKn			: std_logic := '1';
+	signal VPAn			: std_logic := '1';
+	signal BERRn			: std_logic := '1';
+	signal BRn			: std_logic := '1';
+	signal BGACKn			: std_logic := '1';
 
-	signal cpuRomQ			: std_logic_vector (7 downto 0);
+	-- Outputs
+	signal eRWn			: std_logic;
+	signal ASn			: std_logic;
+	signal E			: std_logic;
+	signal VMAn			: std_logic;
+	signal FC0			: std_logic;
+	signal FC1			: std_logic;
+	signal FC2			: std_logic;
+	signal BGn			: std_logic;
+	signal oRESETn			: std_logic;
+	signal oHALTEDn			: std_logic;
+
+	-- Buses
+	signal iEdb			: std_logic_vector(15 downto 0) := (others => '0');	-- Input data
+	signal oEdb			: std_logic_vector(15 downto 0) := (others => '0');	-- Output data
+	signal eab			: std_logic_vector(23 downto 0) := (others => '0');	-- Address
+
+	-- ----------------------------------------------------------------------------------------------------
+
+	signal cpuInt			: std_logic_vector (2 downto 0) := (others => '0');	-- Interrupt level
+
+	signal cpuByteEnables		: std_logic_vector (1 downto 0);
+
+	signal cpuRomQ			: std_logic_vector (15 downto 0);
 
 	signal cpuRamWren		: std_logic;
-	signal cpuRamQ			: std_logic_vector (7 downto 0);
+	signal cpuRamQ			: std_logic_vector (15 downto 0);
 
 	signal cpuUartCS		: std_logic;
 	signal cpuUartWR		: std_logic;
@@ -287,7 +327,6 @@ architecture a of terminal is
 	signal cpuClearD1_n		: std_logic := '0';
 
 	signal dotClock			: std_logic := '0';
-	signal cpuClock			: std_logic := '0';
 
 	signal addressA			: std_logic_vector (10 downto 0);
 
@@ -347,14 +386,24 @@ begin
 			c0 => dotClock		-- 108.0 MHz
 		);
 
-	-- Create a 12.9 MHz cpu clock from the 12 MHz oscillator.
+	-- Create a 100 MHz cpu clock from the 12 MHz oscillator.
 	-- This frequency is chosen to get good baud rate accuracy.
 	cpuClockGen: cpu_clock
 		port map
 		(
 			inclk0 => CLK12M,
-			c0 => cpuClock		-- 12.9 MHz
+			c0 => cpuClock		-- 100 MHz
 		);
+
+	phaseProcess: process(cpuClock)
+		variable clkDivisor : std_logic := '0';
+	begin
+		if(rising_edge(cpuClock)) then
+			clkDivisor := not clkDivisor;
+			enPhi1 <= clkDivisor;
+			enPhi2 <= not clkDivisor;
+		end if;
+	end process;
 
 	-- Reset all counters, registers, etc.
 	resetProcess: process(dotClock)
@@ -392,48 +441,64 @@ begin
 		end if;
 	end process;
 
-	-- Z80 CPU
-	z80CPU: z80_top_direct_n
-		port map (
-			nM1 => nM1,
-			nMREQ => nMREQ,
-			nIORQ => nIORQ,
-			nRD => nRD,
-			nWR => nWR,
-			nRFSH => nRFSH,
-			nHALT => nHALT,
-			nBUSACK => nBUSACK,
+	cpu: fx68k
+		port map
+		(
+			clk => cpuClock,
+			HALTn => '1',
+			extReset => clear,
+			pwrUp => clear,
+			enPhi1 => enPhi1,
+			enPhi2 => enPhi2,
 
-			nWAIT => '1',
-			nINT => cpuInt_n,
-			nNMI => '1',
-			nRESET => cpuClearD1_n,
-			nBUSRQ => '1',
+			eRWn => eRWn,
+			ASn => ASn,
+			LDSn => cpuByteEnables(0),
+			UDSn => cpuByteEnables(1),
+			E => E,
+			VMAn => VMAn,
+	
+			FC0 => FC0,
+			FC1 => FC1,
+			FC2 => FC2,
+			BGn => BGn,
+			oRESETn => oRESETn,
+			oHALTEDn => oHALTEDn,
 
-			CLK => cpuClock,
-			A => cpuAddrBus,
-			D => cpuDataBus
+			DTACKn => DTACKn,
+			VPAn => VPAn,
+			BERRn => BERRn,
+			BRn => BRn,
+			BGACKn => BGACKn,
+			IPL0n => cpuInt(0),
+			IPL1n => cpuInt(1),
+			IPL2n => cpuInt(2),
+
+			iEdb => iEdb,
+			oEdb => oEdb,
+			eab => eab(23 downto 1)
 		);
 
-	-- Z80 ROM
-	z80_rom: z80Rom
+	-- CPU ROM
+	cpuRom: cpu_rom
 		port map (
-			address => cpuAddrBus(13 downto 0),
+			address => eab(12 downto 0),
 			clock => cpuClock,
 			q => cpuRomQ
 		);
 
-	-- Z80 RAM
-	z80_ram: z80Ram
+	-- CPU RAM
+	cpuRam: cpu_ram
 		port map (
-			address => cpuAddrBus(13 downto 0),
+			address => eab(12 downto 0),
+			byteena => cpuByteEnables,
 			clock => cpuClock,
-			data => cpuDataBus,
+			data => oEdb,
 			wren => cpuRamWren,
 			q => cpuRamQ
 		);
 
-	-- Z80 UART
+	-- CPU UART
 	uart: gh_uart_16550
 		port map(
 			-- processor interface
@@ -442,8 +507,8 @@ begin
 			rst => clear,
 			CS => cpuUartCS,
 			WR => cpuUartWR,
-			ADD => cpuAddrBus(2 downto 0),
-			D => cpuDataBus,
+			ADD => eab(2 downto 0),
+			D => oEdb(7 downto 0),
 			RD => cpuUartQ,
 			IRQ => cpuUartInt,
 
@@ -462,14 +527,14 @@ begin
 	cts_n <= UART_CTS;
 	UART_RTS <= rts_n;
 
-	-- Z80 Keyboard
-	z80kb: keyboard
+	-- CPU Keyboard
+	cpuKB: keyboard
 		port map
 		(
 			-- CPU
 			clk => cpuClock,
 			reset => clear,
-			addrIn => cpuAddrBus(2 downto 0),
+			addrIn => eab(2 downto 0),
 			dataOut => cpuKbQ,
 			kbCS => cpuKbCS,
 			irq => cpuKbInt,
@@ -479,30 +544,30 @@ begin
 			ps2_data => KBD_DATA
 		);
 
-	-- Z80 Control
-	z80control: control
+	-- CPU Control
+	cpuControl: control
 		port map
 		(
 			-- CPU
 			clk => cpuClock,
 			reset => clear,
-			D => cpuDataBus,
+			D => oEdb(7 downto 0),
 			WR => cpuControlWR,
 
 			-- Control
 			Q => cpuControlQ
 		);
 
-	-- Z80 Bus
-	z80Bus: z80_bus
+	-- CPU Bus
+	cpuBus: cpu_bus
 		port map (
 			-- CPU Interface
 			cpuClock => cpuClock,
-			cpuAddr => cpuAddrBus,
-			cpuData => cpuDataBus,
-			cpuRden => nRD,
-			cpuWren => nWR,
-			cpuInt_n => cpuInt_n,
+			cpuAddr => eab,
+			cpuDataIn => iEdb,		-- CPU input data from cpuBus
+			cpuRWn => eRWn,
+			cpuInt => cpuInt,
+			cpuDTACKn => DTACKn,
 
 			-- CPU ROM Interface
 			cpuRomQ => cpuRomQ,
@@ -602,11 +667,11 @@ begin
 	frameRam: frame_ram
 		port map (
 			address_a => addressA,
-			address_b => cpuAddrBus(10 downto 0),
+			address_b => eab(10 downto 0),
 			clock_a => dotClock,
 			clock_b => cpuClock,
 			data_a => "00000000", -- not used
-			data_b => cpuDataBus,
+			data_b => oEdb(7 downto 0),
 			wren_a => '0', -- not used
 			wren_b => videoRamWren,
 			q_a => frameChar,

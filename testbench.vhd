@@ -20,7 +20,7 @@ architecture a of testbench is
 			CLK12M			: in std_logic;
 
 			-- DIP switches for baud rate
-			DIP_SW			: in std_logic_vector(3 downto 0);
+			DIP_SW			: in std_logic_vector(7 downto 0);
 
 			PIXEL_R1		: out std_logic;
 			PIXEL_R2		: out std_logic;
@@ -32,22 +32,25 @@ architecture a of testbench is
 			HSYNC			: out std_logic;
 			VSYNC			: out std_logic;
 
-			KBD_CLK			: in std_logic;
-			KBD_DATA		: in std_logic;
+			KBD_CLK			: inout std_logic;
+			KBD_DATA		: inout std_logic;
 
 			UART_RX			: in std_logic;
-			UART_TX			: out std_logic
+			UART_TX			: out std_logic;
+			UART_RTS		: out std_logic;
+			UART_CTS		: in std_logic
 		    );
 	end component;
 
 	signal CLK12M				: std_logic;
 
 	signal loopback				: std_logic;
+	signal loopback2			: std_logic;
 
-	signal dipSwitches			: std_logic_vector(3 downto 0);
+	signal dipSwitches			: std_logic_vector(7 downto 0);
 
-	signal kbdClock				: std_logic;
-	signal kbdData				: std_logic;
+	signal kbdClock				: std_logic := '0';
+	signal kbdData				: std_logic := '0';
 
 begin
 	term: terminal
@@ -57,6 +60,8 @@ begin
 
 		UART_RX => loopback,
 		UART_TX => loopback,
+		UART_RTS => loopback2,
+		UART_CTS => loopback2,
 
 		KBD_CLK => kbdClock,
 		KBD_DATA => kbdData,
@@ -73,6 +78,6 @@ begin
 		wait for 41.6667 ns;
 	end process extClk;
 
-	dipSwitches <= "1010";
+	dipSwitches <= "00001010";
 
 end a;
