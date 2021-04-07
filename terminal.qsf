@@ -236,14 +236,10 @@ set_global_assignment -name QIP_FILE cpu_rom.qip
 set_global_assignment -name QIP_FILE char_rom.qip
 set_global_assignment -name VHDL_FILE control.vhd
 set_global_assignment -name VHDL_FILE dot_clock.vhd
-set_global_assignment -name VHDL_FILE cpu_rom.vhd
 set_global_assignment -name VHDL_FILE frame_gen.vhd
 set_global_assignment -name VHDL_FILE terminal.vhd
 set_global_assignment -name VHDL_FILE pel_select.vhd
-set_global_assignment -name VHDL_FILE cpu_ram.vhd
 set_global_assignment -name VHDL_FILE cpu_bus.vhd
 set_global_assignment -name VHDL_FILE testbench.vhd
-set_global_assignment -name VHDL_FILE cpu_clock.vhd
 set_global_assignment -name VHDL_FILE char_rom.vhd
-set_global_assignment -name VHDL_FILE frame_ram.vhd
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

@@ -73,3 +73,5 @@ set_false_path -from [get_ports {KBD_DATA}] -to *
 set_false_path -from * -to [get_ports {KBD_DATA}]
 
 set_false_path -from [get_ports {DIP_SW[*]}] -to *
+
+set_false_path -from * -to [get_ports {LEDS[*]}]

@@ -1,0 +1,25 @@
+
+test:     file format elf32-m68k
+
+
+Disassembly of section .init:
+
+00000000 <_start-0x8>:
+   0:	0000 0000      	orib #0,%d0
+   4:	0000 0008      	orib #8,%d0
+
+00000008 <_start>:
+   8:	303c 0000      	movew #0,%d0
+
+0000000c <next>:
+   c:	5240           	addqw #1,%d0
+   e:	33c0 0000 c040 	movew %d0,c040 <_ebss+0x4040>
+  14:	343c 000f      	movew #15,%d2
+
+00000018 <wait_more>:
+  18:	323c 7fff      	movew #32767,%d1
+
+0000001c <wait>:
+  1c:	5bc9 fffe      	dbmi %d1,1c <wait>
+  20:	5bca fff6      	dbmi %d2,18 <wait_more>
+  24:	60e6           	bras c <next>
