@@ -195,6 +195,8 @@ set_instance_assignment -name SLEW_RATE 2 -to PIXEL_R2
 set_instance_assignment -name SLEW_RATE 2 -to PIXEL_G1
 set_instance_assignment -name SLEW_RATE 2 -to UART_RTS
 set_instance_assignment -name SLEW_RATE 2 -to UART_TX
+set_global_assignment -name EDA_NATIVELINK_SIMULATION_SETUP_SCRIPT terminal_run_msim_rtl_vhdl.do -section_id eda_simulation
+set_global_assignment -name VHDL_FILE led_reg.vhd
 set_global_assignment -name VHDL_FILE uart/gh_uart_Tx_8bit.vhd
 set_global_assignment -name VHDL_FILE uart/gh_uart_Rx_8bit.vhd
 set_global_assignment -name VHDL_FILE uart/gh_uart_16550.vhd

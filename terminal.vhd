@@ -170,11 +170,14 @@ architecture a of terminal is
 		port (
 			-- CPU Interface.
 			cpuClock	: in std_logic;
+			cpuClear	: in std_logic;
+			cpuByteEnables	: in std_logic_vector (1 downto 0);
 			cpuAddr		: in std_logic_vector (23 downto 0);
 			cpuDataIn	: out std_logic_vector (15 downto 0);
 			cpuRWn		: in std_logic;
 			cpuInt		: out std_logic_vector(2 downto 0);
 			cpuDTACKn	: out std_logic;
+			cpuASn		: in std_logic;
 
 			-- CPU ROM Interface
 			cpuRomQ		: in std_logic_vector (15 downto 0);
@@ -198,11 +201,25 @@ architecture a of terminal is
 			cpuKbQ		: in std_logic_vector (7 downto 0);
 			cpuKbInt	: in std_logic;
 
+			-- LED Interface
+			cpuLEDsWR	: out std_logic;
+
 			-- DIP Switch Interface
 			cpuDipQ		: in std_logic_vector (7 downto 0);
 
 			-- Control Register Interface
 			cpuControlWR	: out std_logic
+		);
+	end component;
+
+	component led_reg is
+		port(
+			clk		: in std_logic;
+			reset		: in std_logic;
+			D		: in std_logic_vector (7 downto 0);
+			WR		: in std_logic;
+
+			Q		: out std_logic_vector (7 downto 0)
 		);
 	end component;
 
@@ -312,6 +329,9 @@ architecture a of terminal is
 	signal cpuKbQ			: std_logic_vector (7 downto 0);
 	signal cpuKbInt			: std_logic;
 
+	signal cpuLEDsWR		: std_logic;
+	signal cpuLEDsQ			: std_logic_vector (7 downto 0);
+
 	signal cpuControlWR		: std_logic;
 	signal cpuControlQ		: std_logic_vector (7 downto 0);
 
@@ -375,8 +395,9 @@ architecture a of terminal is
 
 begin
 
-	LEDS <= "00000000";
+	-- LEDS <= "00000000";
 	-- LEDS <= cpuControlQ;
+	LEDS <= cpuLEDsQ;
 
 	-- Create a 108.0 MHz dot clock from the 12 MHz oscillator.
 	dotClockGen: dot_clock
@@ -482,7 +503,7 @@ begin
 	-- CPU ROM
 	cpuRom: cpu_rom
 		port map (
-			address => eab(12 downto 0),
+			address => eab(13 downto 1),
 			clock => cpuClock,
 			q => cpuRomQ
 		);
@@ -490,7 +511,7 @@ begin
 	-- CPU RAM
 	cpuRam: cpu_ram
 		port map (
-			address => eab(12 downto 0),
+			address => eab(13 downto 1),
 			byteena => cpuByteEnables,
 			clock => cpuClock,
 			data => oEdb,
@@ -558,16 +579,33 @@ begin
 			Q => cpuControlQ
 		);
 
+	-- CPU LEDs
+	cpuLEDs: led_reg
+		port map
+		(
+			-- CPU
+			clk => cpuClock,
+			reset => clear,
+			D => oEdb(7 downto 0),
+			WR => cpuLEDsWR,
+
+			-- Control
+			Q => cpuLEDsQ
+		);
+
 	-- CPU Bus
 	cpuBus: cpu_bus
 		port map (
 			-- CPU Interface
 			cpuClock => cpuClock,
+			cpuClear => clear,
+			cpuByteEnables => cpuByteEnables,
 			cpuAddr => eab,
 			cpuDataIn => iEdb,		-- CPU input data from cpuBus
 			cpuRWn => eRWn,
 			cpuInt => cpuInt,
 			cpuDTACKn => DTACKn,
+			cpuASn => ASn,
 
 			-- CPU ROM Interface
 			cpuRomQ => cpuRomQ,
@@ -590,6 +628,9 @@ begin
 			cpuKbCS => cpuKbCS,
 			cpuKbQ => cpuKbQ,
 			cpuKbInt => cpuKbInt,
+
+			-- LED Interface
+			cpuLEDsWR => cpuLEDsWR,
 
 			-- DIP Switch Interface
 			cpuDipQ => DIP_SW,

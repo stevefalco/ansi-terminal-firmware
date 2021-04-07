@@ -17,11 +17,14 @@ entity cpu_bus is
 	port (
 		-- CPU Interface.
 		cpuClock	: in std_logic;
+		cpuClear	: in std_logic;
+		cpuByteEnables	: in std_logic_vector (1 downto 0);
 		cpuAddr		: in std_logic_vector (23 downto 0);
 		cpuDataIn	: out std_logic_vector (15 downto 0);
 		cpuRWn		: in std_logic;
 		cpuInt		: out std_logic_vector (2 downto 0);
 		cpuDTACKn	: out std_logic;
+		cpuASn		: in std_logic;
 
 		-- CPU ROM Interface
 		cpuRomQ		: in std_logic_vector (15 downto 0);
@@ -45,6 +48,9 @@ entity cpu_bus is
 		cpuKbQ		: in std_logic_vector (7 downto 0);
 		cpuKbInt	: in std_logic;
 
+		-- LED Interface
+		cpuLEDsWR	: out std_logic;
+
 		-- DIP Switch Interface
 		cpuDipQ		: in std_logic_vector (7 downto 0);
 
@@ -62,76 +68,96 @@ architecture a of cpu_bus is
 	signal cpuKbCS_D1	: std_logic;
 
 begin
-	cpu_bus_process: process(all)
+	cpu_bus_process: process(cpuClock)
 	begin
-		-- Assume no writes, no uart access
-		cpuRamWren <= '0';
-		videoRamWren <= '0';
-		cpuUartCS_D0 <= '0';
-		cpuUartWR <= '0';
-		cpuKbCS_D0 <= '0';
-		cpuControlWR <= '0';
-		cpuDataIn <= (others => '0');
-		cpuDTACKn <= '0';
+		if rising_edge(cpuClock) then
+			if(cpuClear = '1') then
+				cpuRamWren <= '0';
+				videoRamWren <= '0';
+				cpuUartCS_D0 <= '0';
+				cpuUartWR <= '0';
+				cpuKbCS_D0 <= '0';
+				cpuControlWR <= '0';
+				cpuLEDsWR <= '0';
+				cpuDataIn <= (others => '0');
+				cpuDTACKn <= '1';
+			else
+				if(cpuASn = '0') then
+					case to_integer(unsigned(cpuAddr(23 downto 0))) is
 
-		case to_integer(unsigned(cpuAddr(23 downto 0))) is
+						when 16#000000# to 16#001FFF# =>
+							-- CPU ROM
+							if(cpuRWn = '1') then
+								cpuDataIn <= cpuRomQ;
+								cpuDTACKn <= '0';
+							end if;
 
-			when 16#000000# to 16#001FFF# =>
-				-- CPU ROM
-				if(cpuRWn = '1') then
-					cpuDataIn <= cpuRomQ;
-					cpuDTACKn <= '0';
+						when 16#004000# to 16#005FFF# =>
+							-- CPU RAM
+							if(cpuRWn = '1') then
+								cpuDataIn <= cpuRamQ;
+							elsif(cpuRWn = '0') then
+								cpuRamWren <= '1';
+							end if;
+
+						when 16#008000# to 16#00BFFF# =>
+							-- Video RAM
+							if(cpuRWn = '1') then
+								cpuDataIn(7 downto 0) <= videoRamQ;
+							elsif(cpuRWn = '0') then
+								videoRamWren <= '1';
+							end if;
+
+						when 16#00C000# to 16#00C007# =>
+							-- UART
+							if(cpuRWn = '1') then
+								cpuUartCS_D0 <= '1';
+								cpuUartWR <= '0';
+								cpuDataIn(7 downto 0) <= cpuUartQ;
+							elsif(cpuRWn = '0') then
+								cpuUartCS_D0 <= '1';
+								cpuUartWR <= '1';
+							end if;
+
+						when 16#00C010# =>
+							-- DIP Switches
+							if(cpuRWn = '1') then
+								cpuDataIn(7 downto 0) <= cpuDipQ;
+							end if;
+
+						when 16#00C020# to 16#00C027# =>
+							-- Keyboard
+							if(cpuRWn = '1') then
+								cpuKbCS_D0 <= '1';
+								cpuDataIn(7 downto 0) <= cpuKbQ;
+							end if;
+
+						when 16#00C030# =>
+							-- Control Register Bits
+							if(cpuRWn = '0') then
+								cpuControlWR <= '1';
+							end if;
+
+						when 16#00C040# =>
+							-- LED Register Bits
+							if(cpuRWn = '0') then
+								cpuLEDsWR <= '1';
+								cpuDTACKn <= '0';
+							end if;
+
+						when others =>
+							null;
+					end case;
 				end if;
+			end if;
+		end if;
 
-			when 16#004000# to 16#005FFF# =>
-				-- CPU RAM
-				if(cpuRWn = '1') then
-					cpuDataIn <= cpuRamQ;
-				elsif(cpuRWn = '0') then
-					cpuRamWren <= '1';
-				end if;
-
-			when 16#008000# to 16#00BFFF# =>
-				-- Video RAM
-				if(cpuRWn = '1') then
-					cpuDataIn(7 downto 0) <= videoRamQ;
-				elsif(cpuRWn = '0') then
-					videoRamWren <= '1';
-				end if;
-
-			when 16#00C000# to 16#00C007# =>
-				-- UART
-				if(cpuRWn = '1') then
-					cpuUartCS_D0 <= '1';
-					cpuUartWR <= '0';
-					cpuDataIn(7 downto 0) <= cpuUartQ;
-				elsif(cpuRWn = '0') then
-					cpuUartCS_D0 <= '1';
-					cpuUartWR <= '1';
-				end if;
-
-			when 16#00C010# =>
-				-- DIP Switches
-				if(cpuRWn = '1') then
-					cpuDataIn(7 downto 0) <= cpuDipQ;
-				end if;
-
-			when 16#00C020# to 16#00C027# =>
-				-- Keyboard
-				if(cpuRWn = '1') then
-					cpuKbCS_D0 <= '1';
-					cpuDataIn(7 downto 0) <= cpuKbQ;
-				end if;
-
-			when 16#00C030# =>
-				-- Control Register Bits
-				if(cpuRWn = '0') then
-					cpuControlWR <= '1';
-				end if;
-
-			when others =>
-				null;
-		end case;
+		-- When the CPU releases Data Strobe we release dtack.
+		-- (No real need to do this, provided everything responds
+		-- in a single cycle.  DTACK Grounded!)
+		if cpuByteEnables = "11" then
+			cpuDTACKn <='1';
+		end if;
 	end process;
 
 	-- In this discussion, we consider that CPU clock cycles begin with a
@@ -191,6 +217,8 @@ begin
 		else
 			cpuInt(0) <= '0';
 		end if;
+		-- FIXME
+		cpuInt <= "111";
 	end process;
 
 end a;
