@@ -69,8 +69,7 @@ architecture a of cpu_bus is
 
 	type bus_FSM_type is (
 		busIdle_state,
-		busActive_state,
-		busComplete_state
+		busActive_state
 	);
 
 	signal busFSM		: bus_FSM_type := busIdle_state;
@@ -94,78 +93,76 @@ begin
 
 					if(cpuASn = '0' and cpuByteEnables /= "00") then
 						busFSM <= busActive_state;
+
+						case to_integer(unsigned(cpuAddr(23 downto 0))) is
+
+							when 16#000000# to 16#001FFF# =>
+								-- CPU ROM
+								if(cpuRWn = '1') then
+									cpuDataIn <= cpuRomQ;
+									cpuDTACKn <= '0';
+								end if;
+
+							when 16#004000# to 16#005FFF# =>
+								-- CPU RAM
+								if(cpuRWn = '1') then
+									cpuDataIn <= cpuRamQ;
+								elsif(cpuRWn = '0') then
+									cpuRamWren <= '1';
+								end if;
+								cpuDTACKn <= '0';
+
+							when 16#008000# to 16#00BFFF# =>
+								-- Video RAM
+								if(cpuRWn = '1') then
+									cpuDataIn(7 downto 0) <= videoRamQ;
+								elsif(cpuRWn = '0') then
+									videoRamWren <= '1';
+								end if;
+
+							when 16#00C000# to 16#00C007# =>
+								-- UART
+								if(cpuRWn = '1') then
+									cpuUartCS_D0 <= '1';
+									cpuUartWR <= '0';
+									cpuDataIn(7 downto 0) <= cpuUartQ;
+								elsif(cpuRWn = '0') then
+									cpuUartCS_D0 <= '1';
+									cpuUartWR <= '1';
+								end if;
+
+							when 16#00C010# =>
+								-- DIP Switches
+								if(cpuRWn = '1') then
+									cpuDataIn(7 downto 0) <= cpuDipQ;
+								end if;
+
+							when 16#00C020# to 16#00C027# =>
+								-- Keyboard
+								if(cpuRWn = '1') then
+									cpuKbCS_D0 <= '1';
+									cpuDataIn(7 downto 0) <= cpuKbQ;
+								end if;
+
+							when 16#00C030# =>
+								-- Control Register Bits
+								if(cpuRWn = '0') then
+									cpuControlWR <= '1';
+								end if;
+
+							when 16#00C040# =>
+								-- LED Register Bits
+								if(cpuRWn = '0') then
+									cpuLEDsWR <= '1';
+									cpuDTACKn <= '0';
+								end if;
+
+							when others =>
+								null;
+						end case;
 					end if;
 
 				when busActive_state =>
-					case to_integer(unsigned(cpuAddr(23 downto 0))) is
-
-						when 16#000000# to 16#001FFF# =>
-							-- CPU ROM
-							if(cpuRWn = '1') then
-								cpuDataIn <= cpuRomQ;
-								cpuDTACKn <= '0';
-							end if;
-
-						when 16#004000# to 16#005FFF# =>
-							-- CPU RAM
-							if(cpuRWn = '1') then
-								cpuDataIn <= cpuRamQ;
-							elsif(cpuRWn = '0') then
-								cpuRamWren <= '1';
-							end if;
-							cpuDTACKn <= '0';
-
-						when 16#008000# to 16#00BFFF# =>
-							-- Video RAM
-							if(cpuRWn = '1') then
-								cpuDataIn(7 downto 0) <= videoRamQ;
-							elsif(cpuRWn = '0') then
-								videoRamWren <= '1';
-							end if;
-
-						when 16#00C000# to 16#00C007# =>
-							-- UART
-							if(cpuRWn = '1') then
-								cpuUartCS_D0 <= '1';
-								cpuUartWR <= '0';
-								cpuDataIn(7 downto 0) <= cpuUartQ;
-							elsif(cpuRWn = '0') then
-								cpuUartCS_D0 <= '1';
-								cpuUartWR <= '1';
-							end if;
-
-						when 16#00C010# =>
-							-- DIP Switches
-							if(cpuRWn = '1') then
-								cpuDataIn(7 downto 0) <= cpuDipQ;
-							end if;
-
-						when 16#00C020# to 16#00C027# =>
-							-- Keyboard
-							if(cpuRWn = '1') then
-								cpuKbCS_D0 <= '1';
-								cpuDataIn(7 downto 0) <= cpuKbQ;
-							end if;
-
-						when 16#00C030# =>
-							-- Control Register Bits
-							if(cpuRWn = '0') then
-								cpuControlWR <= '1';
-							end if;
-
-						when 16#00C040# =>
-							-- LED Register Bits
-							if(cpuRWn = '0') then
-								cpuLEDsWR <= '1';
-								cpuDTACKn <= '0';
-							end if;
-
-						when others =>
-							null;
-					end case;
-					busFSM <= busComplete_state;
-
-				when busComplete_state =>
 					cpuRamWren <= '0';
 					videoRamWren <= '0';
 					cpuUartCS_D0 <= '0';
