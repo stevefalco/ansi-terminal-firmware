@@ -311,6 +311,8 @@ architecture a of terminal is
 
 	-- ----------------------------------------------------------------------------------------------------
 
+	signal byteBus			: std_logic_vector(23 downto 0) := (others => '0');
+
 	signal cpuInt			: std_logic_vector (2 downto 0) := (others => '0');	-- Interrupt level
 
 	signal LDSn			: std_logic;
@@ -503,6 +505,7 @@ begin
 		);
 
 	cpuByteEnables <= not (UDSn & LDSn);
+	byteBus <= eab(23 downto 1) & cpuByteEnables(0);
 
 	-- CPU ROM
 	cpuRom: cpu_rom
@@ -712,7 +715,7 @@ begin
 	frameRam: frame_ram
 		port map (
 			address_a => addressA,
-			address_b => eab(10 downto 0),
+			address_b => byteBus(10 downto 0),
 			clock_a => dotClock,
 			clock_b => cpuClock,
 			data_a => "00000000", -- not used
@@ -813,13 +816,13 @@ begin
 			PIXEL_B1 <= pixelBlanked;
 			PIXEL_B2 <= pixelBlanked;
 
-			if(cpuControlQ(0) = '1') then
+			--if(cpuControlQ(0) = '1') then
 				HSYNC <= hSyncD4;
 				VSYNC <= vSyncD4;
-			else
-				HSYNC <= '0';
-				VSYNC <= '0';
-			end if;
+			--else
+			--	HSYNC <= '0';
+			--	VSYNC <= '0';
+			--end if;
 		end if;
 	end process;
 

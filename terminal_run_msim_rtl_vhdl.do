@@ -18,8 +18,9 @@ configure wave -timelineunits ns
 
 delete wave *
 
-add wave -r /testbench/term/cpuBus/*
 add wave /testbench/term/cpuRam/*
+add wave /testbench/term/frameRam/*
+add wave -r /testbench/term/cpuBus/*
 add wave -r /testbench/term/*
 
 run 40ms

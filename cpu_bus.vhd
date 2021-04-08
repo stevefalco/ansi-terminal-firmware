@@ -100,8 +100,8 @@ begin
 								-- CPU ROM
 								if(cpuRWn = '1') then
 									cpuDataIn <= cpuRomQ;
-									cpuDTACKn <= '0';
 								end if;
+								cpuDTACKn <= '0';
 
 							when 16#004000# to 16#005FFF# =>
 								-- CPU RAM
@@ -119,6 +119,7 @@ begin
 								elsif(cpuRWn = '0') then
 									videoRamWren <= '1';
 								end if;
+								cpuDTACKn <= '0';
 
 							when 16#00C000# to 16#00C007# =>
 								-- UART

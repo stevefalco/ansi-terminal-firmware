@@ -3,9 +3,9 @@ ENTRY(_start)
 __DYNAMIC = 0;
 
 MEMORY {
-	init : ORIGIN = 0x0, LENGTH = 0x40
-	pmem : ORIGIN = 0x00000040, LENGTH = 0x8000
-	dmem : ORIGIN = 0x00008000, LENGTH = 0x8000
+	init : ORIGIN = 0x00000000, LENGTH = 0x00000040
+	pmem : ORIGIN = 0x00000040, LENGTH = 0x00008000
+	dmem : ORIGIN = 0x00008000, LENGTH = 0x00008000
 }
 
 SECTIONS {
@@ -24,7 +24,7 @@ SECTIONS {
 		*(.rodata .rodata.* .gnu.linkonce.r.*)
 		*(.rodata1)
 		_erodata = .;
-	} > dmem
+	} > pmem
 
 	.data :
 	{

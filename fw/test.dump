@@ -9,23 +9,68 @@ Disassembly of section .init:
    4:	0000 0008      	orib #8,%d0
 
 00000008 <_start>:
-   8:	303c 1234      	movew #4660,%d0
-   c:	31c0 4000      	movew %d0,4000 <_etext+0x3fc0>
-  10:	323c abcd      	movew #-21555,%d1
-  14:	11c1 4000      	moveb %d1,4000 <_etext+0x3fc0>
-  18:	3438 4000      	movew 4000 <_etext+0x3fc0>,%d2
-  1c:	11c1 4001      	moveb %d1,4001 <_etext+0x3fc1>
-  20:	3438 4000      	movew 4000 <_etext+0x3fc0>,%d2
+   8:	6000 0036      	braw 40 <_ftext>
 
-00000024 <next>:
-  24:	5240           	addqw #1,%d0
-  26:	33c0 0000 c040 	movew %d0,c040 <_ebss+0x4040>
-  2c:	343c 000f      	movew #15,%d2
+Disassembly of section .text:
 
-00000030 <wait_more>:
-  30:	323c 7fff      	movew #32767,%d1
+00000040 <_ftext>:
+  40:	343c 0018      	movew #24,%d2
+  44:	163c 0041      	moveb #65,%d3
+  48:	207c 0000 4000 	moveal #16384,%a0
 
-00000034 <wait>:
-  34:	5bc9 fffe      	dbmi %d1,34 <wait>
-  38:	5bca fff6      	dbmi %d2,30 <wait_more>
-  3c:	60e6           	bras 24 <next>
+0000004e <more>:
+  4e:	323c 0050      	movew #80,%d1
+  52:	1003           	moveb %d3,%d0
+  54:	5203           	addqb #1,%d3
+
+00000056 <cagain>:
+  56:	1080           	moveb %d0,%a0@
+  58:	5200           	addqb #1,%d0
+  5a:	5288           	addql #1,%a0
+  5c:	51c9 fff8      	dbf %d1,56 <cagain>
+  60:	51ca ffec      	dbf %d2,4e <more>
+
+00000064 <top>:
+  64:	207c 0000 4000 	moveal #16384,%a0
+  6a:	227c 0000 8000 	moveal #32768,%a1
+  70:	323c 0780      	movew #1920,%d1
+
+00000074 <again>:
+  74:	1290           	moveb %a0@,%a1@
+  76:	5288           	addql #1,%a0
+  78:	5289           	addql #1,%a1
+  7a:	51c9 fff8      	dbf %d1,74 <again>
+  7e:	3a3c 000f      	movew #15,%d5
+
+00000082 <w1a>:
+  82:	383c ffff      	movew #-1,%d4
+
+00000086 <w1>:
+  86:	4e71           	nop
+  88:	4e71           	nop
+  8a:	4e71           	nop
+  8c:	4e71           	nop
+  8e:	51cc fff6      	dbf %d4,86 <w1>
+  92:	51cd ffee      	dbf %d5,82 <w1a>
+  96:	207c 0000 4000 	moveal #16384,%a0
+  9c:	227c 0000 8780 	moveal #34688,%a1
+  a2:	323c 0780      	movew #1920,%d1
+
+000000a6 <bagain>:
+  a6:	1290           	moveb %a0@,%a1@
+  a8:	5288           	addql #1,%a0
+  aa:	5389           	subql #1,%a1
+  ac:	51c9 fff8      	dbf %d1,a6 <bagain>
+  b0:	3a3c 000f      	movew #15,%d5
+
+000000b4 <w2a>:
+  b4:	383c ffff      	movew #-1,%d4
+
+000000b8 <w2>:
+  b8:	4e71           	nop
+  ba:	4e71           	nop
+  bc:	4e71           	nop
+  be:	4e71           	nop
+  c0:	51cc fff6      	dbf %d4,b8 <w2>
+  c4:	51cd ffee      	dbf %d5,b4 <w2a>
+  c8:	609a           	bras 64 <top>
