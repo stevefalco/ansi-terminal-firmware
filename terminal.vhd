@@ -313,6 +313,8 @@ architecture a of terminal is
 
 	signal cpuInt			: std_logic_vector (2 downto 0) := (others => '0');	-- Interrupt level
 
+	signal LDSn			: std_logic;
+	signal UDSn			: std_logic;
 	signal cpuByteEnables		: std_logic_vector (1 downto 0);
 
 	signal cpuRomQ			: std_logic_vector (15 downto 0);
@@ -474,8 +476,8 @@ begin
 
 			eRWn => eRWn,
 			ASn => ASn,
-			LDSn => cpuByteEnables(0),
-			UDSn => cpuByteEnables(1),
+			LDSn => LDSn,
+			UDSn => UDSn,
 			E => E,
 			VMAn => VMAn,
 	
@@ -499,6 +501,8 @@ begin
 			oEdb => oEdb,
 			eab => eab(23 downto 1)
 		);
+
+	cpuByteEnables <= not (UDSn & LDSn);
 
 	-- CPU ROM
 	cpuRom: cpu_rom

@@ -1,0 +1,56 @@
+
+Memory Configuration
+
+Name             Origin             Length             Attributes
+init             0x0000000000000000 0x0000000000000040
+pmem             0x0000000000000040 0x0000000000008000
+dmem             0x0000000000008000 0x0000000000008000
+*default*        0x0000000000000000 0xffffffffffffffff
+
+Linker script and memory map
+
+                0x0000000000000000                __DYNAMIC = 0x0
+
+.init           0x0000000000000000       0x3e
+ *(.init)
+ .init          0x0000000000000000       0x3e /tmp/cca55TYn.o
+                0x0000000000000008                _start
+
+.text           0x0000000000000040        0x0
+                0x0000000000000040                _ftext = .
+ *(.text .stub .text.* .gnu.linkonce.t.*)
+ .text          0x0000000000000040        0x0 /tmp/cca55TYn.o
+                0x0000000000000040                _etext = .
+
+.rodata         0x0000000000008000        0x0
+                0x0000000000008000                . = ALIGN (0x4)
+                0x0000000000008000                _frodata = .
+ *(.rodata .rodata.* .gnu.linkonce.r.*)
+ *(.rodata1)
+                0x0000000000008000                _erodata = .
+
+.data           0x0000000000008000        0x0
+                0x0000000000008000                . = ALIGN (0x4)
+                0x0000000000008000                _fdata = .
+ *(.data .data.* .gnu.linkonce.d.*)
+ .data          0x0000000000008000        0x0 /tmp/cca55TYn.o
+ *(.data1)
+                0x0000000000008000                _gp = ALIGN (0x10)
+ *(.sdata .sdata.* .gnu.linkonce.s.*)
+                0x0000000000008000                _edata = .
+
+.bss            0x0000000000008000        0x0
+                0x0000000000008000                . = ALIGN (0x4)
+                0x0000000000008000                _fbss = .
+ *(.dynsbss)
+ *(.sbss .sbss.* .gnu.linkonce.sb.*)
+ *(.scommon)
+ *(.dynbss)
+ *(.bss .bss.* .gnu.linkonce.b.*)
+ .bss           0x0000000000008000        0x0 /tmp/cca55TYn.o
+ *(COMMON)
+                0x0000000000008000                . = ALIGN (0x4)
+                0x0000000000008000                _ebss = .
+                0x0000000000008000                _end = .
+LOAD /tmp/cca55TYn.o
+OUTPUT(test elf32-m68k)

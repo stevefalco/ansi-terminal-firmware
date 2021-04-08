@@ -67,22 +67,36 @@ architecture a of cpu_bus is
 	signal cpuKbCS_D0	: std_logic;
 	signal cpuKbCS_D1	: std_logic;
 
+	type bus_FSM_type is (
+		busIdle_state,
+		busActive_state,
+		busComplete_state
+	);
+
+	signal busFSM		: bus_FSM_type := busIdle_state;
+
 begin
 	cpu_bus_process: process(cpuClock)
 	begin
 		if rising_edge(cpuClock) then
-			if(cpuClear = '1') then
-				cpuRamWren <= '0';
-				videoRamWren <= '0';
-				cpuUartCS_D0 <= '0';
-				cpuUartWR <= '0';
-				cpuKbCS_D0 <= '0';
-				cpuControlWR <= '0';
-				cpuLEDsWR <= '0';
-				cpuDataIn <= (others => '0');
-				cpuDTACKn <= '1';
-			else
-				if(cpuASn = '0') then
+			case busFSM is
+
+				when busIdle_state =>
+					cpuRamWren <= '0';
+					videoRamWren <= '0';
+					cpuUartCS_D0 <= '0';
+					cpuUartWR <= '0';
+					cpuKbCS_D0 <= '0';
+					cpuControlWR <= '0';
+					cpuLEDsWR <= '0';
+					cpuDataIn <= (others => '0');
+					cpuDTACKn <= '1';
+
+					if(cpuASn = '0' and cpuByteEnables /= "00") then
+						busFSM <= busActive_state;
+					end if;
+
+				when busActive_state =>
 					case to_integer(unsigned(cpuAddr(23 downto 0))) is
 
 						when 16#000000# to 16#001FFF# =>
@@ -99,6 +113,7 @@ begin
 							elsif(cpuRWn = '0') then
 								cpuRamWren <= '1';
 							end if;
+							cpuDTACKn <= '0';
 
 						when 16#008000# to 16#00BFFF# =>
 							-- Video RAM
@@ -148,15 +163,26 @@ begin
 						when others =>
 							null;
 					end case;
-				end if;
-			end if;
-		end if;
+					busFSM <= busComplete_state;
 
-		-- When the CPU releases Data Strobe we release dtack.
-		-- (No real need to do this, provided everything responds
-		-- in a single cycle.  DTACK Grounded!)
-		if cpuByteEnables = "11" then
-			cpuDTACKn <='1';
+				when busComplete_state =>
+					cpuRamWren <= '0';
+					videoRamWren <= '0';
+					cpuUartCS_D0 <= '0';
+					cpuUartWR <= '0';
+					cpuKbCS_D0 <= '0';
+					cpuControlWR <= '0';
+					cpuLEDsWR <= '0';
+
+					if(cpuASn = '1') then
+						busFSM <= busIdle_state;
+						cpuDTACKn <= '1';
+					end if;
+
+				when others =>
+					null;
+
+			end case;
 		end if;
 	end process;
 

@@ -1,13 +1,44 @@
--- test.srec
---
--- Generated automatically by srec_cat -o --mif
---
-DEPTH = 19;
-WIDTH = 16;
-ADDRESS_RADIX = HEX;
-DATA_RADIX = HEX;
+-- begin_signature
+-- test.bin
+-- end_signature
+
+WIDTH=16;
+DEPTH=31;
+
+ADDRESS_RADIX=UNS;
+DATA_RADIX=HEX;
+
 CONTENT BEGIN
-0000: 0000 0000 0000 0008 303C 0000 5240 33C0 0000 C040 343C 000F 323C 7FFF;
-000E: 5BC9 FFFE 5BCA FFF6 60E6;
--- start address = 0008
-END;
+       0 : 0000;
+       1 : 0000;
+       2 : 0000;
+       3 : 0008;
+       4 : 303c;
+       5 : 1234;
+       6 : 31c0;
+       7 : 4000;
+       8 : 323c;
+       9 : abcd;
+      10 : 11c1;
+      11 : 4000;
+      12 : 3438;
+      13 : 4000;
+      14 : 11c1;
+      15 : 4001;
+      16 : 3438;
+      17 : 4000;
+      18 : 5240;
+      19 : 33c0;
+      20 : 0000;
+      21 : c040;
+      22 : 343c;
+      23 : 000f;
+      24 : 323c;
+      25 : 7fff;
+      26 : 5bc9;
+      27 : fffe;
+      28 : 5bca;
+      29 : fff6;
+      30 : 60e6;
+
+END

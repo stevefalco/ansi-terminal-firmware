@@ -9,17 +9,23 @@ Disassembly of section .init:
    4:	0000 0008      	orib #8,%d0
 
 00000008 <_start>:
-   8:	303c 0000      	movew #0,%d0
+   8:	303c 1234      	movew #4660,%d0
+   c:	31c0 4000      	movew %d0,4000 <_etext+0x3fc0>
+  10:	323c abcd      	movew #-21555,%d1
+  14:	11c1 4000      	moveb %d1,4000 <_etext+0x3fc0>
+  18:	3438 4000      	movew 4000 <_etext+0x3fc0>,%d2
+  1c:	11c1 4001      	moveb %d1,4001 <_etext+0x3fc1>
+  20:	3438 4000      	movew 4000 <_etext+0x3fc0>,%d2
 
-0000000c <next>:
-   c:	5240           	addqw #1,%d0
-   e:	33c0 0000 c040 	movew %d0,c040 <_ebss+0x4040>
-  14:	343c 000f      	movew #15,%d2
+00000024 <next>:
+  24:	5240           	addqw #1,%d0
+  26:	33c0 0000 c040 	movew %d0,c040 <_ebss+0x4040>
+  2c:	343c 000f      	movew #15,%d2
 
-00000018 <wait_more>:
-  18:	323c 7fff      	movew #32767,%d1
+00000030 <wait_more>:
+  30:	323c 7fff      	movew #32767,%d1
 
-0000001c <wait>:
-  1c:	5bc9 fffe      	dbmi %d1,1c <wait>
-  20:	5bca fff6      	dbmi %d2,18 <wait_more>
-  24:	60e6           	bras c <next>
+00000034 <wait>:
+  34:	5bc9 fffe      	dbmi %d1,34 <wait>
+  38:	5bca fff6      	dbmi %d2,30 <wait_more>
+  3c:	60e6           	bras 24 <next>

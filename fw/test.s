@@ -5,11 +5,19 @@
 	dc.l	0	| Initial Stack Pointer
 	dc.l	8	| Initial Program Counter
 _start:			| first instruction of program
-	mov.w	#0, %d0
+	mov.w	#0x1234, %d0
+	mov.w	%d0, 0x004000
+
+	mov.w	#0xabcd, %d1
+	mov.b	%d1, 0x004000
+	mov.w	0x004000, %d2
+
+	mov.b	%d1, 0x004001
+	mov.w	0x004000, %d2
 
 next:
 	addq.w	#1, %d0
-	move.w	%d0, 0x00c040
+	mov.w	%d0, 0x00c040
 
 	| Outer loop
 	mov.w	#0xf, %d2

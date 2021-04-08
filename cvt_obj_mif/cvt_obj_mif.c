@@ -15,19 +15,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-char *
-htob(uint32_t v)
-{
-	int i;
-	static char b[32];
-
-	for(i = 0; i < 8; i++) {
-		b[i] = ((v >> (7 - i)) & 1) ? '1' : '0';
-	}
-
-	return b;
-}
-
 int
 main(int argc, char *argv[])
 {
@@ -43,7 +30,7 @@ main(int argc, char *argv[])
 
 	int i;
 
-	uint8_t in;
+	uint8_t in[2];
 
 	while((opt = getopt(argc, argv, "i:o:")) != -1) {
 		switch(opt) {
@@ -85,21 +72,21 @@ main(int argc, char *argv[])
 	fprintf(pOut, "-- %s\n", pInFile);
 	fprintf(pOut, "-- end_signature\n");
 	fprintf(pOut, "\n");
-	fprintf(pOut, "WIDTH=8;\n");
-	fprintf(pOut, "DEPTH=%d;\n", statbuf.st_size);
+	fprintf(pOut, "WIDTH=16;\n");
+	fprintf(pOut, "DEPTH=%d;\n", (statbuf.st_size / 2));
 	fprintf(pOut, "\n");
 	fprintf(pOut, "ADDRESS_RADIX=UNS;\n");
-	fprintf(pOut, "DATA_RADIX=BIN;\n");
+	fprintf(pOut, "DATA_RADIX=HEX;\n");
 	fprintf(pOut, "\n");
 	fprintf(pOut, "CONTENT BEGIN\n");
 
-	for(i = 0; i < statbuf.st_size; i++) {
-		if(read(ifd, &in, 1) != 1) {
-			fprintf(stderr, "Cannot read %s at byte %d\n", pInFile, i);
+	for(i = 0; i < (statbuf.st_size / 2); i++) {
+		if(read(ifd, &in, 2) != 2) {
+			fprintf(stderr, "Cannot read %s at word %d\n", pInFile, i);
 			exit(1);
 		}
 
-		fprintf(pOut, "%8d : %s; -- %02x\n", i, htob(in), in);
+		fprintf(pOut, "%8d : %02x%02x;\n", i, in[0], in[1]);
 	}
 
 	// Write trailer.

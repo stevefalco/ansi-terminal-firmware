@@ -1,10 +1,10 @@
 all: ../cpu_rom.mif test.dump
 
-../cpu_rom.mif: test.srec
-	srec_cat $< -Output $@ -Memory_Initialization_File 16
+../cpu_rom.mif: test.bin
+	../cvt_obj_mif/cvt_obj_mif -i $< -o $@
 
-test.srec: test
-	m68k-linux-gnu-objcopy -O srec $< $@
+test.bin: test
+	m68k-linux-gnu-objcopy -O binary $< $@
 
 test.dump: test
 	m68k-linux-gnu-objdump -d $< > $@
