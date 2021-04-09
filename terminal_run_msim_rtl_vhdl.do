@@ -18,8 +18,14 @@ configure wave -timelineunits ns
 
 delete wave *
 
-add wave /testbench/term/cpuRam/*
-add wave /testbench/term/frameRam/*
+add wave /testbench/term/junk
+add wave /testbench/term/iEdb
+add wave /testbench/term/oEdb
+add wave /testbench/term/ASn
+add wave /testbench/term/eRWn
+add wave /testbench/term/cpuByteEnables
+
+
 add wave -r /testbench/term/cpuBus/*
 add wave -r /testbench/term/*
 

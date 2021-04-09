@@ -4,77 +4,126 @@ test:     file format elf32-m68k
 
 Disassembly of section .init:
 
-00000000 <_start-0x8>:
-   0:	0000 0000      	orib #0,%d0
-   4:	0000 0008      	orib #8,%d0
-
-00000008 <_start>:
-   8:	6000 0036      	braw 40 <_ftext>
+00000000 <.init>:
+   0:	0000 8000      	orib #0,%d0
+   4:	0000 0100      	orib #0,%d0
+	...
+  60:	0000 01d2      	orib #-46,%d0
+  64:	0000 01d2      	orib #-46,%d0
+  68:	0000 01d2      	orib #-46,%d0
+  6c:	0000 01d2      	orib #-46,%d0
+  70:	0000 01d2      	orib #-46,%d0
+  74:	0000 01d2      	orib #-46,%d0
+  78:	0000 01d2      	orib #-46,%d0
+  7c:	0000 01d2      	orib #-46,%d0
 
 Disassembly of section .text:
 
-00000040 <_ftext>:
-  40:	1c3c 0001      	moveb #1,%d6
-  44:	13c6 0000 c060 	moveb %d6,c060 <_ebss+0x4060>
-  4a:	343c 0017      	movew #23,%d2
-  4e:	207c 0000 4000 	moveal #16384,%a0
+00000100 <_start>:
+ 100:	207c 0000 021a 	moveal #538,%a0
+ 106:	227c 0000 4004 	moveal #16388,%a1
+ 10c:	203c 0000 4008 	movel #16392,%d0
+ 112:	9089           	subl %a1,%d0
 
-00000054 <nextLine>:
-  54:	323c 0007      	movew #7,%d1
+00000114 <initData>:
+ 114:	12d8           	moveb %a0@+,%a1@+
+ 116:	51c8 fffc      	dbf %d0,114 <initData>
+ 11a:	207c 0000 4000 	moveal #16384,%a0
+ 120:	203c 0000 4004 	movel #16388,%d0
+ 126:	9088           	subl %a0,%d0
 
-00000058 <next10>:
-  58:	303c 0009      	movew #9,%d0
-  5c:	163c 0030      	moveb #48,%d3
+00000128 <initBSS>:
+ 128:	10fc 0000      	moveb #0,%a0@+
+ 12c:	51c8 fffa      	dbf %d0,128 <initBSS>
+ 130:	6000 0002      	braw 134 <main>
 
-00000060 <next1>:
-  60:	1083           	moveb %d3,%a0@
-  62:	5203           	addqb #1,%d3
-  64:	5288           	addql #1,%a0
-  66:	51c8 fff8      	dbf %d0,60 <next1>
-  6a:	51c9 ffec      	dbf %d1,58 <next10>
-  6e:	51ca ffe4      	dbf %d2,54 <nextLine>
+00000134 <main>:
+ 134:	4eb9 0000 01e2 	jsr 1e2 <mains>
+ 13a:	1c3c 0001      	moveb #1,%d6
+ 13e:	13c6 0000 c060 	moveb %d6,c060 <_edata+0x8058>
+ 144:	343c 0017      	movew #23,%d2
+ 148:	207c 0000 4000 	moveal #16384,%a0
 
-00000072 <top>:
-  72:	207c 0000 4000 	moveal #16384,%a0
-  78:	227c 0000 8001 	moveal #32769,%a1
-  7e:	323c 077f      	movew #1919,%d1
+0000014e <nextLine>:
+ 14e:	323c 0007      	movew #7,%d1
 
-00000082 <again>:
-  82:	1290           	moveb %a0@,%a1@
-  84:	5288           	addql #1,%a0
-  86:	5489           	addql #2,%a1
-  88:	51c9 fff8      	dbf %d1,82 <again>
-  8c:	3a3c 000f      	movew #15,%d5
+00000152 <next10>:
+ 152:	303c 0009      	movew #9,%d0
+ 156:	163c 0030      	moveb #48,%d3
 
-00000090 <w1a>:
-  90:	383c ffff      	movew #-1,%d4
+0000015a <next1>:
+ 15a:	1083           	moveb %d3,%a0@
+ 15c:	5203           	addqb #1,%d3
+ 15e:	5288           	addql #1,%a0
+ 160:	51c8 fff8      	dbf %d0,15a <next1>
+ 164:	51c9 ffec      	dbf %d1,152 <next10>
+ 168:	51ca ffe4      	dbf %d2,14e <nextLine>
 
-00000094 <w1>:
-  94:	4e71           	nop
-  96:	4e71           	nop
-  98:	4e71           	nop
-  9a:	4e71           	nop
-  9c:	51cc fff6      	dbf %d4,94 <w1>
-  a0:	51cd ffee      	dbf %d5,90 <w1a>
-  a4:	207c 0000 4000 	moveal #16384,%a0
-  aa:	227c 0000 8eff 	moveal #36607,%a1
-  b0:	323c 077f      	movew #1919,%d1
+0000016c <top>:
+ 16c:	207c 0000 4000 	moveal #16384,%a0
+ 172:	227c 0000 8001 	moveal #32769,%a1
+ 178:	323c 077f      	movew #1919,%d1
 
-000000b4 <bagain>:
-  b4:	1290           	moveb %a0@,%a1@
-  b6:	5288           	addql #1,%a0
-  b8:	5589           	subql #2,%a1
-  ba:	51c9 fff8      	dbf %d1,b4 <bagain>
-  be:	3a3c 000f      	movew #15,%d5
+0000017c <again>:
+ 17c:	1290           	moveb %a0@,%a1@
+ 17e:	5288           	addql #1,%a0
+ 180:	5489           	addql #2,%a1
+ 182:	51c9 fff8      	dbf %d1,17c <again>
+ 186:	3a3c 000f      	movew #15,%d5
 
-000000c2 <w2a>:
-  c2:	383c ffff      	movew #-1,%d4
+0000018a <w1a>:
+ 18a:	383c ffff      	movew #-1,%d4
 
-000000c6 <w2>:
-  c6:	4e71           	nop
-  c8:	4e71           	nop
-  ca:	4e71           	nop
-  cc:	4e71           	nop
-  ce:	51cc fff6      	dbf %d4,c6 <w2>
-  d2:	51cd ffee      	dbf %d5,c2 <w2a>
-  d6:	609a           	bras 72 <top>
+0000018e <w1>:
+ 18e:	4e71           	nop
+ 190:	4e71           	nop
+ 192:	4e71           	nop
+ 194:	4e71           	nop
+ 196:	51cc fff6      	dbf %d4,18e <w1>
+ 19a:	51cd ffee      	dbf %d5,18a <w1a>
+ 19e:	207c 0000 4000 	moveal #16384,%a0
+ 1a4:	227c 0000 8eff 	moveal #36607,%a1
+ 1aa:	323c 077f      	movew #1919,%d1
+
+000001ae <bagain>:
+ 1ae:	1290           	moveb %a0@,%a1@
+ 1b0:	5288           	addql #1,%a0
+ 1b2:	5589           	subql #2,%a1
+ 1b4:	51c9 fff8      	dbf %d1,1ae <bagain>
+ 1b8:	3a3c 000f      	movew #15,%d5
+
+000001bc <w2a>:
+ 1bc:	383c ffff      	movew #-1,%d4
+
+000001c0 <w2>:
+ 1c0:	4e71           	nop
+ 1c2:	4e71           	nop
+ 1c4:	4e71           	nop
+ 1c6:	4e71           	nop
+ 1c8:	51cc fff6      	dbf %d4,1c0 <w2>
+ 1cc:	51cd ffee      	dbf %d5,1bc <w2a>
+ 1d0:	609a           	bras 16c <top>
+
+000001d2 <_level1>:
+ 1d2:	6098           	bras 16c <top>
+
+000001d4 <goo>:
+ 1d4:	4e56 0000      	linkw %fp,#0
+ 1d8:	2039 0000 4004 	movel 4004 <yy>,%d0
+ 1de:	4e5e           	unlk %fp
+ 1e0:	4e75           	rts
+
+000001e2 <mains>:
+ 1e2:	4e56 fffc      	linkw %fp,#-4
+ 1e6:	2d7c 0000 01c8 	movel #456,%fp@(-4)
+ 1ec:	fffc 
+ 1ee:	700a           	moveq #10,%d0
+ 1f0:	23c0 0000 4000 	movel %d0,4000 <xx>
+ 1f6:	2039 0000 4000 	movel 4000 <xx>,%d0
+ 1fc:	90ae fffc      	subl %fp@(-4),%d0
+ 200:	23c0 0000 4000 	movel %d0,4000 <xx>
+ 206:	4eb9 0000 01d4 	jsr 1d4 <goo>
+ 20c:	2039 0000 4000 	movel 4000 <xx>,%d0
+ 212:	d0ae fffc      	addl %fp@(-4),%d0
+ 216:	4e5e           	unlk %fp
+ 218:	4e75           	rts

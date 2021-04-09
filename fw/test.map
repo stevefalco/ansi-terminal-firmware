@@ -1,56 +1,59 @@
 
+Discarded input sections
+
+ .comment       0x0000000000000000       0x35 foo.o
+
 Memory Configuration
 
 Name             Origin             Length             Attributes
-init             0x0000000000000000 0x0000000000000040
-pmem             0x0000000000000040 0x0000000000008000
-dmem             0x0000000000008000 0x0000000000008000
+init             0x0000000000000000 0x0000000000000100 xr
+rom              0x0000000000000100 0x0000000000003f00 xr
+ram              0x0000000000004000 0x0000000000004000 !xr
 *default*        0x0000000000000000 0xffffffffffffffff
 
 Linker script and memory map
 
                 0x0000000000000000                __DYNAMIC = 0x0
 
-.init           0x0000000000000000        0xc
+.init           0x0000000000000000       0x80
  *(.init)
- .init          0x0000000000000000        0xc /tmp/cc2kokiw.o
-                0x0000000000000008                _start
+ .init          0x0000000000000000       0x80 test.o
 
-.text           0x0000000000000040       0x98
-                0x0000000000000040                _ftext = .
- *(.text .stub .text.* .gnu.linkonce.t.*)
- .text          0x0000000000000040       0x98 /tmp/cc2kokiw.o
-                0x00000000000000d8                _etext = .
+.text           0x0000000000000100      0x11a
+ *(.text*)
+ .text          0x0000000000000100       0xd4 test.o
+                0x0000000000000100                _start
+ .text          0x00000000000001d4       0x46 foo.o
+                0x00000000000001d4                goo
+                0x00000000000001e2                mains
+                0x000000000000021a                _etext = .
 
-.rodata         0x00000000000000d8        0x0
-                0x00000000000000d8                . = ALIGN (0x4)
-                0x00000000000000d8                _frodata = .
- *(.rodata .rodata.* .gnu.linkonce.r.*)
- *(.rodata1)
-                0x00000000000000d8                _erodata = .
-
-.data           0x0000000000008000        0x0
-                0x0000000000008000                . = ALIGN (0x4)
-                0x0000000000008000                _fdata = .
- *(.data .data.* .gnu.linkonce.d.*)
- .data          0x0000000000008000        0x0 /tmp/cc2kokiw.o
- *(.data1)
-                0x0000000000008000                _gp = ALIGN (0x10)
- *(.sdata .sdata.* .gnu.linkonce.s.*)
-                0x0000000000008000                _edata = .
-
-.bss            0x0000000000008000        0x0
-                0x0000000000008000                . = ALIGN (0x4)
-                0x0000000000008000                _fbss = .
- *(.dynsbss)
- *(.sbss .sbss.* .gnu.linkonce.sb.*)
- *(.scommon)
- *(.dynbss)
- *(.bss .bss.* .gnu.linkonce.b.*)
- .bss           0x0000000000008000        0x0 /tmp/cc2kokiw.o
+.bss            0x0000000000004000        0x4
+                0x0000000000004000                _sbss = .
+ *(.bss*)
+ .bss           0x0000000000004000        0x0 test.o
+ .bss           0x0000000000004000        0x4 foo.o
+                0x0000000000004000                xx
  *(COMMON)
-                0x0000000000008000                . = ALIGN (0x4)
-                0x0000000000008000                _ebss = .
-                0x0000000000008000                _end = .
-LOAD /tmp/cc2kokiw.o
+                0x0000000000004004                _ebss = .
+
+.data           0x0000000000004004        0x4 load address 0x000000000000021a
+                0x0000000000004004                . = ALIGN (0x4)
+                0x0000000000004004                _sdata = .
+ *(.data*)
+ .data          0x0000000000004004        0x0 test.o
+ .data          0x0000000000004004        0x4 foo.o
+                0x0000000000004004                yy
+                0x0000000000004008                . = ALIGN (0x4)
+                0x0000000000004008                _edata = .
+
+/DISCARD/
+ *(.comment)
+LOAD test.o
+LOAD foo.o
 OUTPUT(test elf32-m68k)
+
+.note.GNU-stack
+                0x0000000000000000        0x0
+ .note.GNU-stack
+                0x0000000000000000        0x0 foo.o

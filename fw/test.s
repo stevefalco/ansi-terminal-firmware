@@ -2,15 +2,49 @@
 	.align	2
 	.globl	_start
 
-	dc.l	0	| Initial Stack Pointer
-	dc.l	8	| Initial Program Counter
-_start:			| first instruction of program
-	bra	main
+	. = 0x000	| Reset vector
+	dc.l	0x8000	| Initial Stack Pointer (%a7)
+	dc.l	_start	| Initial Program Counter
+	
+	. = 0x060	| Start of interrupt vectors
+	dc.l	_spurious
+	dc.l	_level1
+	dc.l	_level2
+	dc.l	_level3
+	dc.l	_level4
+	dc.l	_level5
+	dc.l	_level6
+	dc.l	_level7
 
 	.section .text
 	.align	2
 
+_start:			| first instruction of program
+
+			| %a7 = sp
+			| %a6 = fp
+
+	mov.l	#_etext, %a0		| Initial values for data section
+	mov.l	#_sdata, %a1		| Start of data section
+	mov.l	#_edata, %d0		| End of data section
+	sub.l	%a1, %d0		| How many bytes to copy
+initData:
+	mov.b	(%a0)+, (%a1)+		| Copy one byte
+	dbf	%d0, initData		| Do them all
+
+	mov.l	#_sbss, %a0		| Start of BSS
+	mov.l	#_ebss, %d0		| End of BSS
+	sub.l	%a0, %d0		| How many bytes to zero
+initBSS:
+	mov.b	#0, (%a0)+		| Zero one byte
+	dbf	%d0, initBSS		| Do them all
+
+	bra	main
+
 main:
+
+	jsr	mains
+
 	mov.b	#1, %d6
 	mov.b	%d6, 0xc060		| Enable video sync
 
@@ -87,4 +121,14 @@ w2:
 	dbf	%d4, w2
 	dbf	%d5, w2a
 
+	bra.s	top
+
+_spurious:
+_level1:
+_level2:
+_level3:
+_level4:
+_level5:
+_level6:
+_level7:
 	bra.s	top
