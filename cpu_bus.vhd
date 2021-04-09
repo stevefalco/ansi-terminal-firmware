@@ -93,6 +93,10 @@ begin
 
 					if(cpuASn = '0' and cpuByteEnables /= "00") then
 						busFSM <= busActive_state;
+						-- We are faster than the CPU, so we ack the cycle
+						-- immediately.  I might even nail the dtack to 0.
+						-- We'll see...
+						cpuDTACKn <= '0';
 
 						-- Address bus is (23 downto 1), so all addresse
 						-- constants here are divided by 2.
@@ -104,68 +108,69 @@ begin
 						case to_integer(unsigned(cpuAddr)) is
 
 							when 16#000000# to 16#001FFF# =>
-								-- CPU ROM
+								-- CPU ROM @ 0x0000 to 0x3fff
 								-- 8192 16-bit words
 								if(cpuRWn = '1') then
 									cpuDataIn <= cpuRomQ;
 								end if;
-								cpuDTACKn <= '0';
 
 							when 16#002000# to 16#003FFF# =>
-								-- CPU RAM
+								-- CPU RAM @ 0x4000 to 0x7fff
 								-- 8192 16-bit words
 								if(cpuRWn = '1') then
 									cpuDataIn <= cpuRamQ;
 								elsif(cpuRWn = '0') then
 									cpuRamWren <= '1';
 								end if;
-								cpuDTACKn <= '0';
 
 							when 16#004000# to 16#00477F# =>
-								-- Video RAM
-								-- 1920 8-bit bytes
+								-- Video RAM @ 0x8000 to 0x8eff
+								-- 1920 16-bit words
 								if(cpuRWn = '1') then
 									cpuDataIn <= videoRamQ;
 								elsif(cpuRWn = '0') then
 									videoRamWren <= '1';
 								end if;
-								cpuDTACKn <= '0';
 
 							when 16#006000# to 16#006007# =>
-								-- UART
+								-- UART @ 0xc000 to 0xc00f
+								-- 8 bytes, even addresses only
 								if(cpuRWn = '1') then
 									cpuUartCS_D0 <= '1';
 									cpuUartWR <= '0';
-									cpuDataIn(7 downto 0) <= cpuUartQ;
+									cpuDataIn(15 downto 8) <= cpuUartQ;
 								elsif(cpuRWn = '0') then
 									cpuUartCS_D0 <= '1';
 									cpuUartWR <= '1';
 								end if;
 
 							when 16#006010# =>
-								-- DIP Switches
+								-- DIP Switches @ 0xc020
+								-- 1 byte
 								if(cpuRWn = '1') then
-									cpuDataIn(7 downto 0) <= cpuDipQ;
+									cpuDataIn(15 downto 8) <= cpuDipQ;
 								end if;
 
 							when 16#006020# to 16#006027# =>
-								-- Keyboard
+								-- Keyboard @ 0xc040 to 0xc04f
+								-- 8 bytes, even addresses only
 								if(cpuRWn = '1') then
 									cpuKbCS_D0 <= '1';
-									cpuDataIn(7 downto 0) <= cpuKbQ;
+									cpuDataIn(15 downto 8) <= cpuKbQ;
 								end if;
 
 							when 16#006030# =>
-								-- Control Register Bits
+								-- Control Register Bits @ 0xc060
+								-- 1 byte
 								if(cpuRWn = '0') then
 									cpuControlWR <= '1';
 								end if;
 
 							when 16#006040# =>
-								-- LED Register Bits
+								-- LED Register Bits @0xc080
+								-- 1 byte
 								if(cpuRWn = '0') then
 									cpuLEDsWR <= '1';
-									cpuDTACKn <= '0';
 								end if;
 
 							when others =>
@@ -221,38 +226,38 @@ begin
 	--
 	-- Thus, the UART will capture the data on Rising Edge #3, and no adjustment
 	-- to UART CS is needed when writing.
-	uartDelay: process(cpuClock)
-	begin
-		if (falling_edge(cpuClock)) then
-			cpuUartCS_D1 <= cpuUartCS_D0;
-		end if;
-	end process;
-	cpuUartCS <= cpuUartCS_D0 and cpuUartCS_D1 when cpuRWn = '1' else cpuUartCS_D0;
-
-	-- Similar to the UART case, we want to assert the KB CS on the second
-	-- cycle.  The keyboard register interface will capture the various
-	-- data, so they will persist until the next "data ready".
-	--
-	-- We don't support writing to the keyboard, although in theory we could.
-	kbDelay: process(cpuClock)
-	begin
-		if (falling_edge(cpuClock)) then
-			cpuKbCS_D1 <= cpuKbCS_D0;
-		end if;
-	end process;
-	cpuKbCS <= cpuKbCS_D0 and cpuKbCS_D1;
-
-	-- We use one interrupt to the CPU, and only two devices that generate
-	-- interrupts.  So, we just let the CPU poll both devices.
-	cpu_int_process: process(all)
-	begin
-		if(cpuUartInt = '1' or cpuKbInt = '1') then
-			cpuInt(0) <= '1';
-		else
-			cpuInt(0) <= '0';
-		end if;
-		-- FIXME
-		cpuInt <= "111";
-	end process;
+--	uartDelay: process(cpuClock)
+--	begin
+--		if (falling_edge(cpuClock)) then
+--			cpuUartCS_D1 <= cpuUartCS_D0;
+--		end if;
+--	end process;
+--	cpuUartCS <= cpuUartCS_D0 and cpuUartCS_D1 when cpuRWn = '1' else cpuUartCS_D0;
+--
+--	-- Similar to the UART case, we want to assert the KB CS on the second
+--	-- cycle.  The keyboard register interface will capture the various
+--	-- data, so they will persist until the next "data ready".
+--	--
+--	-- We don't support writing to the keyboard, although in theory we could.
+--	kbDelay: process(cpuClock)
+--	begin
+--		if (falling_edge(cpuClock)) then
+--			cpuKbCS_D1 <= cpuKbCS_D0;
+--		end if;
+--	end process;
+--	cpuKbCS <= cpuKbCS_D0 and cpuKbCS_D1;
+--
+--	-- We use one interrupt to the CPU, and only two devices that generate
+--	-- interrupts.  So, we just let the CPU poll both devices.
+--	cpu_int_process: process(all)
+--	begin
+--		if(cpuUartInt = '1' or cpuKbInt = '1') then
+--			cpuInt(0) <= '1';
+--		else
+--			cpuInt(0) <= '0';
+--		end if;
+--		-- FIXME
+--		cpuInt <= "111";
+--	end process;
 
 end a;

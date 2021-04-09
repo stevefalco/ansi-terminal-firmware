@@ -11,6 +11,9 @@ _start:			| first instruction of program
 	.align	2
 
 main:
+	mov.b	#1, %d6
+	mov.b	%d6, 0xc060		| Enable video sync
+
 	| Set up to fill cpu ram
 	mov.w	#23, %d2		| Do 24 lines
 	mov.l	#0x4000, %a0		| RAM base address
@@ -30,6 +33,10 @@ next1:
 	dbf	%d2, nextLine
 
 top:
+
+	| mov.b	0xc020, %d6
+	| mov.b	%d6, 0xc080
+
 	| Copy everything to video ram
 	| We start at an odd address since we want to write
 	| the LSB with the character.  Also, we increment

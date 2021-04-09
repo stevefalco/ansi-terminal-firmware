@@ -13,28 +13,27 @@ Linker script and memory map
 
 .init           0x0000000000000000        0xc
  *(.init)
- .init          0x0000000000000000        0xc /tmp/ccFJaAo7.o
+ .init          0x0000000000000000        0xc /tmp/cc2kokiw.o
                 0x0000000000000008                _start
 
-.text           0x0000000000000040       0x8e
+.text           0x0000000000000040       0x98
                 0x0000000000000040                _ftext = .
  *(.text .stub .text.* .gnu.linkonce.t.*)
- .text          0x0000000000000040       0x8e /tmp/ccFJaAo7.o
-                0x00000000000000ce                _etext = .
+ .text          0x0000000000000040       0x98 /tmp/cc2kokiw.o
+                0x00000000000000d8                _etext = .
 
-.rodata         0x00000000000000ce        0x2
-                0x00000000000000d0                . = ALIGN (0x4)
- *fill*         0x00000000000000ce        0x2 
-                0x00000000000000d0                _frodata = .
+.rodata         0x00000000000000d8        0x0
+                0x00000000000000d8                . = ALIGN (0x4)
+                0x00000000000000d8                _frodata = .
  *(.rodata .rodata.* .gnu.linkonce.r.*)
  *(.rodata1)
-                0x00000000000000d0                _erodata = .
+                0x00000000000000d8                _erodata = .
 
 .data           0x0000000000008000        0x0
                 0x0000000000008000                . = ALIGN (0x4)
                 0x0000000000008000                _fdata = .
  *(.data .data.* .gnu.linkonce.d.*)
- .data          0x0000000000008000        0x0 /tmp/ccFJaAo7.o
+ .data          0x0000000000008000        0x0 /tmp/cc2kokiw.o
  *(.data1)
                 0x0000000000008000                _gp = ALIGN (0x10)
  *(.sdata .sdata.* .gnu.linkonce.s.*)
@@ -48,10 +47,10 @@ Linker script and memory map
  *(.scommon)
  *(.dynbss)
  *(.bss .bss.* .gnu.linkonce.b.*)
- .bss           0x0000000000008000        0x0 /tmp/ccFJaAo7.o
+ .bss           0x0000000000008000        0x0 /tmp/cc2kokiw.o
  *(COMMON)
                 0x0000000000008000                . = ALIGN (0x4)
                 0x0000000000008000                _ebss = .
                 0x0000000000008000                _end = .
-LOAD /tmp/ccFJaAo7.o
+LOAD /tmp/cc2kokiw.o
 OUTPUT(test elf32-m68k)

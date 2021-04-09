@@ -577,7 +577,7 @@ begin
 			-- CPU
 			clk => cpuClock,
 			reset => clear,
-			D => oEdb(7 downto 0),
+			D => oEdb(15 downto 8),
 			WR => cpuControlWR,
 
 			-- Control
@@ -591,7 +591,7 @@ begin
 			-- CPU
 			clk => cpuClock,
 			reset => clear,
-			D => oEdb(7 downto 0),
+			D => oEdb(15 downto 8),
 			WR => cpuLEDsWR,
 
 			-- Control
@@ -815,13 +815,13 @@ begin
 			PIXEL_B1 <= pixelBlanked;
 			PIXEL_B2 <= pixelBlanked;
 
-			--if(cpuControlQ(0) = '1') then
+			if(cpuControlQ(0) = '1') then
 				HSYNC <= hSyncD4;
 				VSYNC <= vSyncD4;
-			--else
-			--	HSYNC <= '0';
-			--	VSYNC <= '0';
-			--end if;
+			else
+				HSYNC <= '0';
+				VSYNC <= '0';
+			end if;
 		end if;
 	end process;
 
