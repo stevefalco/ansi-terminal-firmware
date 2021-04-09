@@ -19,7 +19,7 @@ entity cpu_bus is
 		cpuClock	: in std_logic;
 		cpuClear	: in std_logic;
 		cpuByteEnables	: in std_logic_vector (1 downto 0);
-		cpuAddr		: in std_logic_vector (23 downto 0);
+		cpuAddr		: in std_logic_vector (23 downto 1);
 		cpuDataIn	: out std_logic_vector (15 downto 0);
 		cpuRWn		: in std_logic;
 		cpuInt		: out std_logic_vector (2 downto 0);
@@ -94,17 +94,26 @@ begin
 					if(cpuASn = '0' and cpuByteEnables /= "00") then
 						busFSM <= busActive_state;
 
-						case to_integer(unsigned(cpuAddr(23 downto 0))) is
+						-- Address bus is (23 downto 1), so all addresse
+						-- constants here are divided by 2.
+						--
+						-- I could spread things out more, since I have
+						-- plenty of address bits, but the FPGA doesn't
+						-- have much internal memory left, so it wouldn't
+						-- really be useful.
+						case to_integer(unsigned(cpuAddr)) is
 
 							when 16#000000# to 16#001FFF# =>
 								-- CPU ROM
+								-- 8192 16-bit words
 								if(cpuRWn = '1') then
 									cpuDataIn <= cpuRomQ;
 								end if;
 								cpuDTACKn <= '0';
 
-							when 16#004000# to 16#005FFF# =>
+							when 16#002000# to 16#003FFF# =>
 								-- CPU RAM
+								-- 8192 16-bit words
 								if(cpuRWn = '1') then
 									cpuDataIn <= cpuRamQ;
 								elsif(cpuRWn = '0') then
@@ -112,8 +121,9 @@ begin
 								end if;
 								cpuDTACKn <= '0';
 
-							when 16#008000# to 16#00BFFF# =>
+							when 16#004000# to 16#00477F# =>
 								-- Video RAM
+								-- 1920 8-bit bytes
 								if(cpuRWn = '1') then
 									cpuDataIn(7 downto 0) <= videoRamQ;
 								elsif(cpuRWn = '0') then
@@ -121,7 +131,7 @@ begin
 								end if;
 								cpuDTACKn <= '0';
 
-							when 16#00C000# to 16#00C007# =>
+							when 16#006000# to 16#006007# =>
 								-- UART
 								if(cpuRWn = '1') then
 									cpuUartCS_D0 <= '1';
@@ -132,26 +142,26 @@ begin
 									cpuUartWR <= '1';
 								end if;
 
-							when 16#00C010# =>
+							when 16#006010# =>
 								-- DIP Switches
 								if(cpuRWn = '1') then
 									cpuDataIn(7 downto 0) <= cpuDipQ;
 								end if;
 
-							when 16#00C020# to 16#00C027# =>
+							when 16#006020# to 16#006027# =>
 								-- Keyboard
 								if(cpuRWn = '1') then
 									cpuKbCS_D0 <= '1';
 									cpuDataIn(7 downto 0) <= cpuKbQ;
 								end if;
 
-							when 16#00C030# =>
+							when 16#006030# =>
 								-- Control Register Bits
 								if(cpuRWn = '0') then
 									cpuControlWR <= '1';
 								end if;
 
-							when 16#00C040# =>
+							when 16#006040# =>
 								-- LED Register Bits
 								if(cpuRWn = '0') then
 									cpuLEDsWR <= '1';

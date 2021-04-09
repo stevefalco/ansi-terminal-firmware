@@ -172,7 +172,7 @@ architecture a of terminal is
 			cpuClock	: in std_logic;
 			cpuClear	: in std_logic;
 			cpuByteEnables	: in std_logic_vector (1 downto 0);
-			cpuAddr		: in std_logic_vector (23 downto 0);
+			cpuAddr		: in std_logic_vector (23 downto 1);
 			cpuDataIn	: out std_logic_vector (15 downto 0);
 			cpuRWn		: in std_logic;
 			cpuInt		: out std_logic_vector(2 downto 0);
@@ -307,11 +307,9 @@ architecture a of terminal is
 	-- Buses
 	signal iEdb			: std_logic_vector(15 downto 0) := (others => '0');	-- Input data
 	signal oEdb			: std_logic_vector(15 downto 0) := (others => '0');	-- Output data
-	signal eab			: std_logic_vector(23 downto 0) := (others => '0');	-- Address
+	signal eab			: std_logic_vector(23 downto 1) := (others => '0');	-- Address
 
 	-- ----------------------------------------------------------------------------------------------------
-
-	signal byteBus			: std_logic_vector(23 downto 0) := (others => '0');
 
 	signal cpuInt			: std_logic_vector (2 downto 0) := (others => '0');	-- Interrupt level
 
@@ -501,11 +499,10 @@ begin
 
 			iEdb => iEdb,
 			oEdb => oEdb,
-			eab => eab(23 downto 1)
+			eab => eab
 		);
 
 	cpuByteEnables <= not (UDSn & LDSn);
-	byteBus <= eab(23 downto 1) & cpuByteEnables(0);
 
 	-- CPU ROM
 	cpuRom: cpu_rom
@@ -535,7 +532,7 @@ begin
 			rst => clear,
 			CS => cpuUartCS,
 			WR => cpuUartWR,
-			ADD => eab(2 downto 0),
+			ADD => eab(3 downto 1),
 			D => oEdb(7 downto 0),
 			RD => cpuUartQ,
 			IRQ => cpuUartInt,
@@ -562,7 +559,7 @@ begin
 			-- CPU
 			clk => cpuClock,
 			reset => clear,
-			addrIn => eab(2 downto 0),
+			addrIn => eab(3 downto 1),
 			dataOut => cpuKbQ,
 			kbCS => cpuKbCS,
 			irq => cpuKbInt,
@@ -715,7 +712,7 @@ begin
 	frameRam: frame_ram
 		port map (
 			address_a => addressA,
-			address_b => byteBus(10 downto 0),
+			address_b => eab(11 downto 1),
 			clock_a => dotClock,
 			clock_b => cpuClock,
 			data_a => "00000000", -- not used
