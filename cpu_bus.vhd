@@ -35,7 +35,7 @@ entity cpu_bus is
 
 		-- VIDEO RAM Interface
 		videoRamWren	: out std_logic;
-		videoRamQ	: in std_logic_vector (7 downto 0);
+		videoRamQ	: in std_logic_vector (15 downto 0);
 
 		-- UART Interface
 		cpuUartCS	: out std_logic;
@@ -125,7 +125,7 @@ begin
 								-- Video RAM
 								-- 1920 8-bit bytes
 								if(cpuRWn = '1') then
-									cpuDataIn(7 downto 0) <= videoRamQ;
+									cpuDataIn <= videoRamQ;
 								elsif(cpuRWn = '0') then
 									videoRamWren <= '1';
 								end if;

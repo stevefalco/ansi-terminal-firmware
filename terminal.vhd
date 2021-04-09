@@ -86,14 +86,15 @@ architecture a of terminal is
 		port (
 			address_a	: in std_logic_vector (10 downto 0);
 			address_b	: in std_logic_vector (10 downto 0);
+			byteena_b	: in std_logic_vector (1 downto 0);
 			clock_a		: in std_logic;
 			clock_b		: in std_logic;
-			data_a		: in std_logic_vector (7 downto 0);
-			data_b		: in std_logic_vector (7 downto 0);
+			data_a		: in std_logic_vector (15 downto 0);
+			data_b		: in std_logic_vector (15 downto 0);
 			wren_a		: in std_logic;
 			wren_b		: in std_logic;
-			q_a		: out std_logic_vector (7 downto 0);
-			q_b		: out std_logic_vector (7 downto 0)
+			q_a		: out std_logic_vector (15 downto 0);
+			q_b		: out std_logic_vector (15 downto 0)
 		);
 	end component;
 
@@ -188,7 +189,7 @@ architecture a of terminal is
 
 			-- VIDEO RAM Interface
 			videoRamWren	: out std_logic;
-			videoRamQ	: in std_logic_vector (7 downto 0);
+			videoRamQ	: in std_logic_vector (15 downto 0);
 
 			-- UART Interface
 			cpuUartCS	: out std_logic;
@@ -353,13 +354,13 @@ architecture a of terminal is
 	signal addressA			: std_logic_vector (10 downto 0);
 
 	signal videoRamWren		: std_logic;
-	signal videoRamQ		: std_logic_vector (7 downto 0);
+	signal videoRamQ		: std_logic_vector (15 downto 0);
 	
 	signal rowAddressD0		: std_logic_vector (10 downto 0);
 
 	signal lineAddressD0		: std_logic_vector (9 downto 0);
 	signal lineAddressD1		: std_logic_vector (9 downto 0);
-	signal frameChar		: std_logic_vector (7 downto 0);
+	signal frameChar		: std_logic_vector (15 downto 0);
 
 	signal columnAddressD0		: std_logic_vector (10 downto 0);
 	signal columnAddressD1		: std_logic_vector (10 downto 0);
@@ -713,10 +714,11 @@ begin
 		port map (
 			address_a => addressA,
 			address_b => eab(11 downto 1),
+			byteena_b => cpuByteEnables,
 			clock_a => dotClock,
 			clock_b => cpuClock,
-			data_a => "00000000", -- not used
-			data_b => oEdb(7 downto 0),
+			data_a => (others => '0'), -- not used
+			data_b => oEdb(15 downto 0),
 			wren_a => '0', -- not used
 			wren_b => videoRamWren,
 			q_a => frameChar,

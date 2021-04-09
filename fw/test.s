@@ -31,8 +31,11 @@ next1:
 
 top:
 	| Copy everything to video ram
+	| We start at an odd address since we want to write
+	| the LSB with the character.  Also, we increment
+	| by 2, to skip the flag byte.
 	mov.l	#0x4000, %a0		| RAM base address
-	mov.l	#0x8000, %a1		| Frame buffer
+	mov.l	#0x8001, %a1		| Frame buffer
 	mov.w	#((24 * 80) - 1), %d1	| How much to move
 
 again:
@@ -56,7 +59,7 @@ w1:
 
 	| Copy backwards to video ram
 	mov.l	#0x4000, %a0		| RAM base address
-	mov.l	#0x8efe, %a1		| Frame end address
+	mov.l	#0x8eff, %a1		| Frame end address
 	mov.w	#((24 * 80) - 1), %d1	| How much to move
 
 bagain:

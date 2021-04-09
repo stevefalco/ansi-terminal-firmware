@@ -45,30 +45,33 @@ ENTITY frame_ram IS
 	(
 		address_a		: IN STD_LOGIC_VECTOR (10 DOWNTO 0);
 		address_b		: IN STD_LOGIC_VECTOR (10 DOWNTO 0);
+		byteena_b		: IN STD_LOGIC_VECTOR (1 DOWNTO 0) :=  (OTHERS => '1');
 		clock_a		: IN STD_LOGIC  := '1';
 		clock_b		: IN STD_LOGIC ;
-		data_a		: IN STD_LOGIC_VECTOR (7 DOWNTO 0);
-		data_b		: IN STD_LOGIC_VECTOR (7 DOWNTO 0);
+		data_a		: IN STD_LOGIC_VECTOR (15 DOWNTO 0);
+		data_b		: IN STD_LOGIC_VECTOR (15 DOWNTO 0);
 		wren_a		: IN STD_LOGIC  := '0';
 		wren_b		: IN STD_LOGIC  := '0';
-		q_a		: OUT STD_LOGIC_VECTOR (7 DOWNTO 0);
-		q_b		: OUT STD_LOGIC_VECTOR (7 DOWNTO 0)
+		q_a		: OUT STD_LOGIC_VECTOR (15 DOWNTO 0);
+		q_b		: OUT STD_LOGIC_VECTOR (15 DOWNTO 0)
 	);
 END frame_ram;
 
 
 ARCHITECTURE SYN OF frame_ram IS
 
-	SIGNAL sub_wire0	: STD_LOGIC_VECTOR (7 DOWNTO 0);
-	SIGNAL sub_wire1	: STD_LOGIC_VECTOR (7 DOWNTO 0);
+	SIGNAL sub_wire0	: STD_LOGIC_VECTOR (15 DOWNTO 0);
+	SIGNAL sub_wire1	: STD_LOGIC_VECTOR (15 DOWNTO 0);
 
 BEGIN
-	q_a    <= sub_wire0(7 DOWNTO 0);
-	q_b    <= sub_wire1(7 DOWNTO 0);
+	q_a    <= sub_wire0(15 DOWNTO 0);
+	q_b    <= sub_wire1(15 DOWNTO 0);
 
 	altsyncram_component : altsyncram
 	GENERIC MAP (
 		address_reg_b => "CLOCK1",
+		byteena_reg_b => "CLOCK1",
+		byte_size => 8,
 		clock_enable_input_a => "BYPASS",
 		clock_enable_input_b => "BYPASS",
 		clock_enable_output_a => "BYPASS",
@@ -84,19 +87,20 @@ BEGIN
 		outdata_reg_a => "UNREGISTERED",
 		outdata_reg_b => "UNREGISTERED",
 		power_up_uninitialized => "FALSE",
-		read_during_write_mode_port_a => "NEW_DATA_WITH_NBE_READ",
+		read_during_write_mode_port_a => "NEW_DATA_NO_NBE_READ",
 		read_during_write_mode_port_b => "NEW_DATA_WITH_NBE_READ",
 		widthad_a => 11,
 		widthad_b => 11,
-		width_a => 8,
-		width_b => 8,
+		width_a => 16,
+		width_b => 16,
 		width_byteena_a => 1,
-		width_byteena_b => 1,
+		width_byteena_b => 2,
 		wrcontrol_wraddress_reg_b => "CLOCK1"
 	)
 	PORT MAP (
 		address_a => address_a,
 		address_b => address_b,
+		byteena_b => byteena_b,
 		clock0 => clock_a,
 		clock1 => clock_b,
 		data_a => data_a,
@@ -119,7 +123,7 @@ END SYN;
 -- Retrieval info: PRIVATE: BYTEENA_ACLR_A NUMERIC "0"
 -- Retrieval info: PRIVATE: BYTEENA_ACLR_B NUMERIC "0"
 -- Retrieval info: PRIVATE: BYTE_ENABLE_A NUMERIC "0"
--- Retrieval info: PRIVATE: BYTE_ENABLE_B NUMERIC "0"
+-- Retrieval info: PRIVATE: BYTE_ENABLE_B NUMERIC "1"
 -- Retrieval info: PRIVATE: BYTE_SIZE NUMERIC "8"
 -- Retrieval info: PRIVATE: BlankMemory NUMERIC "1"
 -- Retrieval info: PRIVATE: CLOCK_ENABLE_INPUT_A NUMERIC "0"
@@ -144,7 +148,7 @@ END SYN;
 -- Retrieval info: PRIVATE: JTAG_ENABLED NUMERIC "0"
 -- Retrieval info: PRIVATE: JTAG_ID STRING "NONE"
 -- Retrieval info: PRIVATE: MAXIMUM_DEPTH NUMERIC "0"
--- Retrieval info: PRIVATE: MEMSIZE NUMERIC "15360"
+-- Retrieval info: PRIVATE: MEMSIZE NUMERIC "30720"
 -- Retrieval info: PRIVATE: MEM_IN_BITS NUMERIC "0"
 -- Retrieval info: PRIVATE: MIFfilename STRING "frame.mif"
 -- Retrieval info: PRIVATE: OPERATION_MODE NUMERIC "3"
@@ -152,7 +156,7 @@ END SYN;
 -- Retrieval info: PRIVATE: OUTDATA_REG_B NUMERIC "0"
 -- Retrieval info: PRIVATE: RAM_BLOCK_TYPE NUMERIC "0"
 -- Retrieval info: PRIVATE: READ_DURING_WRITE_MODE_MIXED_PORTS NUMERIC "2"
--- Retrieval info: PRIVATE: READ_DURING_WRITE_MODE_PORT_A NUMERIC "4"
+-- Retrieval info: PRIVATE: READ_DURING_WRITE_MODE_PORT_A NUMERIC "3"
 -- Retrieval info: PRIVATE: READ_DURING_WRITE_MODE_PORT_B NUMERIC "4"
 -- Retrieval info: PRIVATE: REGdata NUMERIC "1"
 -- Retrieval info: PRIVATE: REGq NUMERIC "0"
@@ -164,10 +168,10 @@ END SYN;
 -- Retrieval info: PRIVATE: USE_DIFF_CLKEN NUMERIC "0"
 -- Retrieval info: PRIVATE: UseDPRAM NUMERIC "1"
 -- Retrieval info: PRIVATE: VarWidth NUMERIC "0"
--- Retrieval info: PRIVATE: WIDTH_READ_A NUMERIC "8"
--- Retrieval info: PRIVATE: WIDTH_READ_B NUMERIC "8"
--- Retrieval info: PRIVATE: WIDTH_WRITE_A NUMERIC "8"
--- Retrieval info: PRIVATE: WIDTH_WRITE_B NUMERIC "8"
+-- Retrieval info: PRIVATE: WIDTH_READ_A NUMERIC "16"
+-- Retrieval info: PRIVATE: WIDTH_READ_B NUMERIC "16"
+-- Retrieval info: PRIVATE: WIDTH_WRITE_A NUMERIC "16"
+-- Retrieval info: PRIVATE: WIDTH_WRITE_B NUMERIC "16"
 -- Retrieval info: PRIVATE: WRADDR_ACLR_B NUMERIC "0"
 -- Retrieval info: PRIVATE: WRADDR_REG_B NUMERIC "1"
 -- Retrieval info: PRIVATE: WRCTRL_ACLR_B NUMERIC "0"
@@ -175,6 +179,8 @@ END SYN;
 -- Retrieval info: PRIVATE: rden NUMERIC "0"
 -- Retrieval info: LIBRARY: altera_mf altera_mf.altera_mf_components.all
 -- Retrieval info: CONSTANT: ADDRESS_REG_B STRING "CLOCK1"
+-- Retrieval info: CONSTANT: BYTEENA_REG_B STRING "CLOCK1"
+-- Retrieval info: CONSTANT: BYTE_SIZE NUMERIC "8"
 -- Retrieval info: CONSTANT: CLOCK_ENABLE_INPUT_A STRING "BYPASS"
 -- Retrieval info: CONSTANT: CLOCK_ENABLE_INPUT_B STRING "BYPASS"
 -- Retrieval info: CONSTANT: CLOCK_ENABLE_OUTPUT_A STRING "BYPASS"
@@ -190,35 +196,37 @@ END SYN;
 -- Retrieval info: CONSTANT: OUTDATA_REG_A STRING "UNREGISTERED"
 -- Retrieval info: CONSTANT: OUTDATA_REG_B STRING "UNREGISTERED"
 -- Retrieval info: CONSTANT: POWER_UP_UNINITIALIZED STRING "FALSE"
--- Retrieval info: CONSTANT: READ_DURING_WRITE_MODE_PORT_A STRING "NEW_DATA_WITH_NBE_READ"
+-- Retrieval info: CONSTANT: READ_DURING_WRITE_MODE_PORT_A STRING "NEW_DATA_NO_NBE_READ"
 -- Retrieval info: CONSTANT: READ_DURING_WRITE_MODE_PORT_B STRING "NEW_DATA_WITH_NBE_READ"
 -- Retrieval info: CONSTANT: WIDTHAD_A NUMERIC "11"
 -- Retrieval info: CONSTANT: WIDTHAD_B NUMERIC "11"
--- Retrieval info: CONSTANT: WIDTH_A NUMERIC "8"
--- Retrieval info: CONSTANT: WIDTH_B NUMERIC "8"
+-- Retrieval info: CONSTANT: WIDTH_A NUMERIC "16"
+-- Retrieval info: CONSTANT: WIDTH_B NUMERIC "16"
 -- Retrieval info: CONSTANT: WIDTH_BYTEENA_A NUMERIC "1"
--- Retrieval info: CONSTANT: WIDTH_BYTEENA_B NUMERIC "1"
+-- Retrieval info: CONSTANT: WIDTH_BYTEENA_B NUMERIC "2"
 -- Retrieval info: CONSTANT: WRCONTROL_WRADDRESS_REG_B STRING "CLOCK1"
 -- Retrieval info: USED_PORT: address_a 0 0 11 0 INPUT NODEFVAL "address_a[10..0]"
 -- Retrieval info: USED_PORT: address_b 0 0 11 0 INPUT NODEFVAL "address_b[10..0]"
+-- Retrieval info: USED_PORT: byteena_b 0 0 2 0 INPUT VCC "byteena_b[1..0]"
 -- Retrieval info: USED_PORT: clock_a 0 0 0 0 INPUT VCC "clock_a"
 -- Retrieval info: USED_PORT: clock_b 0 0 0 0 INPUT NODEFVAL "clock_b"
--- Retrieval info: USED_PORT: data_a 0 0 8 0 INPUT NODEFVAL "data_a[7..0]"
--- Retrieval info: USED_PORT: data_b 0 0 8 0 INPUT NODEFVAL "data_b[7..0]"
--- Retrieval info: USED_PORT: q_a 0 0 8 0 OUTPUT NODEFVAL "q_a[7..0]"
--- Retrieval info: USED_PORT: q_b 0 0 8 0 OUTPUT NODEFVAL "q_b[7..0]"
+-- Retrieval info: USED_PORT: data_a 0 0 16 0 INPUT NODEFVAL "data_a[15..0]"
+-- Retrieval info: USED_PORT: data_b 0 0 16 0 INPUT NODEFVAL "data_b[15..0]"
+-- Retrieval info: USED_PORT: q_a 0 0 16 0 OUTPUT NODEFVAL "q_a[15..0]"
+-- Retrieval info: USED_PORT: q_b 0 0 16 0 OUTPUT NODEFVAL "q_b[15..0]"
 -- Retrieval info: USED_PORT: wren_a 0 0 0 0 INPUT GND "wren_a"
 -- Retrieval info: USED_PORT: wren_b 0 0 0 0 INPUT GND "wren_b"
 -- Retrieval info: CONNECT: @address_a 0 0 11 0 address_a 0 0 11 0
 -- Retrieval info: CONNECT: @address_b 0 0 11 0 address_b 0 0 11 0
+-- Retrieval info: CONNECT: @byteena_b 0 0 2 0 byteena_b 0 0 2 0
 -- Retrieval info: CONNECT: @clock0 0 0 0 0 clock_a 0 0 0 0
 -- Retrieval info: CONNECT: @clock1 0 0 0 0 clock_b 0 0 0 0
--- Retrieval info: CONNECT: @data_a 0 0 8 0 data_a 0 0 8 0
--- Retrieval info: CONNECT: @data_b 0 0 8 0 data_b 0 0 8 0
+-- Retrieval info: CONNECT: @data_a 0 0 16 0 data_a 0 0 16 0
+-- Retrieval info: CONNECT: @data_b 0 0 16 0 data_b 0 0 16 0
 -- Retrieval info: CONNECT: @wren_a 0 0 0 0 wren_a 0 0 0 0
 -- Retrieval info: CONNECT: @wren_b 0 0 0 0 wren_b 0 0 0 0
--- Retrieval info: CONNECT: q_a 0 0 8 0 @q_a 0 0 8 0
--- Retrieval info: CONNECT: q_b 0 0 8 0 @q_b 0 0 8 0
+-- Retrieval info: CONNECT: q_a 0 0 16 0 @q_a 0 0 16 0
+-- Retrieval info: CONNECT: q_b 0 0 16 0 @q_b 0 0 16 0
 -- Retrieval info: GEN_FILE: TYPE_NORMAL frame_ram.vhd TRUE
 -- Retrieval info: GEN_FILE: TYPE_NORMAL frame_ram.inc FALSE
 -- Retrieval info: GEN_FILE: TYPE_NORMAL frame_ram.cmp TRUE
