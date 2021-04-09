@@ -11,8 +11,6 @@ use ieee.std_logic_unsigned.all;
 
 entity terminal is
 	port (
-		junk			: out std_logic_vector(23 downto 0);
-
 		CLK12M			: in std_logic;				-- M2
 
 		-- DIP switches for baud rate
@@ -398,9 +396,12 @@ architecture a of terminal is
 	signal rts_n			: std_logic;
 	signal cts_n			: std_logic;
 
+	attribute keep: boolean;
+	signal addrbus			: std_logic_vector(23 downto 0); -- for debug
+	attribute keep of addrbus: signal is true;
 begin
 
-	junk <= eab & '0';
+	addrbus <= eab & '0';
 
 	-- LEDS <= "00000000";
 	-- LEDS <= cpuControlQ;

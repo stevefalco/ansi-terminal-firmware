@@ -12,7 +12,13 @@ test.dump: test
 	m68k-linux-gnu-objdump -d $^ > $@
 
 test: $(OBJ)
-	m68k-linux-gnu-gcc -Wl,--build-id=none -Wl,-M -Wl,-T,test.ld -m68000 -nostdlib -o $@ $^ > test.map
+	m68k-linux-gnu-gcc \
+		-Wl,--build-id=none \
+		-Wl,-M -Wl,-T,test.ld \
+		-m68000 -nostdlib \
+		-o $@ $^ \
+		-lgcc \
+		> test.map
 
 %.o: %.s
 	m68k-linux-gnu-gcc -m68000 -c $^ -o $@

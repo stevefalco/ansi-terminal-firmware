@@ -18,12 +18,14 @@ configure wave -timelineunits ns
 
 delete wave *
 
-add wave /testbench/term/junk
+add wave /testbench/term/addrbus
 add wave /testbench/term/iEdb
 add wave /testbench/term/oEdb
 add wave /testbench/term/ASn
 add wave /testbench/term/eRWn
 add wave /testbench/term/cpuByteEnables
+add wave /testbench/term/cpu/excUnit/regs68L
+add wave /testbench/term/cpu/excUnit/regs68H
 
 
 add wave -r /testbench/term/cpuBus/*

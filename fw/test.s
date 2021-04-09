@@ -28,20 +28,21 @@ _start:			| first instruction of program
 	mov.l	#_sdata, %a1		| Start of data section
 	mov.l	#_edata, %d0		| End of data section
 	sub.l	%a1, %d0		| How many bytes to copy
+	lsr.l	#2, %d0			| Divide by 4
+	sub.l	#1, %d0			| Compensate dbf
 initData:
-	mov.b	(%a0)+, (%a1)+		| Copy one byte
+	mov.l	(%a0)+, (%a1)+		| Copy one lword
 	dbf	%d0, initData		| Do them all
 
 	mov.l	#_sbss, %a0		| Start of BSS
 	mov.l	#_ebss, %d0		| End of BSS
 	sub.l	%a0, %d0		| How many bytes to zero
+	lsr.l	#2, %d0			| Divide by 4
+	sub.l	#1, %d0			| Compensate dbf
+	mov.l	#0, %d1			| Get a zero
 initBSS:
-	mov.b	#0, (%a0)+		| Zero one byte
+	mov.l	%d1, (%a0)+		| Zero one lword
 	dbf	%d0, initBSS		| Do them all
-
-	bra	main
-
-main:
 
 	jsr	mains
 

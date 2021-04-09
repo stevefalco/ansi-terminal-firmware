@@ -20,9 +20,11 @@ SECTIONS {
 	} > rom
 
 	.bss (NOLOAD) : {
+		. = ALIGN(4);
 		_sbss = .;
 		* (.bss*)
 		* (COMMON)
+		. = ALIGN(4);
 		_ebss = .;
 	} > ram
 
