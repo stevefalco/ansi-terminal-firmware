@@ -23,18 +23,13 @@ void
 copyForward()
 {
 	int i;
-	int j;
-	int k;
 	char *p = buf;
 
-	volatile short *q = (volatile short *)0x8000;
+	volatile char *q = (volatile char *)0x8001;
 
-	for(i = 0; i < 24; i++) {
-		for(j = 0; j < 8; j++) {
-			for(k = 0; k < 10; k++) {
-				*q++ = *p++;
-			}
-		}
+	for(i = 0; i < BS; i++) {
+		*q = *p++;
+		q += 2;
 	}
 }
 
@@ -42,18 +37,13 @@ void
 copyBackward()
 {
 	int i;
-	int j;
-	int k;
 	char *p = buf;
 
-	volatile short *q = (volatile short *)0x8efe;
+	volatile char *q = (volatile char *)0x8eff;
 
-	for(i = 0; i < 24; i++) {
-		for(j = 0; j < 8; j++) {
-			for(k = 0; k < 10; k++) {
-				*q-- = *p++;
-			}
-		}
+	for(i = 0; i < BS; i++) {
+		*q = *p++;
+		q -= 2;
 	}
 }
 
