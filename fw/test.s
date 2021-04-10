@@ -68,10 +68,10 @@ initBssLoop:
 	dbf	%d0, initBssLoop	| Do them all
 initBssDone:
 
-	mov.b	#1, %d6
-	mov.b	%d6, 0xc060		| Enable video sync
+	|mov.b	#1, %d6
+	|mov.b	%d6, 0xc060		| Enable video sync
 	
-	| jsr	main
+	jsr	main
 
 	| Set up to fill cpu ram
 	mov.w	#23, %d2		| Do 24 lines

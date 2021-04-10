@@ -9,6 +9,13 @@ timing/
 testbench/
 greybox_tmp
 *_sim/
+cpu_rom.mif
+
+fw/*.o
+fw/test
+fw/test.bin
+fw/test.dump
+fw/test.map
 
 firmware/*.list
 firmware/*.rom
