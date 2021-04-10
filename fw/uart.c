@@ -16,26 +16,26 @@ typedef unsigned char uint8_t;
 
 // UART registers
 #define uart_base		(0xc000)
-#define uart_RBR		(*(uint8_t *)(uart_base + 0x00))	// Receiver Buffer Register - read-only
-#define uart_THR		(*(uint8_t *)(uart_base + 0x00))	// Transmitter Holding Register - write-only
-#define uart_IER		(*(uint8_t *)(uart_base + 0x02))	// Interrupt Enable Register
-#define uart_IIR		(*(uint8_t *)(uart_base + 0x04))	// Interrupt Identification Register - read-only
-#define uart_FCR		(*(uint8_t *)(uart_base + 0x04))	// FIFO Control Register - write-only
-#define uart_LCR		(*(uint8_t *)(uart_base + 0x06))	// Line Control Register
-#define uart_MCR		(*(uint8_t *)(uart_base + 0x08))	// Modem Control Register
-#define uart_LSR		(*(uint8_t *)(uart_base + 0x0a))	// Line Status Register
-#define uart_MSR		(*(uint8_t *)(uart_base + 0x0c))	// Modem Status Register
-#define uart_SCR		(*(uint8_t *)(uart_base + 0x0e))	// Scratch Register
-#define uart_DLL		(*(uint8_t *)(uart_base + 0x00))	// Divisor Latch Low Byte (only when DLAB=1)
-#define uart_DLM		(*(uint8_t *)(uart_base + 0x02))	// Divisor Latch High Byte (only when DLAB=1)
+#define uart_RBR		(*(volatile uint8_t *)(uart_base + 0x00))	// Receiver Buffer Register - read-only
+#define uart_THR		(*(volatile uint8_t *)(uart_base + 0x00))	// Transmitter Holding Register - write-only
+#define uart_IER		(*(volatile uint8_t *)(uart_base + 0x02))	// Interrupt Enable Register
+#define uart_IIR		(*(volatile uint8_t *)(uart_base + 0x04))	// Interrupt Identification Register - read-only
+#define uart_FCR		(*(volatile uint8_t *)(uart_base + 0x04))	// FIFO Control Register - write-only
+#define uart_LCR		(*(volatile uint8_t *)(uart_base + 0x06))	// Line Control Register
+#define uart_MCR		(*(volatile uint8_t *)(uart_base + 0x08))	// Modem Control Register
+#define uart_LSR		(*(volatile uint8_t *)(uart_base + 0x0a))	// Line Status Register
+#define uart_MSR		(*(volatile uint8_t *)(uart_base + 0x0c))	// Modem Status Register
+#define uart_SCR		(*(volatile uint8_t *)(uart_base + 0x0e))	// Scratch Register
+#define uart_DLL		(*(volatile uint8_t *)(uart_base + 0x00))	// Divisor Latch Low Byte (only when DLAB=1)
+#define uart_DLM		(*(volatile uint8_t *)(uart_base + 0x02))	// Divisor Latch High Byte (only when DLAB=1)
 
 // UART register bits
 
 // IER
-#define uart_IER_ERBFI_b	(0)					// Enable Received Data Available Interrupt
-#define uart_IER_ETBEI_b	(1)					// Enable Transmitter Holding Register Empty Interrupt
-#define uart_IER_ELSI_b		(2)					// Enable Receiver Line Status Interrupt
-#define uart_IER_EDSSI_b	(3)					// Enable Model Status Interrupt
+#define uart_IER_ERBFI_b	(0)						// Enable Received Data Available Interrupt
+#define uart_IER_ETBEI_b	(1)						// Enable Transmitter Holding Register Empty Interrupt
+#define uart_IER_ELSI_b		(2)						// Enable Receiver Line Status Interrupt
+#define uart_IER_EDSSI_b	(3)						// Enable Model Status Interrupt
 
 // IER bits as values
 #define uart_IER_ERBFI_v	(1 << uart_IER_ERBFI_b)
@@ -47,12 +47,12 @@ typedef unsigned char uint8_t;
 #define uart_IER_INIT		(uart_IER_ERBFI_v)
 
 // IIR
-#define uart_IIR_PENDING_b	(0)					// Interrupt pending when 0
+#define uart_IIR_PENDING_b	(0)						// Interrupt pending when 0
 
 // FCR
-#define uart_FCR_FEN_b		(0)					// FIFO Enable
-#define uart_FCR_RFR_b		(1)					// Receive FIFO Reset
-#define uart_FCR_XFR_b		(2)					// Transmit FIFO Reset
+#define uart_FCR_FEN_b		(0)						// FIFO Enable
+#define uart_FCR_RFR_b		(1)						// Receive FIFO Reset
+#define uart_FCR_XFR_b		(2)						// Transmit FIFO Reset
 
 // FCR bits as values
 #define uart_FCR_FEN_v		(1 << uart_FCR_FEN_b)
@@ -63,13 +63,13 @@ typedef unsigned char uint8_t;
 #define uart_FCR_INIT		(uart_FCR_FEN_v | uart_FCR_RFR_v | uart_FCR_XFR_v)
 
 // LCR
-#define uart_LCR_WLS0_b		(0)					// Word Length Select Bit 0
-#define uart_LCR_WLS1_b		(1)					// Word Length Select Bit 1
-#define uart_LCR_STB_b		(2)					// Number of Stop Bits
-#define uart_LCR_PEN_b		(3)					// Parity Enable
-#define uart_LCR_EPS_b		(4)					// Even Parity Select
-#define uart_LCR_SBRK_b		(6)					// Set Break
-#define uart_LCR_DLAB_b		(7)					// Divisor Latch Access Bit
+#define uart_LCR_WLS0_b		(0)						// Word Length Select Bit 0
+#define uart_LCR_WLS1_b		(1)						// Word Length Select Bit 1
+#define uart_LCR_STB_b		(2)						// Number of Stop Bits
+#define uart_LCR_PEN_b		(3)						// Parity Enable
+#define uart_LCR_EPS_b		(4)						// Even Parity Select
+#define uart_LCR_SBRK_b		(6)						// Set Break
+#define uart_LCR_DLAB_b		(7)						// Divisor Latch Access Bit
 
 // LCR bits as values
 #define uart_LCR_WLS0_v		(1 << uart_LCR_WLS0_b)
@@ -87,8 +87,8 @@ typedef unsigned char uint8_t;
 #define uart_LCR_WLS8		(uart_LCR_WLS0_v | uart_LCR_WLS1_v)
 
 // MCR
-#define uart_MCR_DTR_b		(0)					// Data Terminal Ready
-#define uart_MCR_RTS_b		(1)					// Request To Send
+#define uart_MCR_DTR_b		(0)						// Data Terminal Ready
+#define uart_MCR_RTS_b		(1)						// Request To Send
 
 // MCR bits as values
 #define uart_MCR_DTR_v		(1 << uart_MCR_DTR_b)
@@ -98,16 +98,16 @@ typedef unsigned char uint8_t;
 #define uart_MCR_INIT		(uart_MCR_DTR_v | uart_MCR_RTS_v)
 
 // LSR
-#define uart_LSR_THRE_b		(5)					// Transmitter Holding Register Empty
+#define uart_LSR_THRE_b		(5)						// Transmitter Holding Register Empty
 
 // LSR bits as values
 #define uart_LSR_THRE_v		(1 << uart_LSR_THRE_b)
 
 // Baud rate, etc. dip switches
-#define dipSW			(*(uint8_t *)(0xc010))
+#define dipSW			(*(volatile uint8_t *)(0xc010))
 #define dipBaudMask		(0x0f)
 
-#define uart_depth		(128)					// SW receiver fifo depth
+#define uart_depth		(128)						// SW receiver fifo depth
 #define uart_high_water		(64)
 
 static int baud_table[] = {

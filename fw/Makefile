@@ -24,7 +24,7 @@ test: $(OBJ)
 	m68k-linux-gnu-gcc -m68000 -c $^ -o $@
 
 %.o: %.c
-	m68k-linux-gnu-gcc -m68000 -c $^ -o $@
+	m68k-linux-gnu-gcc -m68000 -O -c $^ -o $@
 
 clean:
 	rm -f *.o test test.bin test.dump test.map
