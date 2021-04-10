@@ -19,14 +19,13 @@ Linker script and memory map
  *(.init)
  .init          0x0000000000000000       0x80 test.o
 
-.text           0x0000000000000100       0xf6
+.text           0x0000000000000100       0xfa
  *(.text*)
- .text          0x0000000000000100       0xda test.o
+ .text          0x0000000000000100       0xe0 test.o
                 0x0000000000000100                _start
- *fill*         0x00000000000001da        0x2 
- .text          0x00000000000001dc       0x1a main.o
-                0x00000000000001dc                main
-                0x00000000000001f6                _etext = .
+ .text          0x00000000000001e0       0x1a main.o
+                0x00000000000001e0                main
+                0x00000000000001fa                _etext = .
 
 .bss            0x0000000000004000        0x0
                 0x0000000000004000                . = ALIGN (0x4)
@@ -38,7 +37,7 @@ Linker script and memory map
                 0x0000000000004000                . = ALIGN (0x4)
                 0x0000000000004000                _ebss = .
 
-.data           0x0000000000004000        0x0 load address 0x00000000000001f6
+.data           0x0000000000004000        0x0 load address 0x00000000000001fa
                 0x0000000000004000                . = ALIGN (0x4)
                 0x0000000000004000                _sdata = .
  *(.data*)
