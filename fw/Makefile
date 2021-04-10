@@ -1,4 +1,4 @@
-OBJ = test.o foo.o
+OBJ = test.o main.o
 
 all: ../cpu_rom.mif test.dump
 

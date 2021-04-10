@@ -1,11 +1,7 @@
-Archive member included to satisfy reference by file (symbol)
-
-/usr/lib/gcc/m68k-linux-gnu/10/libgcc.a(_mulsi3.o)
-                              foo.o (__mulsi3)
 
 Discarded input sections
 
- .comment       0x0000000000000000       0x35 foo.o
+ .comment       0x0000000000000000       0x35 main.o
 
 Memory Configuration
 
@@ -23,73 +19,42 @@ Linker script and memory map
  *(.init)
  .init          0x0000000000000000       0x80 test.o
 
-.text           0x0000000000000100      0x156
+.text           0x0000000000000100       0xf6
  *(.text*)
- .text          0x0000000000000100       0xd8 test.o
+ .text          0x0000000000000100       0xda test.o
                 0x0000000000000100                _start
- .text          0x00000000000001d8       0x5c foo.o
-                0x00000000000001d8                goo
-                0x00000000000001fc                mains
- .text          0x0000000000000234       0x22 /usr/lib/gcc/m68k-linux-gnu/10/libgcc.a(_mulsi3.o)
-                0x0000000000000234                __mulsi3
-                0x0000000000000256                _etext = .
+ *fill*         0x00000000000001da        0x2 
+ .text          0x00000000000001dc       0x1a main.o
+                0x00000000000001dc                main
+                0x00000000000001f6                _etext = .
 
-.bss            0x0000000000004000       0x28
+.bss            0x0000000000004000        0x0
                 0x0000000000004000                . = ALIGN (0x4)
                 0x0000000000004000                _sbss = .
  *(.bss*)
  .bss           0x0000000000004000        0x0 test.o
- .bss           0x0000000000004000       0x28 foo.o
-                0x0000000000004000                xx
- .bss           0x0000000000004028        0x0 /usr/lib/gcc/m68k-linux-gnu/10/libgcc.a(_mulsi3.o)
+ .bss           0x0000000000004000        0x0 main.o
  *(COMMON)
-                0x0000000000004028                . = ALIGN (0x4)
-                0x0000000000004028                _ebss = .
+                0x0000000000004000                . = ALIGN (0x4)
+                0x0000000000004000                _ebss = .
 
-.data           0x0000000000004028        0x8 load address 0x0000000000000256
-                0x0000000000004028                . = ALIGN (0x4)
-                0x0000000000004028                _sdata = .
+.data           0x0000000000004000        0x0 load address 0x00000000000001f6
+                0x0000000000004000                . = ALIGN (0x4)
+                0x0000000000004000                _sdata = .
  *(.data*)
- .data          0x0000000000004028        0x0 test.o
- .data          0x0000000000004028        0x5 foo.o
-                0x0000000000004028                yy
-                0x000000000000402c                qq
- *fill*         0x000000000000402d        0x3 
- .data          0x0000000000004030        0x0 /usr/lib/gcc/m68k-linux-gnu/10/libgcc.a(_mulsi3.o)
-                0x0000000000004030                . = ALIGN (0x4)
-                0x0000000000004030                _edata = .
+ .data          0x0000000000004000        0x0 test.o
+ .data          0x0000000000004000        0x0 main.o
+                0x0000000000004000                . = ALIGN (0x4)
+                0x0000000000004000                _edata = .
 
 /DISCARD/
  *(.comment)
 LOAD test.o
-LOAD foo.o
+LOAD main.o
 LOAD /usr/lib/gcc/m68k-linux-gnu/10/libgcc.a
 OUTPUT(test elf32-m68k)
 
 .note.GNU-stack
                 0x0000000000000000        0x0
  .note.GNU-stack
-                0x0000000000000000        0x0 foo.o
- .note.GNU-stack
-                0x0000000000000000        0x0 /usr/lib/gcc/m68k-linux-gnu/10/libgcc.a(_mulsi3.o)
-
-.gnu.build.attributes
-                0x0000000000000000       0x1c
- .gnu.build.attributes
-                0x0000000000000000       0x1c /usr/lib/gcc/m68k-linux-gnu/10/libgcc.a(_mulsi3.o)
-
-.debug_line     0x0000000000000000       0x74
- .debug_line    0x0000000000000000       0x74 /usr/lib/gcc/m68k-linux-gnu/10/libgcc.a(_mulsi3.o)
-
-.debug_info     0x0000000000000000       0x26
- .debug_info    0x0000000000000000       0x26 /usr/lib/gcc/m68k-linux-gnu/10/libgcc.a(_mulsi3.o)
-
-.debug_abbrev   0x0000000000000000       0x14
- .debug_abbrev  0x0000000000000000       0x14 /usr/lib/gcc/m68k-linux-gnu/10/libgcc.a(_mulsi3.o)
-
-.debug_aranges  0x0000000000000000       0x20
- .debug_aranges
-                0x0000000000000000       0x20 /usr/lib/gcc/m68k-linux-gnu/10/libgcc.a(_mulsi3.o)
-
-.debug_str      0x0000000000000000       0x95
- .debug_str     0x0000000000000000       0x95 /usr/lib/gcc/m68k-linux-gnu/10/libgcc.a(_mulsi3.o)
+                0x0000000000000000        0x0 main.o

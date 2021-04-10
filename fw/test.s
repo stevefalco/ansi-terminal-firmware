@@ -24,30 +24,36 @@ _start:			| first instruction of program
 			| %a7 = sp
 			| %a6 = fp
 
+initData:
 	mov.l	#_etext, %a0		| Initial values for data section
 	mov.l	#_sdata, %a1		| Start of data section
 	mov.l	#_edata, %d0		| End of data section
 	sub.l	%a1, %d0		| How many bytes to copy
+	beq	initBss			| Nothing to do
 	lsr.l	#2, %d0			| Divide by 4
 	sub.l	#1, %d0			| Compensate dbf
-initData:
+initDataLoop:
 	mov.l	(%a0)+, (%a1)+		| Copy one lword
-	dbf	%d0, initData		| Do them all
+	dbf	%d0, initDataLoop	| Do them all
 
+initBss:
 	mov.l	#_sbss, %a0		| Start of BSS
 	mov.l	#_ebss, %d0		| End of BSS
 	sub.l	%a0, %d0		| How many bytes to zero
+	beq	startMain		| Nothing to do
 	lsr.l	#2, %d0			| Divide by 4
 	sub.l	#1, %d0			| Compensate dbf
 	mov.l	#0, %d1			| Get a zero
-initBSS:
+initBssLoop:
 	mov.l	%d1, (%a0)+		| Zero one lword
-	dbf	%d0, initBSS		| Do them all
+	dbf	%d0, initBssLoop	| Do them all
 
-	jsr	mains
+startMain:
 
 	mov.b	#1, %d6
 	mov.b	%d6, 0xc060		| Enable video sync
+	
+	| jsr	main
 
 	| Set up to fill cpu ram
 	mov.w	#23, %d2		| Do 24 lines
