@@ -71,12 +71,12 @@ main()
 
 	while(1) {
 		copyForward();
-		for(i = 0; i < 1000000; i++) {
+		for(i = 0; i < 500000; i++) {
 			;
 		}
 
 		copyBackward();
-		for(i = 0; i < 1000000; i++) {
+		for(i = 0; i < 500000; i++) {
 			;
 		}
 
