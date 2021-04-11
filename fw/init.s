@@ -81,10 +81,16 @@ initBssDone:
 
 _spurious:
 _level1:
-_level2:
 _level3:
 _level4:
 _level5:
 _level6:
 _level7:
 	bra.s	_start
+
+| UART RX and KB RX interrupts.
+_level2:
+	| See if the UART has anything for us.
+	jsr	uart_test_interrupt
+
+	rts

@@ -1,0 +1,4 @@
+void
+dump(char c)
+{
+}

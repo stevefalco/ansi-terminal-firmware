@@ -2,7 +2,7 @@
 #
 # (c) 2021 Steven A. Falco
 
-OBJ = init.o main.o uart.o
+OBJ = init.o main.o uart.o debug.o
 
 all: ../cpu_rom.mif fw.dump
 

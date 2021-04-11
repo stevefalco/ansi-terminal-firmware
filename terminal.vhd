@@ -176,7 +176,7 @@ architecture a of terminal is
 			cpuAddr		: in std_logic_vector (23 downto 1);
 			cpuDataIn	: out std_logic_vector (15 downto 0);
 			cpuRWn		: in std_logic;
-			cpuInt		: out std_logic_vector(2 downto 0);
+			cpuInt_n	: out std_logic_vector(2 downto 0);
 			cpuDTACKn	: out std_logic;
 			cpuASn		: in std_logic;
 
@@ -312,7 +312,7 @@ architecture a of terminal is
 
 	-- ----------------------------------------------------------------------------------------------------
 
-	signal cpuInt			: std_logic_vector (2 downto 0) := (others => '0');	-- Interrupt level
+	signal cpuInt_n			: std_logic_vector (2 downto 0) := (others => '1');	-- Interrupt level
 
 	signal LDSn			: std_logic;
 	signal UDSn			: std_logic;
@@ -499,9 +499,9 @@ begin
 			BERRn => BERRn,
 			BRn => BRn,
 			BGACKn => BGACKn,
-			IPL0n => cpuInt(0),
-			IPL1n => cpuInt(1),
-			IPL2n => cpuInt(2),
+			IPL0n => cpuInt_n(0),
+			IPL1n => cpuInt_n(1),
+			IPL2n => cpuInt_n(2),
 
 			iEdb => iEdb,
 			oEdb => oEdb,
@@ -613,7 +613,7 @@ begin
 			cpuAddr => eab,
 			cpuDataIn => iEdb,		-- CPU input data from cpuBus
 			cpuRWn => eRWn,
-			cpuInt => cpuInt,
+			cpuInt_n => cpuInt_n,
 			cpuDTACKn => DTACKn,
 			cpuASn => ASn,
 

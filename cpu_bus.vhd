@@ -22,7 +22,7 @@ entity cpu_bus is
 		cpuAddr		: in std_logic_vector (23 downto 1);
 		cpuDataIn	: out std_logic_vector (15 downto 0);
 		cpuRWn		: in std_logic;
-		cpuInt		: out std_logic_vector (2 downto 0);
+		cpuInt_n	: out std_logic_vector (2 downto 0);
 		cpuDTACKn	: out std_logic;
 		cpuASn		: in std_logic;
 
@@ -247,17 +247,19 @@ begin
 --	end process;
 --	cpuKbCS <= cpuKbCS_D0 and cpuKbCS_D1;
 --
---	-- We use one interrupt to the CPU, and only two devices that generate
---	-- interrupts.  So, we just let the CPU poll both devices.
---	cpu_int_process: process(all)
---	begin
---		if(cpuUartInt = '1' or cpuKbInt = '1') then
---			cpuInt(0) <= '1';
---		else
---			cpuInt(0) <= '0';
---		end if;
---		-- FIXME
---		cpuInt <= "111";
---	end process;
+
+	-- We could use multiple interrupt levels, but that is unnecessary.  Instead,
+	-- we just let the CPU poll both devices.
+	-- 
+	-- The peripheral interrupt lines are active-high, but the CPU interrupts are
+	-- active-low.  We use "101" which means "interrupt 2".
+	cpu_int_process: process(all)
+	begin
+		if(cpuUartInt = '1' or cpuKbInt = '1') then
+			cpuInt_n <= "101";
+		else
+			cpuInt_n <= "111";
+		end if;
+	end process;
 
 end a;

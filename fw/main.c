@@ -54,6 +54,7 @@ void
 main()
 {
 	int i;
+	int sr;
 
 	volatile char *pControl = (volatile char *)0x0000c060;
 
@@ -61,6 +62,13 @@ main()
 	*pControl = 1;
 
 	uart_initialize();
+
+	// Read the status register.
+	asm(" mov.w %%sr, %0\n\t" : "=r" (sr));
+	//printf("sr = %x\n\r", sr);
+
+	// Enable interrupts.
+	//asm(" andi.w #~0x0700, %sr");
 
 	uart_transmit_string("test it\n\r");
 
