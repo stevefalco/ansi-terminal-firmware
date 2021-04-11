@@ -68,7 +68,7 @@ main()
 	dump("sr = ", sr);
 
 	// Enable interrupts.
-	//asm(" andi.w #~0x0700, %sr");
+	asm(" andi.w #~0x0700, %sr");
 
 	uart_transmit_string("test it\n\r");
 

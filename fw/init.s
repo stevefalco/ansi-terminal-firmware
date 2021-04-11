@@ -86,11 +86,24 @@ _level4:
 _level5:
 _level6:
 _level7:
+	pea	umsg
+	jsr	uart_transmit_string
+	addql #4,%sp
+
 	bra.s	_start
 
 | UART RX and KB RX interrupts.
 _level2:
+	pea	umsg
+	jsr	uart_transmit_string
+	addql #4,%sp
+
 	| See if the UART has anything for us.
 	jsr	uart_test_interrupt
 
 	rts
+
+wmsg:
+	.asciz "wanted\n\r"
+umsg:
+	.asciz "unwanted\n\r"

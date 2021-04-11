@@ -12,6 +12,8 @@
 // is good, because by default, Sytse's FPGA doesn't implement hardware
 // flow control, although it can be turned on in his VHDL if needed.
 
+#include "uart.h"
+
 typedef unsigned char uint8_t;
 
 // UART registers
@@ -212,6 +214,8 @@ uart_store_char()
 void
 uart_test_interrupt()
 {
+	uart_transmit_string("got interrupt\n\r");
+
 	// Interrupt-pending bit is active-low.
 	// (Bit_0 = 1) means no interrupt
 	//
