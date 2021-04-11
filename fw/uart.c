@@ -132,7 +132,7 @@ static int baud_table[] = {
 	28,	// sw=15 for 115200 baud
 };
 
-void
+static void
 uart_set_baud()
 {
 	uint8_t switches = dipSW;
@@ -186,7 +186,7 @@ uart_initialize()
 	uart_MCR |= uart_MCR_RTS_v;
 }
 
-void
+static void
 uart_store_char()
 {
 	// Read the character - we have to do this even if there is no
@@ -229,7 +229,7 @@ uart_test_interrupt()
 }
 
 void
-uart_transmit(char c)
+uart_transmit(unsigned char c)
 {
 	while(!(uart_LSR & uart_LSR_THRE_v)) {
 		; // Wait for the transmit buffer to be free.

@@ -1,7 +1,7 @@
-#define BS (24 * 80)
+#include "dump.h"
+#include "uart.h"
 
-extern void uart_initialize();
-extern void uart_transmit_string(char *pString);
+#define BS (24 * 80)
 
 char buf[BS];
 
@@ -65,7 +65,7 @@ main()
 
 	// Read the status register.
 	asm(" mov.w %%sr, %0\n\t" : "=r" (sr));
-	//printf("sr = %x\n\r", sr);
+	dump("sr = ", sr);
 
 	// Enable interrupts.
 	//asm(" andi.w #~0x0700, %sr");
