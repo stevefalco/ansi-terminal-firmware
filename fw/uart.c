@@ -49,6 +49,9 @@ typedef unsigned char uint8_t;
 // IIR
 #define uart_IIR_PENDING_b	(0)						// Interrupt pending when 0
 
+// IIR bits as values
+#define uart_IIR_PENDING_v	(1 << uart_IIR_PENDING_b)
+
 // FCR
 #define uart_FCR_FEN_b		(0)						// FIFO Enable
 #define uart_FCR_RFR_b		(1)						// Receive FIFO Reset
@@ -104,29 +107,29 @@ typedef unsigned char uint8_t;
 #define uart_LSR_THRE_v		(1 << uart_LSR_THRE_b)
 
 // Baud rate, etc. dip switches
-#define dipSW			(*(volatile uint8_t *)(0xc010))
+#define dipSW			(*(volatile uint8_t *)(0xc020))
 #define dipBaudMask		(0x0f)
 
 #define uart_depth		(128)						// SW receiver fifo depth
 #define uart_high_water		(64)
 
 static int baud_table[] = {
-	7330,	// sw=0 for 110 baud
-	2688,	// sw=1 for 300 baud
-	1344,	// sw=2 for 600 baud
-	672,	// sw=3 for 1200 baud
-	336,	// sw=4 for 2400 baud
-	168,	// sw=5 for 4800 baud
-	84,	// sw=6 for 9600 baud
-	42,	// sw=7 for 19200 baud
-	21,	// sw=8 for 38400 baud
-	14,	// sw=9 for 57600 baud
-	7,	// sw=10 for 115200 baud
-	7,	// sw=11 for 115200 baud
-	7,	// sw=12 for 115200 baud
-	7,	// sw=13 for 115200 baud
-	7,	// sw=14 for 115200 baud
-	7,	// sw=15 for 115200 baud
+	29318,	// sw=0 for 110 baud
+	10750,	// sw=1 for 300 baud
+	5375,	// sw=2 for 600 baud
+	2688,	// sw=3 for 1200 baud
+	1344,	// sw=4 for 2400 baud
+	672,	// sw=5 for 4800 baud
+	336,	// sw=6 for 9600 baud
+	168,	// sw=7 for 19200 baud
+	84,	// sw=8 for 38400 baud
+	56,	// sw=9 for 57600 baud
+	28,	// sw=10 for 115200 baud
+	28,	// sw=11 for 115200 baud
+	28,	// sw=12 for 115200 baud
+	28,	// sw=13 for 115200 baud
+	28,	// sw=14 for 115200 baud
+	28,	// sw=15 for 115200 baud
 };
 
 void
@@ -183,6 +186,68 @@ uart_initialize()
 	uart_MCR |= uart_MCR_RTS_v;
 }
 
+void
+uart_store_char()
+{
+	// Read the character - we have to do this even if there is no
+	// room to store it, because reading clears the interrupt.
+	char val = uart_RBR;
+
+	if(uart_rb_count > uart_high_water) {
+		// Above high water - clear RTS so the sender will pause.
+		uart_MCR &= ~uart_MCR_RTS_v;
+	}
+
+	if(uart_rb_count < uart_depth) {
+		uart_rb[uart_rb_input] = val;
+
+		// One more now available.
+		++uart_rb_count;
+		
+		// Move the input pointer, keeping it in range.
+		uart_rb_input = (uart_rb_input + 1) & (uart_depth - 1);
+	}
+}
+
+void
+uart_test_interrupt()
+{
+	// Interrupt-pending bit is active-low.
+	// (Bit_0 = 1) means no interrupt
+	//
+	// Read characters and store them until the uart is empty.  This
+	// is ugly because we really cannot tell how much data is in the
+	// fifo.  However, we have set the threshold to "1", so when the
+	// interrupt clears, the fifo must be empty.  If we had set any
+	// other threshold, we'd have to burst "threshold" characters out.
+	// We couldn't use the interrupt flag, because it would clear as
+	// soon as we went below threshold, which would leave some characters
+	// in the fifo.  With threshold = 1, that cannot happen.
+	while(!(uart_IIR & uart_IIR_PENDING_v)) {
+		uart_store_char();
+	}
+}
+
+void
+uart_transmit(char c)
+{
+	while(!(uart_LSR & uart_LSR_THRE_v)) {
+		; // Wait for the transmit buffer to be free.
+	}
+
+	uart_THR = c;
+}
+
+void
+uart_transmit_string(char *pString)
+{
+	char *p = pString;
+
+	while(*p != 0) {
+		uart_transmit(*p++);
+	}
+}
+
 int
 uart_receive()
 {
@@ -190,7 +255,23 @@ uart_receive()
 
 	int rv = -1;
 
+	if(uart_rb_count) {
+		// Something available.
+		rv = uart_rb[uart_rb_output];
+
+		// One less now available.
+		--uart_rb_count;
+		
+		// Move the output pointer, keeping it in range.
+		uart_rb_output = (uart_rb_output + 1) & (uart_depth - 1);
+	} else {
+		// If there is nothing available, make sure we haven't blocked
+		// the sender.
+		uart_MCR |= uart_MCR_RTS_v;
+	}
 
 	asm(" andi.w #~0x0700, %sr");	// Unmask interrupts
+
+	return rv;
 }
 

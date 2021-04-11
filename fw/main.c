@@ -1,5 +1,8 @@
 #define BS (24 * 80)
 
+extern void uart_initialize();
+extern void uart_transmit_string(char *pString);
+
 char buf[BS];
 
 void
@@ -56,6 +59,10 @@ main()
 
 	// Enable video sync
 	*pControl = 1;
+
+	uart_initialize();
+
+	uart_transmit_string("test it\n\r");
 
 	fillMem();
 

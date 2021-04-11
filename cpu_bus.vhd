@@ -61,11 +61,11 @@ end cpu_bus;
 
 architecture a of cpu_bus is
 
-	signal cpuUartCS_D0	: std_logic;
-	signal cpuUartCS_D1	: std_logic;
+	--signal cpuUartCS_D0	: std_logic;
+	--signal cpuUartCS_D1	: std_logic;
 
-	signal cpuKbCS_D0	: std_logic;
-	signal cpuKbCS_D1	: std_logic;
+	--signal cpuKbCS_D0	: std_logic;
+	--signal cpuKbCS_D1	: std_logic;
 
 	type bus_FSM_type is (
 		busIdle_state,
@@ -83,9 +83,9 @@ begin
 				when busIdle_state =>
 					cpuRamWren <= '0';
 					videoRamWren <= '0';
-					cpuUartCS_D0 <= '0';
+					cpuUartCS <= '0';
 					cpuUartWR <= '0';
-					cpuKbCS_D0 <= '0';
+					cpuKbCS <= '0';
 					cpuControlWR <= '0';
 					cpuLEDsWR <= '0';
 					cpuDataIn <= (others => '0');
@@ -136,11 +136,11 @@ begin
 								-- UART @ 0xc000 to 0xc00f
 								-- 8 bytes, even addresses only
 								if(cpuRWn = '1') then
-									cpuUartCS_D0 <= '1';
+									cpuUartCS <= '1';
 									cpuUartWR <= '0';
 									cpuDataIn(15 downto 8) <= cpuUartQ;
 								elsif(cpuRWn = '0') then
-									cpuUartCS_D0 <= '1';
+									cpuUartCS <= '1';
 									cpuUartWR <= '1';
 								end if;
 
@@ -155,7 +155,7 @@ begin
 								-- Keyboard @ 0xc040 to 0xc04f
 								-- 8 bytes, even addresses only
 								if(cpuRWn = '1') then
-									cpuKbCS_D0 <= '1';
+									cpuKbCS <= '1';
 									cpuDataIn(15 downto 8) <= cpuKbQ;
 								end if;
 
@@ -181,9 +181,9 @@ begin
 				when busActive_state =>
 					cpuRamWren <= '0';
 					videoRamWren <= '0';
-					cpuUartCS_D0 <= '0';
+					cpuUartCS <= '0';
 					cpuUartWR <= '0';
-					cpuKbCS_D0 <= '0';
+					cpuKbCS <= '0';
 					cpuControlWR <= '0';
 					cpuLEDsWR <= '0';
 

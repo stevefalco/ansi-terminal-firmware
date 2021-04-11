@@ -415,13 +415,13 @@ begin
 			c0 => dotClock		-- 108.0 MHz
 		);
 
-	-- Create a 100 MHz cpu clock from the 12 MHz oscillator.
+	-- Create a 51.6 MHz cpu clock from the 12 MHz oscillator.
 	-- This frequency is chosen to get good baud rate accuracy.
 	cpuClockGen: cpu_clock
 		port map
 		(
 			inclk0 => CLK12M,
-			c0 => cpuClock		-- 100 MHz
+			c0 => cpuClock		-- 51.6 MHz
 		);
 
 	phaseProcess: process(cpuClock)
