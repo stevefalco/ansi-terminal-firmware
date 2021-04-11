@@ -2,6 +2,7 @@
 *~
 *.rpt
 db/
+terminal.qws
 incremental_db/
 output_files/
 simulation/
