@@ -173,6 +173,11 @@ begin
 									cpuLEDsWR <= '1';
 								end if;
 
+							when 16#7ffffa# =>
+								-- It looks like the peripheral gets queried
+								-- and has to respond with a vector number.
+								cpuDataIn <= "0000000000011010";
+
 							when others =>
 								null;
 						end case;
@@ -258,7 +263,7 @@ begin
 		if(cpuUartInt = '1' or cpuKbInt = '1') then
 			cpuInt_n <= "101";
 		else
-			cpuInt_n <= "111";
+			cpuInt_n <= "101";
 		end if;
 	end process;
 
