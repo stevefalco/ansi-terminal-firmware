@@ -1,3 +1,9 @@
+| ANSI Terminal
+|
+| (c) 2021 Steven A. Falco
+|
+| Bare metal setup
+
 	.section .init
 	.align	2
 	.globl	_start

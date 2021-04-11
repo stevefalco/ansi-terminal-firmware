@@ -1,24 +1,28 @@
-OBJ = test.o main.o uart.o
+# ANSI Terminal
+#
+# (c) 2021 Steven A. Falco
 
-all: ../cpu_rom.mif test.dump
+OBJ = init.o main.o uart.o
 
-../cpu_rom.mif: test.bin
+all: ../cpu_rom.mif fw.dump
+
+../cpu_rom.mif: fw.bin
 	../cvt_obj_mif/cvt_obj_mif -i $^ -o $@
 
-test.bin: test
+fw.bin: fw
 	m68k-linux-gnu-objcopy -O binary $^ $@
 
-test.dump: test
+fw.dump: fw
 	m68k-linux-gnu-objdump -d $^ > $@
 
-test: $(OBJ)
+fw: $(OBJ)
 	m68k-linux-gnu-gcc \
 		-Wl,--build-id=none \
-		-Wl,-M -Wl,-T,test.ld \
+		-Wl,-M -Wl,-T,fw.ld \
 		-m68000 -nostdlib \
 		-o $@ $^ \
 		-lgcc \
-		> test.map
+		> fw.map
 
 %.o: %.s
 	m68k-linux-gnu-gcc -m68000 -c $^ -o $@
@@ -27,4 +31,4 @@ test: $(OBJ)
 	m68k-linux-gnu-gcc -O1 -m68000 -c $^ -o $@
 
 clean:
-	rm -f *.o test test.bin test.dump test.map
+	rm -f *.o fw fw.bin fw.dump fw.map

@@ -13,10 +13,10 @@ greybox_tmp
 cpu_rom.mif
 
 fw/*.o
-fw/test
-fw/test.bin
-fw/test.dump
-fw/test.map
+fw/fw
+fw/fw.bin
+fw/fw.dump
+fw/fw.map
 
 firmware/*.list
 firmware/*.rom
