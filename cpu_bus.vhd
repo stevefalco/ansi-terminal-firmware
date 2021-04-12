@@ -23,6 +23,7 @@ entity cpu_bus is
 		cpuDataIn	: out std_logic_vector (15 downto 0);
 		cpuRWn		: in std_logic;
 		cpuInt_n	: out std_logic_vector (2 downto 0);
+		cpuVPAn		: out std_logic;
 		cpuDTACKn	: out std_logic;
 		cpuASn		: in std_logic;
 
@@ -173,10 +174,10 @@ begin
 									cpuLEDsWR <= '1';
 								end if;
 
-							when 16#7ffffa# =>
+							--when 16#7ffffa# =>
 								-- It looks like the peripheral gets queried
 								-- and has to respond with a vector number.
-								cpuDataIn <= "0000000000011010";
+							--	cpuDataIn <= "0000000000011010";
 
 							when others =>
 								null;
@@ -262,8 +263,10 @@ begin
 	begin
 		if(cpuUartInt = '1' or cpuKbInt = '1') then
 			cpuInt_n <= "101";
+			cpuVPAn <= '0';
 		else
 			cpuInt_n <= "101";
+			cpuVPAn <= '0';
 		end if;
 	end process;
 

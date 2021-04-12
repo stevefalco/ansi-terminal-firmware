@@ -177,6 +177,7 @@ architecture a of terminal is
 			cpuDataIn	: out std_logic_vector (15 downto 0);
 			cpuRWn		: in std_logic;
 			cpuInt_n	: out std_logic_vector(2 downto 0);
+			cpuVPAn		: out std_logic;
 			cpuDTACKn	: out std_logic;
 			cpuASn		: in std_logic;
 
@@ -281,14 +282,11 @@ architecture a of terminal is
 		);
 	end component;
 
-	-- ----------------------------------------------------------------------------------------------------
-
 	signal cpuClock			: std_logic := '0';
 	signal enPhi1			: std_logic := '0';
 	signal enPhi2			: std_logic := '0';
 	signal extReset			: std_logic := '1';
 	signal DTACKn			: std_logic := '1';
-	signal VPAn			: std_logic := '1';
 	signal BERRn			: std_logic := '1';
 	signal BRn			: std_logic := '1';
 	signal BGACKn			: std_logic := '1';
@@ -310,9 +308,8 @@ architecture a of terminal is
 	signal oEdb			: std_logic_vector(15 downto 0) := (others => '0');	-- Output data
 	signal eab			: std_logic_vector(23 downto 1) := (others => '0');	-- Address
 
-	-- ----------------------------------------------------------------------------------------------------
-
 	signal cpuInt_n			: std_logic_vector (2 downto 0) := (others => '1');	-- Interrupt level
+	signal cpuVPAn			: std_logic;						-- Autovector flag
 
 	signal LDSn			: std_logic;
 	signal UDSn			: std_logic;
@@ -495,7 +492,7 @@ begin
 			oHALTEDn => oHALTEDn,
 
 			DTACKn => DTACKn,
-			VPAn => VPAn,
+			VPAn => cpuVPAn,
 			BERRn => BERRn,
 			BRn => BRn,
 			BGACKn => BGACKn,
@@ -614,6 +611,7 @@ begin
 			cpuDataIn => iEdb,		-- CPU input data from cpuBus
 			cpuRWn => eRWn,
 			cpuInt_n => cpuInt_n,
+			cpuVPAn => cpuVPAn,
 			cpuDTACKn => DTACKn,
 			cpuASn => ASn,
 

@@ -1,0 +1,5 @@
+For interrupts, during the interrupt acknowledge bus cycle, a peripheral
+provides an 8-bit vector number (see Figure 6-2) to the processor on data
+bus lines D7–D0.
+
+But for older peripherals, we might be able to pull VPAn low to autovector.
