@@ -280,6 +280,55 @@ screen_normal_char(uint8_t c)
 }
 
 void
+screen_handle_bs()
+{
+	volatile uint16_t *start_of_line;
+	volatile uint16_t *proposed_new_position;
+
+	// We want to move the cursor backwards one position, but we cannot
+	// go before col=0 of the row.
+	// 
+	// Also, if we happen to be in column 79, we will land in column 78,
+	// meaning that we must clear the col79 flag.  It is always safe to
+	// do this.
+	screen_col79_flag = 0;
+	
+	// Find the beginning of the line, so we don't move too far.
+	start_of_line = screen_cursor_start_of_line();
+	proposed_new_position = screen_cursor_location - 1;
+	if(proposed_new_position >= start_of_line) {
+		// The move is good.  The current position is no longer a cursor.
+		*screen_cursor_location &= ~null_cursor;
+
+		// Back up one position.
+		screen_cursor_location = proposed_new_position;
+
+		// The new position is a cursor.
+		*screen_cursor_location |= null_cursor;
+	}
+}
+
+void
+screen_handle_ht()
+{
+}
+
+void
+screen_handle_lf()
+{
+}
+
+void
+screen_handle_cr()
+{
+}
+
+void
+screen_begin_escape()
+{
+}
+
+void
 screen_handler()
 {
 	int rv;
@@ -304,43 +353,46 @@ screen_handler()
 		return;
 	}
 
-	msg("special char");
-#if 0
+	switch(rv) {
+		// Is it a backspace?
+		case char_bs:
+			screen_handle_bs();
+			break;
 
-	// There are not too many special characters, so we won't bother
-	// with a jump table.
+		// Is it a horizontal tab?
+		case char_ht:
+			screen_handle_ht();
+			break;
 
-	// Is it a backspace?
-	cp	char_bs
-	jp	Z, screen_handle_bs
+		// Is it a line feed?
+		case char_lf:
+			screen_handle_lf();
+			break;
 
-	// Is it a horizontal tab?
-	cp	char_ht
-	jp	Z, screen_handle_ht
+		// Is it a vertical tab?  This is handled like a line-feed according to a
+		// VT102 document I found.
+		case char_vt:
+			screen_handle_lf();
+			break;
 
-	// Is it a line feed?
-	cp	char_lf
-	jp	Z, screen_handle_lf
+		// Is it a form feed?  This is handled like a line-feed according to a
+		// VT102 document I found.
+		case char_ff:
+			screen_handle_lf();
+			break;
 
-	// Is it a vertical tab?  This is handled like a line-feed according to a
-	// VT102 document I found.
-	cp	char_vt
-	jp	Z, screen_handle_lf
+		// Is it a carriage return?
+		case char_cr:
+			screen_handle_cr();
+			break;
 
-	// Is it a form feed?  This is handled like a line-feed according to a
-	// VT102 document I found.
-	cp	char_ff
-	jp	Z, screen_handle_lf
+		// Is it an escape?
+		case char_escape:
+			screen_begin_escape();
+			break;
 
-	// Is it a carriage return?
-	cp	char_cr
-	jp	Z, screen_handle_cr
-
-	// Is it an escape?
-	cp	char_escape
-	jp	Z, screen_begin_escape
-
-	// Nothing we care about.  Toss it.
-	ret
-#endif
+		// Nothing we care about.  Toss it.
+		default:
+			break;
+	}
 }
