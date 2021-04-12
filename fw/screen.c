@@ -157,16 +157,28 @@ screen_escape_handler(uint8_t c)
 static int
 screen_cursor_in_line()
 {
-	int tmp = (screen_cursor_location - screen_base) % screen_cols;
+	int diff = screen_cursor_location - screen_base;
+	int line = 0;
 
-	dump("screen_cursor_in_line", tmp);
+	msg("screen_cursor_in_line begins");
 
-	return tmp;
+	// I tried using modulo here, but the program crashes.  There must be some sort of
+	// exception generated.
+	while(diff >= screen_cols) {
+		++line;
+		diff -= screen_cols;
+	}
+
+	dump("screen_cursor_in_line", line);
+
+	return line;
 }
 
 static volatile uint16_t *
 screen_cursor_start_of_line()
 {
+	msg("screen_cursor_start_of_line begins");
+
 	volatile uint16_t *tmp;
 
 	// Find what line we are on.  The call returns 0 to 23 in register A.
@@ -212,8 +224,11 @@ screen_normal_char(uint8_t c)
 			screen_cursor_location = screen_last_line_start;
 		}
 
-		// Put the character on screen, and make it a cursor.
-		*screen_cursor_location = c | null_cursor;
+		// Put the character on screen.
+		*screen_cursor_location++ = c;
+
+		// Make the new position a cursor.
+		*screen_cursor_location |= null_cursor;
 
 		// Clear the col 79 flag
 		screen_col79_flag = 0;
@@ -221,12 +236,16 @@ screen_normal_char(uint8_t c)
 		return;
 	}
 
+	msg("finding eol");
 	// Find the end of the line, so we don't move too far.
 	p = screen_cursor_start_of_line() + (screen_cols - 1);
 	if(screen_cursor_location < p) {
 		// This is the normal case.  Place the character on the screen and
-		// move the cursor.  Also, make the new character a cursor.
-		*screen_cursor_location++ = c | null_cursor;
+		// move the cursor.
+		*screen_cursor_location++ = c;
+
+		// Make the new position a cursor.
+		*screen_cursor_location |= null_cursor;
 		return;
 	}
 
