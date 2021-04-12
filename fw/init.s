@@ -40,8 +40,6 @@ _start:
 	| pointer pre-decrements so we actually want the LWA+1 here.
 	mov.l	#0x00008000, %sp
 
- andi.w #~0x0700, %sr
-
 	| Initialize the C global variables that start off as non-zero.
 	|
 	| Our linker control file specifies 4-byte alignment of the
@@ -88,13 +86,13 @@ _level4:
 _level5:
 _level6:
 _level7:
-	mov.b	0xff, 0xc080
+	mov.b	#0xff, 0xc080
 
 	bra.s	_start
 
 | UART RX and KB RX interrupts.
 _level2:
-	mov.b	0x01, 0xc080
+	mov.b	#0x01, 0xc080
 
 	| See if the UART has anything for us.
 	jsr	uart_test_interrupt

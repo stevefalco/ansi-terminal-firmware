@@ -174,11 +174,6 @@ begin
 									cpuLEDsWR <= '1';
 								end if;
 
-							--when 16#7ffffa# =>
-								-- It looks like the peripheral gets queried
-								-- and has to respond with a vector number.
-							--	cpuDataIn <= "0000000000011010";
-
 							when others =>
 								null;
 						end case;
@@ -205,68 +200,23 @@ begin
 		end if;
 	end process;
 
-	-- In this discussion, we consider that CPU clock cycles begin with a
-	-- rising clock edge, and we call that edge "Rising Edge #1".  "Falling
-	-- edge #1" occurs in the middle of the first CPU clock cycle.  CPU
-	-- clock cycles are also known as T-States.
-	--
-	-- READ Cycles:
-	--
-	-- The CPU puts out an address on Rising Edge #1.  Then, on Falling
-	-- Edge #1 it asserts nRD.  Then, on Falling Edge #3 it samples the
-	-- data and deasserts nRD.  Thus, nRD is low for Rising Edge #2 and
-	-- Rising Edge #3.
-	--
-	-- That is a problem for the UART, because it will pop received characters
-	-- out of its FIFO on each rising edge, and so we would lose a character.
-	--
-	-- When reading from the UART, we therefore shorten UART CS by masking
-	-- out the first half of it.  The keyboard has a similar restriction,
-	-- so we shorten its CS too.
-	--
-	-- WRITE Cycles:
-	--
-	-- The CPU puts out an address on Rising Edge #1.  Then, it puts out
-	-- the data to be written on Falling Edge #1.  It then asserts the nWR
-	-- signal on Falling Edge #2 and deasserts it on Falling Edge #3.
-	--
-	-- Thus, the UART will capture the data on Rising Edge #3, and no adjustment
-	-- to UART CS is needed when writing.
---	uartDelay: process(cpuClock)
---	begin
---		if (falling_edge(cpuClock)) then
---			cpuUartCS_D1 <= cpuUartCS_D0;
---		end if;
---	end process;
---	cpuUartCS <= cpuUartCS_D0 and cpuUartCS_D1 when cpuRWn = '1' else cpuUartCS_D0;
---
---	-- Similar to the UART case, we want to assert the KB CS on the second
---	-- cycle.  The keyboard register interface will capture the various
---	-- data, so they will persist until the next "data ready".
---	--
---	-- We don't support writing to the keyboard, although in theory we could.
---	kbDelay: process(cpuClock)
---	begin
---		if (falling_edge(cpuClock)) then
---			cpuKbCS_D1 <= cpuKbCS_D0;
---		end if;
---	end process;
---	cpuKbCS <= cpuKbCS_D0 and cpuKbCS_D1;
---
-
 	-- We could use multiple interrupt levels, but that is unnecessary.  Instead,
 	-- we just let the CPU poll both devices.
 	-- 
 	-- The peripheral interrupt lines are active-high, but the CPU interrupts are
 	-- active-low.  We use "101" which means "interrupt 2".
+	--
+	-- The CPU normally expects peripherals to respond to an Interrupt Acknowledge
+	-- (IACK) cycle.  However, if we assert cpuVPAn, then the CPU ignores the IACK
+	-- and instead "autovectors".  That is sufficient for our purposes.
 	cpu_int_process: process(all)
 	begin
 		if(cpuUartInt = '1' or cpuKbInt = '1') then
 			cpuInt_n <= "101";
 			cpuVPAn <= '0';
 		else
-			cpuInt_n <= "101";
-			cpuVPAn <= '0';
+			cpuInt_n <= "111";
+			cpuVPAn <= '1';
 		end if;
 	end process;
 
