@@ -9,6 +9,7 @@
 
 #include "keyboard.h"
 #include "uart.h"
+#include "debug.h"
 
 // Keyboard registers
 #define keyboard_base		(0xc040)

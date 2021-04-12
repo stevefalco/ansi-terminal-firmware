@@ -311,6 +311,35 @@ screen_handle_bs()
 void
 screen_handle_ht()
 {
+	volatile uint16_t *p;
+	int col_number;
+
+	// Move the cursor to the next modulo-8 position on the line.
+	//
+	// First, get the starting address of the line.
+	p = screen_cursor_start_of_line();
+
+	// This position is no longer a cursor.
+	*screen_cursor_location &= ~null_cursor;
+	
+	// Find the new location.  Note that we must stay in this line, so we
+	// must not go past column 79.
+	col_number = screen_cursor_location - p;
+
+	col_number += 8;	// Move forward 8 positions
+	col_number &= ~7;	// Clear three LSBs
+
+	// Now we need to make sure we didn't run off the end of the line.
+	if(col_number > 79) {
+		// We went too far.  Instead, we need to stop at column 79.
+		col_number = screen_cols - 1;
+	}
+
+	// Move to the new position.
+	screen_cursor_location = p + col_number;
+	
+	// The new position is a cursor.
+	*screen_cursor_location |= null_cursor;
 }
 
 void
