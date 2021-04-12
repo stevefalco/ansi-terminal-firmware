@@ -394,6 +394,18 @@ screen_handle_lf()
 void
 screen_handle_cr()
 {
+	// No matter what, we will land in colunm 0, meaning that we must clear
+	// the col79 flag.  It is always safe to do this.
+	screen_col79_flag = 0;
+
+	// No longer a cursor.
+	*screen_cursor_location &= ~null_cursor;
+	
+	// Find the start of whatever line the cursor is on.
+	screen_cursor_location = screen_cursor_start_of_line();
+
+	// The new position is a cursor.
+	*screen_cursor_location |= null_cursor;
 }
 
 void
