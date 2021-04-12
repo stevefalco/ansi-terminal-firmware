@@ -45,8 +45,8 @@ static volatile uint16_t	*screen_base = (volatile uint16_t *)(0x8000);
 
 static volatile uint16_t	*screen_cursor_location;	// Pointer into video memory.
 static volatile uint16_t	*screen_cursor_location_save;	// A place to save the cursor for ESC-7 and ESC-8
-static uint16_t	*screen_current_fwa;		// FWA changes with scroll region
-static uint16_t	*screen_current_lwa_p1;		// LWA+1 changes with scroll region
+static volatile uint16_t	*screen_current_fwa;		// FWA changes with scroll region
+static volatile uint16_t	*screen_current_lwa_p1;		// LWA+1 changes with scroll region
 
 static uint8_t	screen_escape_state;		// State machine variable.
 static uint8_t	screen_group_0_digits;		// Group 0 accumulated digits.
@@ -89,8 +89,8 @@ screen_initialize()
 	screen_dec_bottom_margin = screen_lines - 1;
 
 	// Start off with the screen start and end properly set.
-	screen_current_fwa = (uint16_t *)screen_base;
-	screen_current_lwa_p1 = (uint16_t *)screen_end;
+	screen_current_fwa = screen_base;
+	screen_current_lwa_p1 = screen_end;
 }
 
 static void
@@ -345,6 +345,50 @@ screen_handle_ht()
 void
 screen_handle_lf()
 {
+	int curr_line;
+	int new_line;
+	volatile uint16_t *proposed_new_position;
+
+	// There are two cases.  If we are within the scroll region, we move
+	// down or scroll.  But if we are not within the scroll region, we
+	// do an absolute move.
+	curr_line = screen_cursor_in_line();
+	if(curr_line < screen_dec_top_margin || curr_line > screen_dec_bottom_margin) {
+		// Absolute move, bounded by screen dimensions.  No scrolling.
+		new_line = curr_line + 1;
+		if(new_line > (screen_lines - 1)) {
+			// We would land past the last row - do nothing.
+			return;
+		}
+
+		// This position is no longer a cursor.
+		*screen_cursor_location &= ~null_cursor;
+
+		// Find new position - known good.
+		screen_cursor_location += screen_cols;
+
+		// The new position is a cursor.
+		*screen_cursor_location |= null_cursor;
+
+		return;
+	}
+
+	// This position is no longer a cursor.
+	*screen_cursor_location &= ~null_cursor;
+
+	// We are within the scroll region.  In this case, line-feed means we
+	// move 80 characters forward, but if that would move us out of the
+	// scroll region, then we have to scroll up one line.
+	proposed_new_position = screen_cursor_location + screen_cols;
+	if(proposed_new_position >= screen_current_lwa_p1) {
+		// Must scroll up.
+		screen_scroll_up();
+	} else {
+		screen_cursor_location = proposed_new_position;
+	}
+
+	// The new position is a cursor.
+	*screen_cursor_location |= null_cursor;
 }
 
 void
