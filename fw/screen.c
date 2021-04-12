@@ -111,6 +111,36 @@ screen_escape_in_sharp(uint8_t c)
 static void
 screen_scroll_up()
 {
+	int to_scroll;
+	int to_move;
+	int i;
+	volatile uint16_t *destination;
+	volatile uint16_t *source;
+
+	// We have to respect the scroll regions.  Figure out how many
+	// lines are to be scrolled.
+	//
+	// If we are unlimited, the top line is 0, the bottom line is 23.
+	// and the difference is 23, which is the correct number of lines
+	// to scroll.
+	to_scroll = screen_dec_bottom_margin - screen_dec_top_margin;
+
+	// Calculate the number of cells to move.
+	to_move = to_scroll * screen_cols;
+
+	// Calculate the starting destination line FWA.  The top line number
+	// is still in C, and DE still has 80.
+	destination = screen_base + (screen_dec_top_margin * screen_cols);
+	source = destination + screen_cols;
+	for(i = 0; i < to_move; i++) {
+		*destination++ = *source++;
+	}
+
+	// Now clear the last line, since it is "new".
+	destination = screen_base + (screen_dec_bottom_margin * screen_cols);
+	for(i = 0; i < screen_cols; i++) {
+		*destination++ = 0;
+	}
 }
 
 static void
@@ -160,8 +190,6 @@ screen_cursor_in_line()
 	int diff = screen_cursor_location - screen_base;
 	int line = 0;
 
-	msg("screen_cursor_in_line begins");
-
 	// I tried using modulo here, but the program crashes.  There must be some sort of
 	// exception generated.
 	while(diff >= screen_cols) {
@@ -169,23 +197,17 @@ screen_cursor_in_line()
 		diff -= screen_cols;
 	}
 
-	dump("screen_cursor_in_line", line);
-
 	return line;
 }
 
 static volatile uint16_t *
 screen_cursor_start_of_line()
 {
-	msg("screen_cursor_start_of_line begins");
-
 	volatile uint16_t *tmp;
 
 	// Find what line we are on.  The call returns 0 to 23 in register A.
 	// As a side effect, it also clears carry.
 	tmp = screen_base + (screen_cursor_in_line() * screen_cols);
-
-	dump("screen_cursor_start_of_line", (unsigned int)tmp);
 
 	return tmp;
 }
@@ -236,7 +258,6 @@ screen_normal_char(uint8_t c)
 		return;
 	}
 
-	msg("finding eol");
 	// Find the end of the line, so we don't move too far.
 	p = screen_cursor_start_of_line() + (screen_cols - 1);
 	if(screen_cursor_location < p) {
@@ -279,7 +300,6 @@ screen_handler()
 	//
 	// Printing characters run from 0x20 through 0x7f.
 	if(rv >= ' ') {
-		dump("normal char ", rv);
 		screen_normal_char(rv);
 		return;
 	}
