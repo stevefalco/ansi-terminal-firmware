@@ -96,6 +96,48 @@ screen_initialize()
 static void
 screen_escape_handler_first(uint8_t c)
 {
+	// Clear our working storage.
+	screen_group_0_digits = 0;
+	screen_group_1_digits = 0;
+	screen_group_pointer = &screen_group_0_digits;
+
+	// This is the first character after an escape.
+	switch(c) {
+		case '[':
+			screen_escape_handler_start_csi();
+			break;
+
+		case '#':
+			screen_start_sharp();
+			break;
+
+		case '7':
+			screen_save_cursor_position();
+			break;
+
+		case '8':
+			screen_restore_cursor_position();
+			break;
+
+		case 'D':
+			screen_handle_esc_lf();
+			break;
+
+		case 'E':
+			screen_handle_esc_cr_lf();
+			break;
+
+		case 'M':
+			screen_handle_reverse_scroll();
+			break;
+
+		// Eventually there may be additional first chars.  This is the
+		// catch-all, which we shouldn't ever hit.  So, clear the escape
+		// state and give up.
+		default:
+			screen_escape_state = escape_none_state;
+			break;
+	}
 }
 
 static void
@@ -411,6 +453,12 @@ screen_handle_cr()
 void
 screen_begin_escape()
 {
+	// An escape sequence is variable length.  We need a state-machine to
+	// keep track of where we are in a potential sequence.
+	//
+	// We have seen an escape character, so we now must wait for the next
+	// character to see what it means.
+	screen_escape_state = escape_need_first_state;
 }
 
 void
