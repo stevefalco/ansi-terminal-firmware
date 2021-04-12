@@ -92,9 +92,18 @@ _level7:
 
 | UART RX and KB RX interrupts.
 _level2:
+	| Save all registers on the stack.
+	movem.l	%d0-%d7/%a0-%a6, -(%sp)
+
 	mov.b	#0x01, 0xc080
+
+	| See if the keyboard has anything for us.
+	jsr	keyboard_test_interrupt
 
 	| See if the UART has anything for us.
 	jsr	uart_test_interrupt
+
+	| Restore all registers from the stack.
+	movem.l	(%sp)+, %d0-%d7/%a0-%a6
 
 	rte

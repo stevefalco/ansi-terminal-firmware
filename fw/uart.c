@@ -14,8 +14,6 @@
 
 #include "uart.h"
 
-typedef unsigned char uint8_t;
-
 // UART registers
 #define uart_base		(0xc000)
 #define uart_RBR		(*(volatile uint8_t *)(uart_base + 0x00))	// Receiver Buffer Register - read-only
@@ -193,7 +191,7 @@ uart_store_char()
 {
 	// Read the character - we have to do this even if there is no
 	// room to store it, because reading clears the interrupt.
-	char val = uart_RBR;
+	uint8_t val = uart_RBR;
 
 	if(uart_rb_count > uart_high_water) {
 		// Above high water - clear RTS so the sender will pause.

@@ -402,14 +402,14 @@ begin
 
 	-- LEDS <= "00000000";
 	-- LEDS <= cpuControlQ;
-	LEDS <= cpuLEDsQ;
+	-- LEDS <= cpuLEDsQ;
 
 	-- Create a 108.0 MHz dot clock from the 12 MHz oscillator.
 	dotClockGen: dot_clock
 		port map
 		(
 			inclk0 => CLK12M,
-			c0 => dotClock		-- 108.0 MHz
+			c0 => dotClock		-- 108.0 MHz, 9.259... ns period
 		);
 
 	-- Create a 51.6 MHz cpu clock from the 12 MHz oscillator.
@@ -418,7 +418,7 @@ begin
 		port map
 		(
 			inclk0 => CLK12M,
-			c0 => cpuClock		-- 51.6 MHz
+			c0 => cpuClock		-- 51.6 MHz, 19.38 ns period
 		);
 
 	phaseProcess: process(cpuClock)

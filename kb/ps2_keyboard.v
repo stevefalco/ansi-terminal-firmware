@@ -152,10 +152,20 @@ module ps2_keyboard_interface (
 // Parameters
 
 // The timer value can be up to (2^bits) inclusive.
-parameter TIMER_60USEC_VALUE_PP = 774;  // Number of sys_clks for 60usec.
-parameter TIMER_60USEC_BITS_PP  = 10;   // Number of bits needed for timer
-parameter TIMER_5USEC_VALUE_PP = 63;    // Number of sys_clks for debounce
-parameter TIMER_5USEC_BITS_PP  = 6;     // Number of bits needed for timer
+//
+// We have a 51.6 MHz cpu clock, which has a 19.38 ns period.
+//
+// For 60 us, we calculate 60000 / 19.38 = 3095.97, round up to 3096.
+// Converting to binary, 3096 needs 12 bits for the counter.
+//
+// For 5 us, we calculate 5000 / 19.38 = 257.99, round up to 258.
+// Converting to binary, 258 needs 9 bits for the counter.  We could
+// use 255 and save a bit, but it hardly matters.
+//
+parameter TIMER_60USEC_VALUE_PP = 3096;	// Number of sys_clks for 60 usec.
+parameter TIMER_60USEC_BITS_PP  = 12;   // Number of bits needed for timer
+parameter TIMER_5USEC_VALUE_PP = 258;    // Number of sys_clks for 5 usec debounce
+parameter TIMER_5USEC_BITS_PP  = 9;     // Number of bits needed for timer
 parameter TRAP_SHIFT_KEYS_PP = 1;       // Trap shift keys - i.e. don't output scan codes for them.
 parameter TRAP_CONTROL_KEYS_PP = 1;     // Trap control keys - i.e. don't output scan codes for them.
 parameter TRAP_ALT_KEYS_PP = 1;         // Trap alt keys - i.e. don't output scan codes for them.

@@ -1,54 +1,9 @@
 #include "dump.h"
+#include "keyboard.h"
 #include "uart.h"
 
-#define BS (24 * 80)
-
-char buf[BS];
-
-void
-fillMem()
-{
-	int i;
-	int j;
-	int k;
-	char *p = buf;
-
-	for(i = 0; i < 24; i++) {
-		for(j = 0; j < 8; j++) {
-			for(k = 0; k < 10; k++) {
-				*p++ = '0' + k;
-			}
-		}
-	}
-}
-
-void
-copyForward()
-{
-	int i;
-	char *p = buf;
-
-	volatile char *q = (volatile char *)0x8001;
-
-	for(i = 0; i < BS; i++) {
-		*q = *p++;
-		q += 2;
-	}
-}
-
-void
-copyBackward()
-{
-	int i;
-	char *p = buf;
-
-	volatile char *q = (volatile char *)0x8eff;
-
-	for(i = 0; i < BS; i++) {
-		*q = *p++;
-		q -= 2;
-	}
-}
+static int inactive = 0;
+static int blanked = 0;
 
 void
 main()
@@ -62,6 +17,8 @@ main()
 	*pControl = 1;
 
 	uart_initialize();
+	screen_initialize();
+	keyboard_initialize();
 
 	// Read the status register.
 	asm(" mov.w %%sr, %0\n\t" : "=r" (sr));
@@ -72,18 +29,34 @@ main()
 
 	uart_transmit_string("test it\n\r");
 
-	fillMem();
-
 	while(1) {
-		copyForward();
-		for(i = 0; i < 500000; i++) {
-			;
+		// Get any waiting uart characters and process them.
+		screen_handler();
+
+		// Get any waiting keyboard characters and process them.
+		if(!keyboard_handler()) {
+			// Nothing received from the keyboard.  Keep a
+			// count so we can blank the screen if we go
+			// too long without activity.
+			//
+			// Only increment when not blanked, else the
+			// counter might overflow and turn the screen
+			// back on.
+			if(!blanked) {
+				inactive++;
+			}
+		} else {
+			// Got something from the keyboard.  Reset
+			// flags and turn screen back on.
+			blanked = 0;
+			inactive = 0;
+			*pControl = 1;
 		}
 
-		copyBackward();
-		for(i = 0; i < 500000; i++) {
-			;
+		if(inactive > 1000000) {
+			// We've been inactive too long.  Blank the screen.
+			*pControl = 0;
+			blanked = 1;
 		}
-
 	}
 }
