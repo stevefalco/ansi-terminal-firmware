@@ -212,8 +212,6 @@ uart_store_char()
 void
 uart_test_interrupt()
 {
-	uart_transmit_string("got interrupt\n\r");
-
 	// Interrupt-pending bit is active-low.
 	// (Bit_0 = 1) means no interrupt
 	//

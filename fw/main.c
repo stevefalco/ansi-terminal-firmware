@@ -1,5 +1,6 @@
 #include "dump.h"
 #include "keyboard.h"
+#include "screen.h"
 #include "uart.h"
 
 static int inactive = 0;
@@ -21,13 +22,14 @@ main()
 	keyboard_initialize();
 
 	// Read the status register.
-	asm(" mov.w %%sr, %0\n\t" : "=r" (sr));
-	dump("sr = ", sr);
+	// asm(" mov.w %%sr, %0\n\t" : "=r" (sr));
+	// dump("sr = ", sr);
 
 	// Enable interrupts.
 	asm(" andi.w #~0x0700, %sr");
 
-	uart_transmit_string("test it\n\r");
+	// FIXME - remove this soonish.
+	uart_transmit_string("Program begins...\n\r");
 
 	while(1) {
 		// Get any waiting uart characters and process them.
@@ -53,7 +55,8 @@ main()
 			*pControl = 1;
 		}
 
-		if(inactive > 1000000) {
+		// Should be about 15 minutes.
+		if(inactive > 45000000) {
 			// We've been inactive too long.  Blank the screen.
 			*pControl = 0;
 			blanked = 1;

@@ -86,8 +86,6 @@ _level4:
 _level5:
 _level6:
 _level7:
-	mov.b	#0xff, 0xc080
-
 	bra.s	_start
 
 | UART RX and KB RX interrupts.
@@ -95,7 +93,8 @@ _level2:
 	| Save all registers on the stack.
 	movem.l	%d0-%d7/%a0-%a6, -(%sp)
 
-	mov.b	#0x01, 0xc080
+	| Write to LED register
+	| mov.b	#0x01, 0xc080
 
 	| See if the keyboard has anything for us.
 	jsr	keyboard_test_interrupt
