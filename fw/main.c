@@ -1,4 +1,4 @@
-#include "dump.h"
+#include "debug.h"
 #include "keyboard.h"
 #include "screen.h"
 #include "uart.h"
@@ -23,7 +23,7 @@ main()
 
 	// Read the status register.
 	// asm(" mov.w %%sr, %0\n\t" : "=r" (sr));
-	// dump("sr = ", sr);
+	// dump("sr =", sr);
 
 	// Enable interrupts.
 	asm(" andi.w #~0x0700, %sr");
@@ -56,7 +56,7 @@ main()
 		}
 
 		// Should be about 15 minutes.
-		if(inactive > 45000000) {
+		if(inactive > 52200000) {
 			// We've been inactive too long.  Blank the screen.
 			*pControl = 0;
 			blanked = 1;

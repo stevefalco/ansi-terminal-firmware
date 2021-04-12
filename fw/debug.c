@@ -1,4 +1,4 @@
-#include "dump.h"
+#include "debug.h"
 #include "uart.h"
 
 void
@@ -8,6 +8,7 @@ dump(char *prefix, unsigned int c)
 	unsigned char tmp;
 
 	uart_transmit_string(prefix);
+	uart_transmit(' ');
 
 	for(i = 7; i >= 0; i--) {
 		// Get a nibble.
@@ -21,5 +22,12 @@ dump(char *prefix, unsigned int c)
 		uart_transmit(tmp);
 	}
 
-	uart_transmit_string("\n\r");
+	uart_transmit_string("\r\n");
+}
+
+void
+msg(char *str)
+{
+	uart_transmit_string(str);
+	uart_transmit_string("\r\n");
 }

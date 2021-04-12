@@ -113,7 +113,7 @@
 #define uart_depth		(128)						// SW receiver fifo depth
 #define uart_high_water		(64)
 
-static int baud_table[] = {
+static uint16_t baud_table[] = {
 	29318,	// sw=0 for 110 baud
 	10750,	// sw=1 for 300 baud
 	5375,	// sw=2 for 600 baud
@@ -138,7 +138,7 @@ uart_set_baud()
 	uint8_t switches = dipSW;
 
 	// We are using bits 0-3 for the baud rate, so mask out the rest.
-	int divisor = baud_table[switches & dipBaudMask];
+	uint16_t divisor = baud_table[switches & dipBaudMask];
 
 	// Unlock divisor registers.
 	uart_LCR |= uart_LCR_DLAB_v;
