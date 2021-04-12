@@ -21,6 +21,7 @@ SECTIONS {
 
 	.text : {
 		* (.text*)
+		* (.rodata .rodata* .gnu.linkonce.r.*)
 		_etext = .;
 	} > rom
 

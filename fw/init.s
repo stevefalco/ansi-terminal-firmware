@@ -105,4 +105,5 @@ _level2:
 	| Restore all registers from the stack.
 	movem.l	(%sp)+, %d0-%d7/%a0-%a6
 
+	| Return from exception.
 	rte
