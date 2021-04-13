@@ -230,7 +230,7 @@ screen_scroll_down()
 	}
 }
 
-void
+static void
 screen_handle_lf()
 {
 	int curr_line;
@@ -279,7 +279,7 @@ screen_handle_lf()
 	*screen_cursor_location |= null_cursor;
 }
 
-void
+static void
 screen_handle_cr()
 {
 	// No matter what, we will land in colunm 0, meaning that we must clear
@@ -430,7 +430,7 @@ screen_parse_dec_command(uint8_t c)
 	return;
 }
 
-void
+static void
 screen_handle_bs()
 {
 	volatile uint16_t *start_of_line;
@@ -459,7 +459,7 @@ screen_handle_bs()
 	}
 }
 
-void
+static void
 screen_handle_ht()
 {
 	volatile uint16_t *p;
@@ -821,7 +821,6 @@ static void
 screen_clear_rows()
 {
 	volatile uint16_t *p;
-	volatile uint16_t *limit;
 
 	// There are three subsets:
 	// 0 = erase below
@@ -829,29 +828,20 @@ screen_clear_rows()
 	// 2 = erase all
 	switch(screen_group_0_digits) {
 		case 0: // erase below
-			p = screen_cursor_location;
-			limit = screen_end;
-
-			while(p < limit) {
-				*p++ = 0;
+			for(p = screen_cursor_location; p < screen_end; p++) {
+				*p = 0;
 			}
 			break;
 
 		case 1: // erase above
-			p = screen_cursor_location;
-			limit = screen_base;
-
-			while(p >= limit) {
-				*p-- = 0;
+			for(p = screen_cursor_location; p >= screen_base; p--) {
+				*p = 0;
 			}
 			break;
 
 		case 2: // erase all
-			p = screen_base;
-			limit = screen_end;
-
-			while(p < limit) {
-				*p++ = 0;
+			for(p = screen_base; p < screen_end; p++) {
+				*p = 0;
 			}
 			break;
 
@@ -869,85 +859,46 @@ screen_clear_rows()
 static void
 screen_clear_columns()
 {
-	
-#if 0
-	// Clear the character under the cursor, by painting a null + cursor.
-	ld	a, null_cursor
-	ld	hl, (screen_cursor_location)
-	ld	(hl), a
+	volatile uint16_t *p;
+	volatile uint16_t *line_start;
+	volatile uint16_t *line_end;
+
+	line_start = screen_cursor_start_of_line();
+	line_end = line_start + screen_cols;
 
 	// There are three subsets:
 	// 0 = erase to the right
 	// 1 = erase to the left
 	// 2 = erase the whole line
-	ld	a, (screen_group_0_digits)		// A = type of clear
-	cp	0					// Erase to the right
-	jr	Z, screen_clear_cols_right
-	cp	1					// Erase to the left
-	jr	Z, screen_clear_cols_left
-	
-	// Clear everything on the line.
-	call	screen_cursor_start_of_line		// HL = FWA of this line
-	ld	b, screen_cols				// DE = 80
-	xor	a					// Clear A and clear carry
-screen_clear_cols_all:
-	ld	(hl), a					// Clear the character
-	inc	hl					// Next position to clear
-	djnz	screen_clear_cols_all
+	switch(screen_group_0_digits) {
+		case 0: // erase right
+			for(p = screen_cursor_location; p < line_end; p++) {
+				*p = 0;
+			}
+			break;
+
+		case 1: // erase left
+			for(p = screen_cursor_location; p >= line_start; p--) {
+				*p = 0;
+			}
+			break;
+
+		case 2: // erase line
+			for(p = line_start; p < line_end; p++) {
+				*p = 0;
+			}
+			break;
+
+		default:
+			break;
+
+	}
 
 	// Put the cursor back on screen.
-	ld	hl, (screen_cursor_location)
-	set	7, (hl)
-		
-	jr	screen_clear_cols_done
-
-screen_clear_cols_right:
-	// Find the end of the line, so we don't move too far.
-	call	screen_cursor_start_of_line		// HL = FWA of this line
-	ld	de, screen_cols				// DE = 80
-	add	hl, de					// HL = LWA+1 of this line, clears carry
-	ex	de, hl					// DE = LWA+1, HL=80
-	ld	hl, (screen_cursor_location)		// HL = cursor location
-
-screen_clear_right_loop:
-	inc	hl					// Next position to clear
-
-	// Make sure we haven't gone off the end.
-	xor	a					// Clear A and clear carry
-	push	hl					// Save HL on the stack
-	sbc	hl, de					// Sets borrow if DE > HL
-	pop	hl					// HL = position to clear
-	jr	NC, screen_clear_cols_done
-	ld	(hl), a					// Clear the character
-	jr	screen_clear_right_loop
-
-screen_clear_cols_left:
-	// Find the start of the line, so we don't move too far.
-	call	screen_cursor_start_of_line		// HL = FWA of this line
-	ex	de, hl					// DE = FWA
-	ld	hl, (screen_cursor_location)		// HL = cursor location
-
-screen_clear_left_loop:
-	dec	hl					// Next position to clear
-
-	// Make sure we haven't gone off the end.
-	xor	a					// Clear A and clear carry
-	push	hl					// Save HL on the stack
-	sbc	hl, de					// Sets borrow if DE > HL
-	pop	hl					// HL = position to clear
-	jr	C, screen_clear_cols_done
-	ld	(hl), a					// Clear the character
-	jr	screen_clear_left_loop
-
-screen_clear_cols_done:
+	*screen_cursor_location |= null_cursor;
 
 	// Escape sequence complete.
-	ld	a, escape_none_state
-	ld	(screen_escape_state), a
-	ret
-
-
-#endif
+	screen_escape_state = escape_none_state;
 }
 
 static void
