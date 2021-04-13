@@ -390,8 +390,306 @@ screen_escape_handler_first(uint8_t c)
 }
 
 static void
+screen_got_csi_group_N_digit(uint8_t c)
+{
+	uint8_t	*p;
+
+	// We have a digit.  Go into the group N digits state.
+	screen_escape_state = escape_csi_d_N_state;
+
+	// Find the buffer we are using.
+	p = screen_group_pointer;
+
+	// Save this digit.  First, multiply the previous digits, if any, by 10.
+	// Then merge in the new digit.
+	*p = (*p * 10) + (c - '0');
+}
+
+static void
+screen_parse_dec_command(uint8_t c)
+{
+	// We don't handle most of these, but DECCOLM has the side-effect of
+	// reinitializing the screen, and we need that to pass vttest.
+	switch(screen_group_0_digits) {
+		case 3:
+			// We don't care if the last character is "l" or 'h', because we don't
+			// support 132 column mode.  So there is no need to test what is in
+			// c here.
+			screen_initialize();
+			break;
+
+		default:
+			break;
+	}
+
+	// Clear the DEC flag.
+	screen_dec_flag = 0;
+	
+	// Done with this escape sequence
+	screen_escape_state = escape_none_state;
+	return;
+}
+
+void
+screen_handle_bs()
+{
+	volatile uint16_t *start_of_line;
+	volatile uint16_t *proposed_new_position;
+
+	// We want to move the cursor backwards one position, but we cannot
+	// go before col=0 of the row.
+	// 
+	// Also, if we happen to be in column 79, we will land in column 78,
+	// meaning that we must clear the col79 flag.  It is always safe to
+	// do this.
+	screen_col79_flag = 0;
+	
+	// Find the beginning of the line, so we don't move too far.
+	start_of_line = screen_cursor_start_of_line();
+	proposed_new_position = screen_cursor_location - 1;
+	if(proposed_new_position >= start_of_line) {
+		// The move is good.  The current position is no longer a cursor.
+		*screen_cursor_location &= ~null_cursor;
+
+		// Back up one position.
+		screen_cursor_location = proposed_new_position;
+
+		// The new position is a cursor.
+		*screen_cursor_location |= null_cursor;
+	}
+}
+
+void
+screen_handle_ht()
+{
+	volatile uint16_t *p;
+	int col_number;
+
+	// Move the cursor to the next modulo-8 position on the line.
+	//
+	// First, get the starting address of the line.
+	p = screen_cursor_start_of_line();
+
+	// This position is no longer a cursor.
+	*screen_cursor_location &= ~null_cursor;
+	
+	// Find the new location.  Note that we must stay in this line, so we
+	// must not go past column 79.
+	col_number = screen_cursor_location - p;
+
+	col_number += 8;	// Move forward 8 positions
+	col_number &= ~7;	// Clear three LSBs
+
+	// Now we need to make sure we didn't run off the end of the line.
+	if(col_number > 79) {
+		// We went too far.  Instead, we need to stop at column 79.
+		col_number = screen_cols - 1;
+	}
+
+	// Move to the new position.
+	screen_cursor_location = p + col_number;
+	
+	// The new position is a cursor.
+	*screen_cursor_location |= null_cursor;
+}
+
+static void
+screen_begin_escape()
+{
+	// An escape sequence is variable length.  We need a state-machine to
+	// keep track of where we are in a potential sequence.
+	//
+	// We have seen an escape character, so we now must wait for the next
+	// character to see what it means.
+	screen_escape_state = escape_need_first_state;
+}
+
+static void
+screen_next_argument()
+{
+	// We only handle up to two arguments.  So, just switch to group 1.
+	screen_group_pointer = &screen_group_1_digits;
+}
+
+static void
+screen_send_primary_device_attributes()
+{
+	// This is a request for our attributes.  Claim that we are a VT100.
+	uart_transmit_string("1;2c");
+	
+	screen_escape_state = escape_none_state;
+}
+
+static void
+screen_move_cursor_numeric()
+{
+}
+
+static void
+screen_set_margins()
+{
+}
+
+static void
+screen_move_cursor_up()
+{
+}
+
+static void
+screen_move_cursor_down()
+{
+}
+
+static void
+screen_move_cursor_right()
+{
+}
+
+static void
+screen_move_cursor_left()
+{
+}
+
+static void
+screen_clear_rows()
+{
+}
+
+static void
+screen_clear_columns()
+{
+}
+
+static void
+screen_set_dec_flag()
+{
+	// Mark that this is a special DEC sequence
+	screen_dec_flag = 1;
+}
+
+static void
 screen_escape_handler_in_csi(uint8_t c)
 {
+	// If a control character appears in the middle of an escape sequence,
+	// we simply execute it.  This is an error recovery behavior, and should
+	// not be sent by an OS.
+	switch(c) {
+		case char_bs:
+			screen_handle_bs();
+			break;
+
+		case char_ht:
+			screen_handle_ht();
+			break;
+
+		case char_lf:
+			screen_handle_lf();
+			break;
+
+		case char_vt:
+			screen_handle_lf();
+			break;
+
+		case char_ff:
+			screen_handle_lf();
+			break;
+
+		case char_cr:
+			screen_handle_cr();
+			break;
+
+		// An escape while handing an escape is also an error condition.  Terminate
+		// the previous sequence and begin a new one.
+		case char_escape:
+			screen_begin_escape();
+			break;
+		
+		// Semicolon and digits are common to DEC and ANSI, so handle them
+		// before checking the DEC flag.
+
+		// If it is a semicolon, we have collected all the digits in an argument.
+		// Note that there may be no digits before the semicolon, which implies zero.
+		case '/':
+			screen_next_argument();
+			break;
+
+		// If this is a digit, go to an "accumulating digits" state, until we
+		// see a non-digit.
+		case '0':
+		case '1':
+		case '2':
+		case '3':
+		case '4':
+		case '5':
+		case '6':
+		case '7':
+		case '8':
+		case '9':
+			screen_got_csi_group_N_digit(c);
+			break;
+			
+		default:
+			if(screen_dec_flag) {
+				// If the DEC flag is set, go to an alternate parser.
+				screen_parse_dec_command(c);
+				return;
+			} else {
+				switch(c) {
+					// Test for some of the simple commands.
+					case 'c':
+						screen_send_primary_device_attributes();
+						break;
+
+					case 'f':
+						screen_move_cursor_numeric();
+						break;
+
+					case 'r':
+						screen_set_margins();
+						break;
+
+					case 'A':
+						screen_move_cursor_up();
+						break;
+					
+					case 'B':
+						screen_move_cursor_down();
+						break;
+
+					case 'C':
+						screen_move_cursor_right();
+						break;
+
+					case 'D':
+						screen_move_cursor_left();
+						break;
+
+					case 'H':
+						screen_move_cursor_numeric();
+						break;
+
+					case 'J':
+						screen_clear_rows();
+						break;
+
+					case 'K':
+						screen_clear_columns();
+						break;
+
+					case '?':
+						screen_set_dec_flag();
+						break;
+
+					default:
+						// This is not a sequence we handle yet.
+						break;
+				}
+			}
+			break;
+	}
+		
+	screen_escape_state = escape_none_state;
+	return;
 }
 
 static void
@@ -527,80 +825,6 @@ screen_normal_char(uint8_t c)
 
 	// We don't move the cursor, so we are done.
 	return;
-}
-
-void
-screen_handle_bs()
-{
-	volatile uint16_t *start_of_line;
-	volatile uint16_t *proposed_new_position;
-
-	// We want to move the cursor backwards one position, but we cannot
-	// go before col=0 of the row.
-	// 
-	// Also, if we happen to be in column 79, we will land in column 78,
-	// meaning that we must clear the col79 flag.  It is always safe to
-	// do this.
-	screen_col79_flag = 0;
-	
-	// Find the beginning of the line, so we don't move too far.
-	start_of_line = screen_cursor_start_of_line();
-	proposed_new_position = screen_cursor_location - 1;
-	if(proposed_new_position >= start_of_line) {
-		// The move is good.  The current position is no longer a cursor.
-		*screen_cursor_location &= ~null_cursor;
-
-		// Back up one position.
-		screen_cursor_location = proposed_new_position;
-
-		// The new position is a cursor.
-		*screen_cursor_location |= null_cursor;
-	}
-}
-
-void
-screen_handle_ht()
-{
-	volatile uint16_t *p;
-	int col_number;
-
-	// Move the cursor to the next modulo-8 position on the line.
-	//
-	// First, get the starting address of the line.
-	p = screen_cursor_start_of_line();
-
-	// This position is no longer a cursor.
-	*screen_cursor_location &= ~null_cursor;
-	
-	// Find the new location.  Note that we must stay in this line, so we
-	// must not go past column 79.
-	col_number = screen_cursor_location - p;
-
-	col_number += 8;	// Move forward 8 positions
-	col_number &= ~7;	// Clear three LSBs
-
-	// Now we need to make sure we didn't run off the end of the line.
-	if(col_number > 79) {
-		// We went too far.  Instead, we need to stop at column 79.
-		col_number = screen_cols - 1;
-	}
-
-	// Move to the new position.
-	screen_cursor_location = p + col_number;
-	
-	// The new position is a cursor.
-	*screen_cursor_location |= null_cursor;
-}
-
-void
-screen_begin_escape()
-{
-	// An escape sequence is variable length.  We need a state-machine to
-	// keep track of where we are in a potential sequence.
-	//
-	// We have seen an escape character, so we now must wait for the next
-	// character to see what it means.
-	screen_escape_state = escape_need_first_state;
 }
 
 void

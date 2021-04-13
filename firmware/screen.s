@@ -907,7 +907,7 @@ screen_escape_handler_in_csi:
 	cp	char_ht
 	jp	Z, screen_handle_ht
 
-	cp	char_ht
+	cp	char_lf
 	jp	Z, screen_handle_lf
 
 	cp	char_vt
