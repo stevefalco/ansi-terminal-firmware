@@ -523,6 +523,57 @@ screen_send_primary_device_attributes()
 static void
 screen_move_cursor_numeric()
 {
+	int digits0;
+	int digits1;
+
+	// There may be digits or not, but it doesn't matter.  If there are
+	// no digits, our numeric buffers have 0,0 which means the same thing
+	// as if there were no digits; i.e. go to the upper left corner.
+	//
+	// HOWEVER, in VT100 escape sequences, the lines and columns are
+	// numbered from 1, and the spec says that both 0 and 1 are to be
+	// interpreted as 1.  We number lines and columns from 0, so we need
+	// to make some adjustments.
+	//
+	// Basically, we have to decrement the parameters to make them 0-based,
+	// but we must not go below zero.
+
+	// The current position is no longer a cursor.
+	*screen_cursor_location &= ~null_cursor;
+
+	// Get the line parameter, and map it to our notation.
+	digits0 = screen_group_0_digits;
+	if(digits0 != 0) {
+		--digits0; // Convert to 0-based.
+	}
+
+	// Bound it to stay on screen.
+	if(digits0 >= screen_lines) {
+		digits0 = (screen_lines - 1);
+	}
+
+	// Get the column parameter, and map it to our notation.
+	digits1 = screen_group_1_digits;
+	if(digits1 != 0) {
+		--digits1; // Convert to 0-based.
+	}
+
+	// Bound it to stay on screen.
+	if(digits1 >= screen_cols) {
+		digits1 = (screen_cols - 1);
+	}
+
+	// Set the new cursor position.
+	screen_cursor_location = screen_base + (digits0 * screen_cols) + digits1;
+
+	// The new position is a cursor.
+	*screen_cursor_location |= null_cursor;
+
+	// Any move means we must clear the col79 flag.
+	screen_col79_flag = 0;
+
+	// Escape sequence complete.
+	screen_escape_state = escape_none_state;
 }
 
 static void
@@ -576,42 +627,42 @@ screen_escape_handler_in_csi(uint8_t c)
 	switch(c) {
 		case char_bs:
 			screen_handle_bs();
-			break;
+			return;
 
 		case char_ht:
 			screen_handle_ht();
-			break;
+			return;
 
 		case char_lf:
 			screen_handle_lf();
-			break;
+			return;
 
 		case char_vt:
 			screen_handle_lf();
-			break;
+			return;
 
 		case char_ff:
 			screen_handle_lf();
-			break;
+			return;
 
 		case char_cr:
 			screen_handle_cr();
-			break;
+			return;
 
 		// An escape while handing an escape is also an error condition.  Terminate
 		// the previous sequence and begin a new one.
 		case char_escape:
 			screen_begin_escape();
-			break;
+			return;
 		
 		// Semicolon and digits are common to DEC and ANSI, so handle them
 		// before checking the DEC flag.
 
 		// If it is a semicolon, we have collected all the digits in an argument.
 		// Note that there may be no digits before the semicolon, which implies zero.
-		case '/':
+		case ';':
 			screen_next_argument();
-			break;
+			return;
 
 		// If this is a digit, go to an "accumulating digits" state, until we
 		// see a non-digit.
@@ -626,7 +677,7 @@ screen_escape_handler_in_csi(uint8_t c)
 		case '8':
 		case '9':
 			screen_got_csi_group_N_digit(c);
-			break;
+			return;
 			
 		default:
 			if(screen_dec_flag) {
@@ -638,47 +689,47 @@ screen_escape_handler_in_csi(uint8_t c)
 					// Test for some of the simple commands.
 					case 'c':
 						screen_send_primary_device_attributes();
-						break;
+						return;
 
 					case 'f':
 						screen_move_cursor_numeric();
-						break;
+						return;
 
 					case 'r':
 						screen_set_margins();
-						break;
+						return;
 
 					case 'A':
 						screen_move_cursor_up();
-						break;
+						return;
 					
 					case 'B':
 						screen_move_cursor_down();
-						break;
+						return;
 
 					case 'C':
 						screen_move_cursor_right();
-						break;
+						return;
 
 					case 'D':
 						screen_move_cursor_left();
-						break;
+						return;
 
 					case 'H':
 						screen_move_cursor_numeric();
-						break;
+						return;
 
 					case 'J':
 						screen_clear_rows();
-						break;
+						return;
 
 					case 'K':
 						screen_clear_columns();
-						break;
+						return;
 
 					case '?':
 						screen_set_dec_flag();
-						break;
+						return;
 
 					default:
 						// This is not a sequence we handle yet.
@@ -736,7 +787,7 @@ screen_escape_handler(uint8_t c)
 	// What state are we in?
 	switch(screen_escape_state) {
 		case escape_need_first_state:
-			screen_escape_handler_first(c); //Got first char after escape
+			screen_escape_handler_first(c); // Got first char after escape
 			break;
 
 		case escape_csi_state:
@@ -777,7 +828,6 @@ screen_normal_char(uint8_t c)
 	// If the column 79 flag is set, this character needs special
 	// handling.
 	if(screen_col79_flag) {
-		msg("flag 79");
 
 		// This column is no longer a cursor.  Clear the flag and
 		// bump to the proposed new cursor location.
