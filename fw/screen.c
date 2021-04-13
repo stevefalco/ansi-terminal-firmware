@@ -579,6 +579,66 @@ screen_move_cursor_numeric()
 static void
 screen_set_margins()
 {
+	int digits0;
+	int digits1;
+
+	// Special case - if screen_group_0_digits and screen_group_1_digits
+	// are both zero, set the full range.
+	//
+	// Do this test first; it is the only time A = B is allowed - i.e. when
+	// A and B are both zero.
+	if(screen_group_0_digits == 0 && screen_group_1_digits == 0) {
+		// Reset top margin to 0, bottom margin to 23.
+		screen_dec_top_margin = 0;
+		screen_dec_bottom_margin = screen_lines - 1;
+
+		// Reset FWA and LWA+1
+		screen_current_fwa = screen_base;
+		screen_current_lwa_p1 = screen_end;
+
+	} else if(screen_group_0_digits < screen_group_1_digits) {
+		// For all other cases, the top margin must be strictly less than the bottom margin.
+		// Good - we can proceed.
+	
+		// Get top row number.  Note that row numbers are 1-based, so we have 
+		// to decrement, but cannot go below zero.
+		digits0 = screen_group_0_digits;
+		if(digits0 != 0) {
+			--digits0; // Convert to 0-based.
+		}
+
+		// Set the top margin.
+		screen_dec_top_margin = digits0;
+		screen_current_fwa = screen_base + (screen_dec_top_margin * screen_cols);
+		
+		// Get bottom row number.  Note that row numbers are 1-based, so we have 
+		// to decrement, but cannot go below zero.
+		digits1 = screen_group_1_digits;
+		if(digits1 != 0) {
+			--digits1; // Convert to 0-based.
+		}
+
+		// Set the bottom margin.  We note that the lwa+1 is the same as the fwa
+		// of the following row.  Hence, increase the bottom margin by 1 when doing
+		// the calculation.
+		screen_dec_bottom_margin = digits1;
+		screen_current_lwa_p1 = screen_base + ((screen_dec_bottom_margin + 1) * screen_cols);
+	}
+
+	// The old position is not a cursor.
+	*screen_cursor_location &= ~null_cursor;
+
+	// Move the cursor to the upper left.
+	screen_cursor_location = screen_base;
+
+	// The new position is a cursor.
+	*screen_cursor_location |= null_cursor;
+
+	// Any move means we must clear the col79 flag.
+	screen_col79_flag = 0;
+
+	// Escape sequence complete.
+	screen_escape_state = escape_none_state;
 }
 
 static void
