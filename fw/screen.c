@@ -397,6 +397,28 @@ screen_escape_handler_in_csi(uint8_t c)
 static void
 screen_escape_in_sharp(uint8_t c)
 {
+	volatile uint16_t *p;
+	int i;
+
+	switch(c) {
+		case '8':
+			// Fill the screen with the letter 'E'.
+			p = screen_base;
+			for(i = 0; i < screen_length; i++) {
+				*p++ = 'E';
+			}
+
+			// Initialize the cursor pointer.
+			screen_cursor_location = screen_base;
+			*screen_cursor_location |= null_cursor;
+			break;
+
+		default:
+			break;
+	}
+
+	screen_escape_state = escape_none_state;
+	return;
 }
 
 static void
@@ -593,7 +615,6 @@ screen_handler()
 	// We first have to determine if we are collecting an escape
 	// sequence.
 	if(screen_escape_state != escape_none_state) {
-		msg("handling escape");
 		screen_escape_handler(rv & 0xff); // We are handling an escape sequence.
 		return;
 	}
