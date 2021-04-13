@@ -94,6 +94,255 @@ screen_initialize()
 }
 
 static void
+screen_escape_handler_start_csi()
+{
+	screen_escape_state = escape_csi_state;
+}
+
+static void
+screen_start_sharp()
+{
+	screen_escape_state = escape_sharp_state;
+}
+
+static void
+screen_save_cursor_position()
+{
+	screen_cursor_location_save = screen_cursor_location;
+
+	// Escape sequence complete.
+	screen_escape_state = escape_none_state;
+}
+
+static void
+screen_restore_cursor_position()
+{
+	// Remove the old cursor.
+	*screen_cursor_location &= ~null_cursor;
+
+	// Restore the cursor position
+	screen_cursor_location = screen_cursor_location_save;
+
+	// Make the new position a cursor.
+	*screen_cursor_location |= null_cursor;
+
+	// Escape sequence complete.
+	screen_escape_state = escape_none_state;
+}
+
+static int
+screen_cursor_in_line()
+{
+	int diff = screen_cursor_location - screen_base;
+	int line = 0;
+
+	// I tried using modulo here, but the program crashes.  There must be some sort of
+	// exception generated.
+	while(diff >= screen_cols) {
+		++line;
+		diff -= screen_cols;
+	}
+
+	return line;
+}
+
+static volatile uint16_t *
+screen_cursor_start_of_line()
+{
+	volatile uint16_t *tmp;
+
+	// Find what line we are on.  The call returns 0 to 23 in register A.
+	// As a side effect, it also clears carry.
+	tmp = screen_base + (screen_cursor_in_line() * screen_cols);
+
+	return tmp;
+}
+
+static void
+screen_scroll_up()
+{
+	int to_scroll;
+	int to_move;
+	int i;
+	volatile uint16_t *destination;
+	volatile uint16_t *source;
+
+	// We have to respect the scroll regions.  Figure out how many
+	// lines are to be scrolled.
+	//
+	// If we are unlimited, the top line is 0, the bottom line is 23.
+	// and the difference is 23, which is the correct number of lines
+	// to scroll.
+	to_scroll = screen_dec_bottom_margin - screen_dec_top_margin;
+
+	// Calculate the number of cells to move.
+	to_move = to_scroll * screen_cols;
+
+	// Calculate the starting destination line FWA.
+	destination = screen_base + (screen_dec_top_margin * screen_cols);
+	source = destination + screen_cols;
+	for(i = 0; i < to_move; i++) {
+		*destination++ = *source++;
+	}
+
+	// Now clear the last line, since it is "new".
+	destination = screen_base + (screen_dec_bottom_margin * screen_cols);
+	for(i = 0; i < screen_cols; i++) {
+		*destination++ = 0;
+	}
+}
+
+static void
+screen_scroll_down()
+{
+	int to_scroll;
+	int to_move;
+	int i;
+	volatile uint16_t *destination;
+	volatile uint16_t *source;
+
+	// We have to respect the scroll regions.  Figure out how many
+	// lines are to be scrolled.
+	//
+	// If we are unlimited, the top line is 0, the bottom line is 23.
+	// and the difference is 23, which is the correct number of lines
+	// to scroll.
+	to_scroll = screen_dec_bottom_margin - screen_dec_top_margin;
+
+	// Calculate the number of cells to move.
+	to_move = to_scroll * screen_cols;
+
+	// Calculate the starting destination line LWA.  This is a bit
+	// tricky.  We calculate the FWA of the line below the bottom
+	// margin (the part in the parens), which is also the LWA+1 of
+	// the bottom margin.  Then we subtract one, which gives us the
+	// LWA of the bottom margin, and that is the destination.
+	destination = screen_base + ((screen_dec_bottom_margin + 1) * screen_cols) - 1;
+	source = destination - screen_cols;
+	for(i = 0; i < to_move; i++) {
+		*destination-- = *source--;
+	}
+
+	// Now clear the top line, since it is "new".
+	destination = screen_base + (screen_dec_top_margin * screen_cols);
+	for(i = 0; i < screen_cols; i++) {
+		*destination++ = 0;
+	}
+}
+
+void
+screen_handle_lf()
+{
+	int curr_line;
+	int new_line;
+	volatile uint16_t *proposed_new_position;
+
+	// There are two cases.  If we are within the scroll region, we move
+	// down or scroll.  But if we are not within the scroll region, we
+	// do an absolute move.
+	curr_line = screen_cursor_in_line();
+	if(curr_line < screen_dec_top_margin || curr_line > screen_dec_bottom_margin) {
+		// Absolute move, bounded by screen dimensions.  No scrolling.
+		new_line = curr_line + 1;
+		if(new_line > (screen_lines - 1)) {
+			// We would land past the last row - do nothing.
+			return;
+		}
+
+		// This position is no longer a cursor.
+		*screen_cursor_location &= ~null_cursor;
+
+		// Find new position - known good.
+		screen_cursor_location += screen_cols;
+
+		// The new position is a cursor.
+		*screen_cursor_location |= null_cursor;
+
+		return;
+	}
+
+	// This position is no longer a cursor.
+	*screen_cursor_location &= ~null_cursor;
+
+	// We are within the scroll region.  In this case, line-feed means we
+	// move 80 characters forward, but if that would move us out of the
+	// scroll region, then we have to scroll up one line.
+	proposed_new_position = screen_cursor_location + screen_cols;
+	if(proposed_new_position >= screen_current_lwa_p1) {
+		// Must scroll up.
+		screen_scroll_up();
+	} else {
+		screen_cursor_location = proposed_new_position;
+	}
+
+	// The new position is a cursor.
+	*screen_cursor_location |= null_cursor;
+}
+
+void
+screen_handle_cr()
+{
+	// No matter what, we will land in colunm 0, meaning that we must clear
+	// the col79 flag.  It is always safe to do this.
+	screen_col79_flag = 0;
+
+	// No longer a cursor.
+	*screen_cursor_location &= ~null_cursor;
+	
+	// Find the start of whatever line the cursor is on.
+	screen_cursor_location = screen_cursor_start_of_line();
+
+	// The new position is a cursor.
+	*screen_cursor_location |= null_cursor;
+}
+
+static void
+screen_handle_esc_lf()
+{
+	//This seems to be like <LF>
+	screen_handle_lf();
+
+	// Escape sequence complete.
+	screen_escape_state = escape_none_state;
+}
+
+static void
+screen_handle_esc_cr_lf()
+{
+	// This seems to be like <CR><LF>
+	screen_handle_cr();
+	screen_handle_lf();
+
+	// Escape sequence complete.
+	screen_escape_state = escape_none_state;
+}
+
+static void
+screen_handle_reverse_scroll()
+{
+	volatile uint16_t *proposed_new_position;
+
+	// Current position is not a cursor.
+	*screen_cursor_location &= ~null_cursor;
+
+	// reverse-scroll means we move 80 characters backward, but if that would
+	// move us above the scroll region, then we have to scroll down one line.
+	proposed_new_position = screen_cursor_location - screen_cols;
+	if(proposed_new_position < screen_current_fwa) {
+		// We have to scroll down.
+		screen_scroll_down();
+	} else {
+		screen_cursor_location = proposed_new_position;
+	}
+
+	// The new position is a cursor.
+	*screen_cursor_location |= null_cursor;
+
+	// Escape sequence complete.
+	screen_escape_state = escape_none_state;
+}
+
+static void
 screen_escape_handler_first(uint8_t c)
 {
 	// Clear our working storage.
@@ -151,41 +400,6 @@ screen_escape_in_sharp(uint8_t c)
 }
 
 static void
-screen_scroll_up()
-{
-	int to_scroll;
-	int to_move;
-	int i;
-	volatile uint16_t *destination;
-	volatile uint16_t *source;
-
-	// We have to respect the scroll regions.  Figure out how many
-	// lines are to be scrolled.
-	//
-	// If we are unlimited, the top line is 0, the bottom line is 23.
-	// and the difference is 23, which is the correct number of lines
-	// to scroll.
-	to_scroll = screen_dec_bottom_margin - screen_dec_top_margin;
-
-	// Calculate the number of cells to move.
-	to_move = to_scroll * screen_cols;
-
-	// Calculate the starting destination line FWA.  The top line number
-	// is still in C, and DE still has 80.
-	destination = screen_base + (screen_dec_top_margin * screen_cols);
-	source = destination + screen_cols;
-	for(i = 0; i < to_move; i++) {
-		*destination++ = *source++;
-	}
-
-	// Now clear the last line, since it is "new".
-	destination = screen_base + (screen_dec_bottom_margin * screen_cols);
-	for(i = 0; i < screen_cols; i++) {
-		*destination++ = 0;
-	}
-}
-
-static void
 screen_escape_handler(uint8_t c)
 {
 	// We are in an escape sequence, and we've gotten the next character
@@ -224,34 +438,6 @@ screen_escape_handler(uint8_t c)
 			screen_escape_state = escape_none_state;
 			break;
 	}
-}
-
-static int
-screen_cursor_in_line()
-{
-	int diff = screen_cursor_location - screen_base;
-	int line = 0;
-
-	// I tried using modulo here, but the program crashes.  There must be some sort of
-	// exception generated.
-	while(diff >= screen_cols) {
-		++line;
-		diff -= screen_cols;
-	}
-
-	return line;
-}
-
-static volatile uint16_t *
-screen_cursor_start_of_line()
-{
-	volatile uint16_t *tmp;
-
-	// Find what line we are on.  The call returns 0 to 23 in register A.
-	// As a side effect, it also clears carry.
-	tmp = screen_base + (screen_cursor_in_line() * screen_cols);
-
-	return tmp;
 }
 
 static void
@@ -380,72 +566,6 @@ screen_handle_ht()
 	// Move to the new position.
 	screen_cursor_location = p + col_number;
 	
-	// The new position is a cursor.
-	*screen_cursor_location |= null_cursor;
-}
-
-void
-screen_handle_lf()
-{
-	int curr_line;
-	int new_line;
-	volatile uint16_t *proposed_new_position;
-
-	// There are two cases.  If we are within the scroll region, we move
-	// down or scroll.  But if we are not within the scroll region, we
-	// do an absolute move.
-	curr_line = screen_cursor_in_line();
-	if(curr_line < screen_dec_top_margin || curr_line > screen_dec_bottom_margin) {
-		// Absolute move, bounded by screen dimensions.  No scrolling.
-		new_line = curr_line + 1;
-		if(new_line > (screen_lines - 1)) {
-			// We would land past the last row - do nothing.
-			return;
-		}
-
-		// This position is no longer a cursor.
-		*screen_cursor_location &= ~null_cursor;
-
-		// Find new position - known good.
-		screen_cursor_location += screen_cols;
-
-		// The new position is a cursor.
-		*screen_cursor_location |= null_cursor;
-
-		return;
-	}
-
-	// This position is no longer a cursor.
-	*screen_cursor_location &= ~null_cursor;
-
-	// We are within the scroll region.  In this case, line-feed means we
-	// move 80 characters forward, but if that would move us out of the
-	// scroll region, then we have to scroll up one line.
-	proposed_new_position = screen_cursor_location + screen_cols;
-	if(proposed_new_position >= screen_current_lwa_p1) {
-		// Must scroll up.
-		screen_scroll_up();
-	} else {
-		screen_cursor_location = proposed_new_position;
-	}
-
-	// The new position is a cursor.
-	*screen_cursor_location |= null_cursor;
-}
-
-void
-screen_handle_cr()
-{
-	// No matter what, we will land in colunm 0, meaning that we must clear
-	// the col79 flag.  It is always safe to do this.
-	screen_col79_flag = 0;
-
-	// No longer a cursor.
-	*screen_cursor_location &= ~null_cursor;
-	
-	// Find the start of whatever line the cursor is on.
-	screen_cursor_location = screen_cursor_start_of_line();
-
 	// The new position is a cursor.
 	*screen_cursor_location |= null_cursor;
 }
