@@ -216,7 +216,6 @@ set_global_assignment -name VHDL_FILE uart/gh_counter_down_ce_ld_tc.vhd
 set_global_assignment -name VHDL_FILE uart/gh_counter_down_ce_ld.vhd
 set_global_assignment -name VHDL_FILE uart/gh_binary2gray.vhd
 set_global_assignment -name VHDL_FILE uart/gh_baud_rate_gen.vhd
-set_global_assignment -name VERILOG_FILE kb/ps2_keyboard.v
 set_global_assignment -name VHDL_FILE kb/keyboard.vhd
 set_global_assignment -name SYSTEMVERILOG_FILE fx68k/uaddrPla.sv
 set_global_assignment -name SYSTEMVERILOG_FILE fx68k/fx68kAlu.sv

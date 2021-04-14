@@ -39,6 +39,7 @@ set refPeriod 12MHz
 #**************************************************************
 
 create_clock -name {CLK12M} -period $refPeriod [get_ports {CLK12M}]
+create_clock -name {cleanedClk} -period 20kHz [get_keepers {keyboard:cpuKB|cleanedClk}]
 
 derive_pll_clocks
 derive_clock_uncertainty
@@ -60,7 +61,8 @@ set_output_delay -add_delay -clock [get_clocks {dotClockGen|altpll_component|aut
 # Isolate clocks
 set_clock_groups -exclusive \
 	-group  {dotClockGen|altpll_component|auto_generated|pll1|clk[0]} \
-	-group  {cpuClockGen|altpll_component|auto_generated|pll1|clk[0]}
+	-group  {cpuClockGen|altpll_component|auto_generated|pll1|clk[0]} \
+	-group {cleanedClk}
 
 # Don't cares
 set_false_path -from [get_ports {UART_RX UART_CTS}] -to *

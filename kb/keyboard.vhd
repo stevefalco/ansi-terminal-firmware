@@ -49,6 +49,8 @@ architecture a of keyboard is
 	signal shiftRegCount			: integer range 0 to 8;
 
 	signal rx_data_ready			: std_logic := '0';
+	signal rx_data_ready_D0			: std_logic := '0';
+	signal rx_data_ready_D1			: std_logic := '0';
 	signal rx_data_ack			: std_logic := '0';
 
 begin
@@ -112,6 +114,14 @@ begin
 		end if;
 	end process;
 
+	cross_to_clk: process(clk)
+	begin
+		if (rising_edge(clk)) then
+			rx_data_ready_D0 <=  rx_data_ready;
+			rx_data_ready_D1 <=  rx_data_ready_D0;
+		end if;
+	end process;
+
 	rx: process(clk)
 	begin
 		if (rising_edge(clk)) then
@@ -120,7 +130,7 @@ begin
 				rx_data_ack <= '0';
 				irq <= '0';
 			else
-				if (rx_data_ready = '1') then
+				if (rx_data_ready_D1 = '1') then
 					-- If data is available, capture it and set an interrupt to the CPU.
 					rx_scan_code_reg <= shiftReg(7 downto 0);
 					irq <= '1';
@@ -150,7 +160,7 @@ begin
 				dataOut <= rx_scan_code_reg;
 
 			when "001" =>
-				dataOut <= "0000000" & rx_data_ready;
+				dataOut <= "0000000" & rx_data_ready_D1;
 
 			when others =>
 				dataOut <= (others => '0');
