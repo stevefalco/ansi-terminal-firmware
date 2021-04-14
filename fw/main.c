@@ -21,15 +21,8 @@ main()
 	screen_initialize();
 	keyboard_initialize();
 
-	// Read the status register.
-	// asm(" mov.w %%sr, %0\n\t" : "=r" (sr));
-	// dump("sr =", sr);
-
 	// Enable interrupts.
 	asm(" andi.w #~0x0700, %sr");
-
-	// FIXME - remove this soonish.
-	uart_transmit_string("Program begins...\n\r");
 
 	while(1) {
 		// Get any waiting uart characters and process them.

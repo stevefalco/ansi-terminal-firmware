@@ -2,7 +2,7 @@
 #
 # (c) 2021 Steven A. Falco
 
-OBJ = init.o main.o keyboard.o screen.o uart.o debug.o
+OBJ = init.o main.o screen.o keyboard.o uart.o debug.o
 
 all: ../cpu_rom.mif fw.dump
 
@@ -28,7 +28,7 @@ fw: $(OBJ)
 	m68k-linux-gnu-gcc -m68000 -c $^ -o $@
 
 %.o: %.c
-	m68k-linux-gnu-gcc -O1 -m68000 -c $^ -o $@
+	m68k-linux-gnu-gcc -m68000 -c $^ -o $@
 
 clean:
 	rm -f *.o fw fw.bin fw.dump fw.map

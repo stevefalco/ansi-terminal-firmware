@@ -11,6 +11,10 @@ use ieee.numeric_std.all;
 use ieee.std_logic_unsigned.all;
 
 entity keyboard is
+	generic (
+		clk_freq	: integer := 51_600_000;	-- Hz
+		stable_time	: integer := 5			-- us
+	);
 	port (
 			-- CPU interface
 			clk				: in std_logic;
@@ -28,94 +32,111 @@ end keyboard;
 
 architecture a of keyboard is
 
-	component ps2_keyboard_interface is
-		port (
-			clk				: in std_logic;
-			reset				: in std_logic;
-			ps2_clk				: inout std_logic;
-			ps2_data			: inout std_logic;
-			rx_extended			: out std_logic;
-			rx_released			: out std_logic;
-			rx_shift_key_on			: out std_logic;
-			rx_scan_code			: out std_logic_vector(7 downto 0);
-			rx_ascii			: out std_logic_vector(7 downto 0);
-			rx_data_ready			: out std_logic;
-			rx_read				: in std_logic;
-			tx_data				: in std_logic_vector(7 downto 0);
-			tx_write			: in std_logic;
-			tx_write_ack_o			: out std_logic;
-			tx_error_no_keyboard_ack	: out std_logic
-		    );
-	end component;
-
-	signal rx_extended			: std_logic;
-	signal rx_released			: std_logic;
-	signal rx_shift_key_on			: std_logic;
-	signal rx_scan_code			: std_logic_vector(7 downto 0);
-	signal rx_ascii				: std_logic_vector(7 downto 0);
-	signal rx_data_ready			: std_logic;
-	signal rx_read				: std_logic;
-
 	signal rx_scan_code_reg			: std_logic_vector(7 downto 0);
-	signal rx_ascii_reg			: std_logic_vector(7 downto 0);
-	signal rx_status_reg			: std_logic_vector(7 downto 0);
+
+	signal clkFlops				: std_logic_vector(1 downto 0);
+	signal ctrReset				: std_logic;
+	signal cleanedClk			: std_logic;
+
+	type shiftRegFSM_type is (
+		shiftRegIdle_state,
+		shiftRegActive_state,
+		shiftRegComplete_state
+	);
+
+	signal shiftRegFSM			: shiftRegFSM_type := shiftRegIdle_state;
+	signal shiftReg				: std_logic_vector(8 downto 0);
+	signal shiftRegCount			: integer range 0 to 8;
+
+	signal rx_data_ready			: std_logic := '0';
+	signal rx_data_ack			: std_logic := '0';
 
 begin
-	kb: ps2_keyboard_interface
-	port map
-	(
-		-- CPU
-		clk => clk,
-		reset => reset,
 
-		-- KB
-		ps2_clk => ps2_clk,
-		ps2_data => ps2_data,
+	ctrReset <= clkFlops(0) xor clkFlops(1); -- '1' if state of clock line is changing
 
-		-- RX
-		rx_extended => rx_extended,
-		rx_released => rx_released,
-		rx_shift_key_on => rx_shift_key_on,
-		rx_scan_code => rx_scan_code,
-		rx_ascii => rx_ascii,
-		rx_data_ready => rx_data_ready,
-		rx_read => rx_read,
+	ps2_clk_debounce: process(clk)
+		variable count : integer range 0 to clk_freq * stable_time / 1_000_000;
+	begin
+		if (rising_edge(clk)) then
+			if (reset = '1') then
+				clkFlops <= "00";
+				cleanedClk <= '1'; -- clock should rest high
+				count := 0;
+			else
+				clkFlops(0) <= ps2_clk;
+				clkFlops(1) <= clkFlops(0);
 
-		-- TX
-		tx_write => '0',
-		tx_data => (others => '0')
-	);
+				if(ctrReset) then
+					count := 0; -- state is changing, clear counter.
+				elsif (count < clk_freq * stable_time / 1_000_000) then
+					count := count + 1; -- not stable long enough yet.
+				else
+					cleanedClk <= clkFlops(1);
+				end if;
+			end if;
+		end if;
+	end process;
+
+	ps2_FSM: process(cleanedClk, reset, rx_data_ack)
+	begin
+		if (reset = '1' or rx_data_ack = '1') then
+			shiftRegFSM <= shiftRegIdle_state;
+			shiftRegCount <= 0;
+			rx_data_ready <= '0';
+		elsif (falling_edge(cleanedClk)) then
+			case shiftRegFSM is
+				when shiftRegIdle_state =>
+					if(ps2_data = '0') then
+						-- First low bit starts us off.
+						shiftRegFSM <= shiftRegActive_state;
+						shiftRegCount <= 0;
+						rx_data_ready <= '0';
+					end if;
+
+				when shiftRegActive_state =>
+					shiftReg(shiftRegCount) <= ps2_data;
+					if (shiftRegCount /= 8) then
+						shiftRegCount <= shiftRegCount + 1;
+					else
+						shiftRegFSM <= shiftRegComplete_state;
+					end if;
+
+				when shiftRegComplete_state =>
+					-- Stop bit received.  Data is ready.
+					rx_data_ready <= '1';
+
+				when others =>
+					null;
+			end case;
+		end if;
+	end process;
 
 	rx: process(clk)
 	begin
 		if (rising_edge(clk)) then
 			if (reset = '1') then
 				rx_scan_code_reg <= (others => '0');
-				rx_ascii_reg <= (others => '0');
-				rx_status_reg <= (others => '0');
-				rx_read <= '0';
+				rx_data_ack <= '0';
 				irq <= '0';
 			else
 				if (rx_data_ready = '1') then
 					-- If data is available, capture it and set an interrupt to the CPU.
-					rx_scan_code_reg <= rx_scan_code;
-					rx_ascii_reg <= rx_ascii;
-					rx_status_reg <= "00001" & rx_extended & rx_released & rx_shift_key_on;
+					rx_scan_code_reg <= shiftReg(7 downto 0);
 					irq <= '1';
 				else
 					-- Once the CPU does a read, the rx_data_ready signal will clear,
 					-- and we can clear the interrupt.
-					rx_status_reg <= "00000" & rx_extended & rx_released & rx_shift_key_on;
 					irq <= '0';
 				end if;
 
 				if (kbCS = '1' and addrIn = "000") then
 					-- On the first read, send an ACK to the keyboard SM to retire the
-					-- interrupt.  The CPU will read all the registers before returning
+					-- interrupt.  The CPU will read the register before returning
 					-- from the interrupt.
-					rx_read <= '1';
+					rx_data_ack <= '1';
 				else
-					rx_read <= '0';
+					rx_data_ack <= '0';
 				end if;
 			end if;
 
@@ -129,10 +150,7 @@ begin
 				dataOut <= rx_scan_code_reg;
 
 			when "001" =>
-				dataOut <= rx_ascii_reg;
-
-			when "010" =>
-				dataOut <= rx_status_reg;
+				dataOut <= "0000000" & rx_data_ready;
 
 			when others =>
 				dataOut <= (others => '0');

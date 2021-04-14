@@ -21,7 +21,9 @@ SECTIONS {
 
 	.text : {
 		* (.text*)
+		. = ALIGN(4);
 		* (.rodata .rodata* .gnu.linkonce.r.*)
+		. = ALIGN(4);
 		_etext = .;
 	} > rom
 

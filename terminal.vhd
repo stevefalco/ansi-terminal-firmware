@@ -342,9 +342,9 @@ architecture a of terminal is
 	);
 
 	signal resetFSM			: resetFSM_type := resetIdle_state;
-	signal clear			: std_logic := '1';
-	signal cpuClearD0_n		: std_logic := '0';
-	signal cpuClearD1_n		: std_logic := '0';
+	signal dotClear			: std_logic := '1';
+	signal cpuClearD0		: std_logic := '1';
+	signal cpuClearD1		: std_logic := '1';
 
 	signal dotClock			: std_logic := '0';
 
@@ -440,13 +440,13 @@ begin
 
 				when resetIdle_state =>
 					resetFSM <= resetActive_state;
-					clear <= '1';
+					dotClear <= '1';
 					
 				when resetActive_state =>
 					resetDuration := resetDuration + 1;
 					if (resetDuration = "11111111") then
 						resetFSM <= resetComplete_state;
-						clear <= '0';
+						dotClear <= '0';
 					end if;
 
 				when resetComplete_state =>
@@ -462,8 +462,8 @@ begin
 	cpuResetProcess: process(cpuClock)
 	begin
 		if (rising_edge(cpuClock)) then
-			cpuClearD0_n <= not clear;
-			cpuClearD1_n <= cpuClearD0_n;
+			cpuClearD0 <= dotClear;
+			cpuClearD1 <= cpuClearD0;
 		end if;
 	end process;
 
@@ -472,8 +472,8 @@ begin
 		(
 			clk => cpuClock,
 			HALTn => '1',
-			extReset => clear,
-			pwrUp => clear,
+			extReset => cpuClearD1,
+			pwrUp => cpuClearD1,
 			enPhi1 => enPhi1,
 			enPhi2 => enPhi2,
 
@@ -532,7 +532,7 @@ begin
 			-- processor interface
 			clk => cpuClock,
 			BR_clk => cpuClock,
-			rst => clear,
+			rst => cpuClearD1,
 			CS => cpuUartCS,
 			WR => cpuUartWR,
 			ADD => eab(3 downto 1),
@@ -561,7 +561,7 @@ begin
 		(
 			-- CPU
 			clk => cpuClock,
-			reset => clear,
+			reset => cpuClearD1,
 			addrIn => eab(3 downto 1),
 			dataOut => cpuKbQ,
 			kbCS => cpuKbCS,
@@ -578,7 +578,7 @@ begin
 		(
 			-- CPU
 			clk => cpuClock,
-			reset => clear,
+			reset => cpuClearD1,
 			D => oEdb(15 downto 8),
 			WR => cpuControlWR,
 
@@ -592,7 +592,7 @@ begin
 		(
 			-- CPU
 			clk => cpuClock,
-			reset => clear,
+			reset => cpuClearD1,
 			D => oEdb(15 downto 8),
 			WR => cpuLEDsWR,
 
@@ -605,7 +605,7 @@ begin
 		port map (
 			-- CPU Interface
 			cpuClock => cpuClock,
-			cpuClear => clear,
+			cpuClear => cpuClearD1,
 			cpuByteEnables => cpuByteEnables,
 			cpuAddr => eab,
 			cpuDataIn => iEdb,		-- CPU input data from cpuBus
@@ -661,7 +661,7 @@ begin
        	-- That lets us do simple shifting to address the character ROM.
 	frameGen: frame_gen
 		port map (
-			clear => clear,
+			clear => dotClear,
 			dotClock => dotClock,
 			hSync => hSyncD0,
 			vSync => vSyncD0,

@@ -93,9 +93,6 @@ _level2:
 	| Save all registers on the stack.
 	movem.l	%d0-%d7/%a0-%a6, -(%sp)
 
-	| Write to LED register
-	| mov.b	#0x01, 0xc080
-
 	| See if the keyboard has anything for us.
 	jsr	keyboard_test_interrupt
 
