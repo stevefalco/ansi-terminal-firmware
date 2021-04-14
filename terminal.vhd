@@ -32,8 +32,8 @@ entity terminal is
 		HSYNC			: out std_logic;			-- T15
 		VSYNC			: out std_logic;			-- N16
 
-		KBD_CLK			: inout std_logic;			-- K15
-		KBD_DATA		: inout std_logic;			-- K16
+		KBD_CLK			: in std_logic;				-- K15
+		KBD_DATA		: in std_logic;				-- K16
 
 		UART_RX			: in std_logic;				-- L16
 		UART_TX			: out std_logic;			-- L15
@@ -266,8 +266,8 @@ architecture a of terminal is
 			irq		: out std_logic;
 
 			-- Keyboard interface
-			ps2_clk		: inout std_logic;
-			ps2_data	: inout std_logic
+			ps2_clk		: in std_logic;
+			ps2_data	: in std_logic
 		);
 	end component;
 

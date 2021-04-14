@@ -25,8 +25,8 @@ entity keyboard is
 			irq				: out std_logic;
 
 			-- Keyboard interface
-			ps2_clk				: inout std_logic;
-			ps2_data			: inout std_logic
+			ps2_clk				: in std_logic;
+			ps2_data			: in std_logic
 	);
 end keyboard;
 

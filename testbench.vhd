@@ -32,8 +32,8 @@ architecture a of testbench is
 			HSYNC			: out std_logic;
 			VSYNC			: out std_logic;
 
-			KBD_CLK			: inout std_logic;
-			KBD_DATA		: inout std_logic;
+			KBD_CLK			: in std_logic;
+			KBD_DATA		: in std_logic;
 
 			UART_RX			: in std_logic;
 			UART_TX			: out std_logic;
