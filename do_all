@@ -2,7 +2,7 @@
 
 set -e
 
-(cd fw && make)
+(cd firmware && make)
 
 ./do_build
 

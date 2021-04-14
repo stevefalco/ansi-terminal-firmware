@@ -12,11 +12,8 @@ greybox_tmp
 *_sim/
 cpu_rom.mif
 
-fw/*.o
-fw/fw
-fw/fw.bin
-fw/fw.dump
-fw/fw.map
-
-firmware/*.list
-firmware/*.rom
+firmware/*.o
+firmware/fw
+firmware/fw.bin
+firmware/fw.dump
+firmware/fw.map
