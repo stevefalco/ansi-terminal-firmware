@@ -95,7 +95,6 @@ keyboard_test_interrupt()
 #define R_CTRL		0xe014
 #define R_GUI		0xe027
 #define R_ALT		0xe011
-#define ENTER		0x5a
 #define F1		0x05
 #define F2		0x06
 #define F3		0x04
@@ -119,8 +118,8 @@ keyboard_test_interrupt()
 #define L_ARROW		0xe06b
 #define D_ARROW		0xe072
 #define R_ARROW		0xe074
-#define KEY_UP		0xf0
-#define EXTENSION	0xe0
+#define KEY_UP		0xf0		// not a key - sent when a key is released
+#define EXTENSION	0xe0		// first code of an extended sequence
 
 typedef struct {
 	uint8_t		ascii_value;
@@ -145,11 +144,12 @@ static SCAN_TABLE scan_table[] = {
 	{ 0x0b, 0x42, CONTROL_FLAG },			// ^K
 	{ 0x0c, 0x4b, CONTROL_FLAG },			// ^L
 	{ 0x0d, 0x3a, CONTROL_FLAG },			// ^M
+	{ 0x0d, 0x5a, 0x00 },				// ENTER
 	{ 0x0e, 0x31, CONTROL_FLAG },			// ^N
 	{ 0x0f, 0x44, CONTROL_FLAG },			// ^O
 	{ 0x10, 0x4d, CONTROL_FLAG },			// ^P
 	{ 0x11, 0x15, CONTROL_FLAG },			// ^Q
-	{ 0x12, 0x20, CONTROL_FLAG },			// ^R
+	{ 0x12, 0x2d, CONTROL_FLAG },			// ^R
 	{ 0x13, 0x1b, CONTROL_FLAG },			// ^S
 	{ 0x14, 0x2c, CONTROL_FLAG },			// ^T
 	{ 0x15, 0x3c, CONTROL_FLAG },			// ^U
@@ -181,7 +181,7 @@ static SCAN_TABLE scan_table[] = {
 	{ 'o', 0x44, 0x00 },
 	{ 'p', 0x4d, 0x00 },
 	{ 'q', 0x15, 0x00 },
-	{ 'r', 0x20, 0x00 },
+	{ 'r', 0x2d, 0x00 },
 	{ 's', 0x1b, 0x00 },
 	{ 't', 0x2c, 0x00 },
 	{ 'u', 0x3c, 0x00 },
@@ -208,7 +208,7 @@ static SCAN_TABLE scan_table[] = {
 	{ 'O', 0x44, SHIFT_FLAG },
 	{ 'P', 0x4d, SHIFT_FLAG },
 	{ 'Q', 0x15, SHIFT_FLAG },
-	{ 'R', 0x20, SHIFT_FLAG },
+	{ 'R', 0x2d, SHIFT_FLAG },
 	{ 'S', 0x1b, SHIFT_FLAG },
 	{ 'T', 0x2c, SHIFT_FLAG },
 	{ 'U', 0x3c, SHIFT_FLAG },
@@ -287,7 +287,7 @@ keyboard_decode(uint8_t scan_code)
 {
 	uint8_t c;
 
-	// dump("scan code", scan_code);
+	//dump("scan code", scan_code);
 
 	// Figure out what we got.
 	switch(keyboard_state) {
@@ -314,6 +314,54 @@ keyboard_decode(uint8_t scan_code)
 					keyboard_modifiers |= SHIFT_FLAG;
 					break;
 
+				case F1:
+					uart_transmit_string("OP");
+					break;
+
+				case F2:
+					uart_transmit_string("OQ");
+					break;
+
+				case F3:
+					uart_transmit_string("OR");
+					break;
+
+				case F4:
+					uart_transmit_string("OS");
+					break;
+
+				case F5:
+					uart_transmit_string("[15~");
+					break;
+
+				case F6:
+					uart_transmit_string("[17~");
+					break;
+
+				case F7:
+					uart_transmit_string("[18~");
+					break;
+
+				case F8:
+					uart_transmit_string("[19~");
+					break;
+
+				case F9:
+					uart_transmit_string("[20~");
+					break;
+
+				case F10:
+					uart_transmit_string("[21~");
+					break;
+
+				case F11:
+					uart_transmit_string("[22~");
+					break;
+
+				case F12:
+					uart_transmit_string("[23~");
+					break;
+
 					// Everything else can be looked up in the ASCII table.
 				default:
 					c = keyboard_find(scan_code);
@@ -331,33 +379,43 @@ keyboard_decode(uint8_t scan_code)
 					return;
 
 				case INSERT & 0xff:
+					uart_transmit_string("[2~");
 					break;
 
 				case HOME & 0xff:
+					uart_transmit_string("[H");
 					break;
 
 				case PG_UP & 0xff:
+					uart_transmit_string("[5~");
 					break;
 
 				case DELETE & 0xff:
+					uart_transmit_string("[3~");
 					break;
 
 				case END & 0xff:
+					uart_transmit_string("OF");
 					break;
 
 				case PG_DOWN & 0xff:
+					uart_transmit_string("[6~");
 					break;
 
 				case U_ARROW & 0xff:
-					break;
-
-				case L_ARROW & 0xff:
+					uart_transmit_string("OA");
 					break;
 
 				case D_ARROW & 0xff:
+					uart_transmit_string("OB");
 					break;
 
 				case R_ARROW & 0xff:
+					uart_transmit_string("OC");
+					break;
+
+				case L_ARROW & 0xff:
+					uart_transmit_string("OD");
 					break;
 
 				case R_CTRL & 0xff:
