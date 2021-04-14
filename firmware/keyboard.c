@@ -128,6 +128,7 @@ typedef struct {
 } SCAN_TABLE;
 
 static SCAN_TABLE scan_table[] = {
+	{ 0x00, 0x1e, CONTROL_FLAG },			// ^2
 	{ 0x00, 0x1e, CONTROL_FLAG | SHIFT_FLAG },	// ^@
 	{ 0x01, 0x1c, CONTROL_FLAG },			// ^A
 	{ 0x02, 0x32, CONTROL_FLAG },			// ^B
@@ -161,8 +162,12 @@ static SCAN_TABLE scan_table[] = {
 	{ 0x1b, 0x76, 0x00 }, 				// ESCAPE
 	{ 0x1c, 0x5d, CONTROL_FLAG },			// ^backslash
 	{ 0x1d, 0x5b, CONTROL_FLAG },			// ^]
+	{ 0x1e, 0x36, CONTROL_FLAG },			// ^6
 	{ 0x1e, 0x36, CONTROL_FLAG | SHIFT_FLAG },	// ^^
+	{ 0x1f, 0x4e, CONTROL_FLAG },			// ^-
 	{ 0x1f, 0x4e, CONTROL_FLAG | SHIFT_FLAG },	// ^_
+	{ 0x7f, 0x4a, CONTROL_FLAG },			// ^/
+	{ 0x7f, 0x4a, CONTROL_FLAG | SHIFT_FLAG },	// ^?
 
 	{ 'a', 0x1c, 0x00 },
 	{ 'b', 0x32, 0x00 },
@@ -391,7 +396,7 @@ keyboard_decode(uint8_t scan_code)
 					break;
 
 				case DELETE & 0xff:
-					uart_transmit_string("[3~");
+					uart_transmit(0x7f);
 					break;
 
 				case END & 0xff:

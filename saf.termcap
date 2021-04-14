@@ -33,7 +33,6 @@ sf|saf|saf terminal:\
 	:k;=\E[21~:\
 	:kh=\E[H:\
 	:kI=\E[2~:\
-	:kD=\E[3~:\
 	:kP=\E[5~:\
 	:kN=\E[6~:\
 	:ku=\EOA:\
