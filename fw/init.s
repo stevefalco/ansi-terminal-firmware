@@ -45,13 +45,16 @@ _start:
 	| Our linker control file specifies 4-byte alignment of the
 	| _sdata and _edata variables, so we know the number of bytes
 	| to copy is a multiple of 4.
-	mov.l	#_etext, %a0		| Initial values for data section
+	|
+	| The initial values come at the end of the rodata section and
+	| also have a 4-byte alignment.
+	mov.l	#_erodata, %a0		| Initial values for data section
 	mov.l	#_sdata, %a1		| Start of data section
 	mov.l	#_edata, %d0		| End of data section
 	sub.l	%a1, %d0		| How many bytes to copy
 	beq	initDataDone		| Nothing to do
 	lsr.l	#2, %d0			| Divide by 4
-	sub.l	#1, %d0			| Compensate dbf
+	sub.l	#1, %d0			| Compensate dbf (test at bottom of loop)
 initDataLoop:
 	mov.l	(%a0)+, (%a1)+		| Copy one lword
 	dbf	%d0, initDataLoop	| Do them all
@@ -67,7 +70,7 @@ initDataDone:
 	sub.l	%a0, %d0		| How many bytes to zero
 	beq	initBssDone		| Nothing to do
 	lsr.l	#2, %d0			| Divide by 4
-	sub.l	#1, %d0			| Compensate dbf
+	sub.l	#1, %d0			| Compensate dbf (test at bottom of loop)
 	mov.l	#0, %d1			| Get a zero
 initBssLoop:
 	mov.l	%d1, (%a0)+		| Zero one lword

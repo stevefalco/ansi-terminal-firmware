@@ -20,11 +20,19 @@ SECTIONS {
 	} > init
 
 	.text : {
+		. = ALIGN(4);
+		_stext = .;
 		* (.text*)
 		. = ALIGN(4);
+		_etext = .;
+	} > rom
+
+	.rodata : {
+		. = ALIGN(4);
+		_srodata = .;
 		* (.rodata .rodata* .gnu.linkonce.r.*)
 		. = ALIGN(4);
-		_etext = .;
+		_erodata = .;
 	} > rom
 
 	.bss (NOLOAD) : {
@@ -36,7 +44,7 @@ SECTIONS {
 		_ebss = .;
 	} > ram
 
-	.data : AT (ADDR(.text) + SIZEOF(.text)) {
+	.data : AT (ADDR(.rodata) + SIZEOF(.rodata)) {
 		. = ALIGN(4);
 		_sdata = .;
 		* (.data*);

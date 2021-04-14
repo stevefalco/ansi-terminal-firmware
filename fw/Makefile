@@ -28,7 +28,7 @@ fw: $(OBJ)
 	m68k-linux-gnu-gcc -m68000 -c $^ -o $@
 
 %.o: %.c
-	m68k-linux-gnu-gcc -m68000 -c $^ -o $@
+	m68k-linux-gnu-gcc -O1 -m68000 -c $^ -o $@
 
 clean:
 	rm -f *.o fw fw.bin fw.dump fw.map
