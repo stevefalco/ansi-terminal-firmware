@@ -282,25 +282,162 @@ keyboard_find(uint8_t scan_code)
 	return KEY_NOT_FOUND;
 }
 
+static void
+keyboard_decode(uint8_t scan_code)
+{
+	uint8_t c;
+
+	// dump("scan code", scan_code);
+
+	// Figure out what we got.
+	switch(keyboard_state) {
+		case KB_NORMAL:
+			switch(scan_code) {
+				case EXTENSION: // starting extended sequence
+					keyboard_state = KB_EXTENSION;
+					return;
+
+				case KEY_UP: // starting key-up sequence
+					keyboard_state = KB_NORMAL_GOING_UP;
+					return;
+
+				case L_CTRL:
+					keyboard_modifiers |= CONTROL_FLAG;
+					break;
+
+				case L_ALT:
+					keyboard_modifiers |= ALT_FLAG;
+					break;
+
+				case L_SHIFT:
+				case R_SHIFT:
+					keyboard_modifiers |= SHIFT_FLAG;
+					break;
+
+					// Everything else can be looked up in the ASCII table.
+				default:
+					c = keyboard_find(scan_code);
+					if(c != KEY_NOT_FOUND) {
+						uart_transmit(c);
+					}
+					break;
+			}
+			break;
+
+		case KB_EXTENSION:
+			switch(scan_code) {
+				case KEY_UP: // starting key-up sequence
+					keyboard_state = KB_EXTENSION_GOING_UP;
+					return;
+
+				case INSERT & 0xff:
+					break;
+
+				case HOME & 0xff:
+					break;
+
+				case PG_UP & 0xff:
+					break;
+
+				case DELETE & 0xff:
+					break;
+
+				case END & 0xff:
+					break;
+
+				case PG_DOWN & 0xff:
+					break;
+
+				case U_ARROW & 0xff:
+					break;
+
+				case L_ARROW & 0xff:
+					break;
+
+				case D_ARROW & 0xff:
+					break;
+
+				case R_ARROW & 0xff:
+					break;
+
+				case R_CTRL & 0xff:
+					keyboard_modifiers |= CONTROL_FLAG;
+					break;
+
+				case R_ALT & 0xff:
+					keyboard_modifiers |= ALT_FLAG;
+					break;
+			}
+			keyboard_state = KB_NORMAL;
+			break;
+
+		case KB_NORMAL_GOING_UP:
+			// I don't really care what the key going up is,
+			// unless it is a modifier going away.
+			// Dump everything else on the floor.
+			switch(scan_code) {
+				case L_CTRL:
+					keyboard_modifiers &= ~CONTROL_FLAG;
+					break;
+
+				case L_ALT:
+					keyboard_modifiers &= ~ALT_FLAG;
+					break;
+
+				case L_SHIFT:
+				case R_SHIFT:
+					keyboard_modifiers &= ~SHIFT_FLAG;
+					break;
+
+				default:
+					break;
+			}
+			keyboard_state = KB_NORMAL;
+			break;
+
+		case KB_EXTENSION_GOING_UP:
+			// I don't really care what the key going up is,
+			// unless it is a modifier going away.
+			// Dump everything else on the floor.
+			switch(scan_code) {
+				case R_CTRL & 0xff:
+					keyboard_modifiers &= ~CONTROL_FLAG;
+					break;
+
+				case R_ALT & 0xff:
+					keyboard_modifiers &= ~ALT_FLAG;
+					break;
+
+				default:
+					break;
+			}
+			keyboard_state = KB_NORMAL;
+			break;
+
+		default:
+			break;
+	}
+}
+
 int
 keyboard_handler()
 {
 	int rv;
-	uint8_t s;
-	uint8_t c;
+	uint8_t scan_code;
 
 	asm(" ori.w #0x0700, %sr");	// Mask interrupts
 
-	rv = 0; // Assume failure.
+	// Assume nothing available.
+	rv = 0;
 
-	// Get the character - but it may be invalid.
-	s = keyboard_rb[keyboard_rb_output];
-
-	// We depend on the order of operations.  If rb_count is zero,
-	// then we won't evaluate the character.
-	if(keyboard_rb_count != 0 && s != 0) {
-		// Good character.  Flag it.
+	// See if there is anything waiting to be processed.
+	if(keyboard_rb_count != 0) {
+		// We have a new scan code.  Flag it for use by the screensaver
+		// timeout logic.
 		rv = 1;
+
+		// Get the scan code.
+		scan_code = keyboard_rb[keyboard_rb_output];
 
 		// One less now available.
 		--keyboard_rb_count;
@@ -308,135 +445,8 @@ keyboard_handler()
 		// Move the output pointer, keeping it in range.
 		keyboard_rb_output = (keyboard_rb_output + 1) & (keyboard_depth - 1);
 
-		//dump("scan code", s);
-
-		// Figure out what we got.
-		switch(keyboard_state) {
-			case KB_NORMAL:
-				switch(s) {
-					case EXTENSION: // starting extended sequence
-						keyboard_state = KB_EXTENSION;
-						break;
-
-					case KEY_UP: // starting key-up sequence
-						keyboard_state = KB_NORMAL_GOING_UP;
-						break;
-
-					case L_CTRL:
-						keyboard_modifiers |= CONTROL_FLAG;
-						break;
-
-					case L_ALT:
-						keyboard_modifiers |= ALT_FLAG;
-						break;
-
-					case L_SHIFT:
-					case R_SHIFT:
-						keyboard_modifiers |= SHIFT_FLAG;
-						break;
-
-					// Everything else can be looked up in the ASCII table.
-					default:
-						c = keyboard_find(s);
-						if(c != KEY_NOT_FOUND) {
-							uart_transmit(c);
-						}
-						break;
-				}
-				break;
-
-			case KB_EXTENSION:
-				switch(s) {
-					case KEY_UP: // starting key-up sequence
-						keyboard_state = KB_EXTENSION_GOING_UP;
-						break;
-
-					case INSERT & 0xff:
-						break;
-
-					case HOME & 0xff:
-						break;
-
-					case PG_UP & 0xff:
-						break;
-
-					case DELETE & 0xff:
-						break;
-
-					case END & 0xff:
-						break;
-
-					case PG_DOWN & 0xff:
-						break;
-
-					case U_ARROW & 0xff:
-						break;
-
-					case L_ARROW & 0xff:
-						break;
-
-					case D_ARROW & 0xff:
-						break;
-
-					case R_ARROW & 0xff:
-						break;
-
-					case R_CTRL & 0xff:
-						keyboard_modifiers |= CONTROL_FLAG;
-						break;
-
-					case R_ALT & 0xff:
-						keyboard_modifiers |= ALT_FLAG;
-						break;
-				}
-				keyboard_state = KB_NORMAL;
-
-			case KB_NORMAL_GOING_UP:
-				// I don't really care what the key going up is,
-				// unless it is a modifier going away.
-				// Dump everything else on the floor.
-				switch(s) {
-					case L_CTRL:
-						keyboard_modifiers &= ~CONTROL_FLAG;
-						break;
-
-					case L_ALT:
-						keyboard_modifiers &= ~ALT_FLAG;
-						break;
-
-					case L_SHIFT:
-					case R_SHIFT:
-						keyboard_modifiers &= ~SHIFT_FLAG;
-						break;
-
-					default:
-						break;
-				}
-				keyboard_state = KB_NORMAL;
-				break;
-
-			case KB_EXTENSION_GOING_UP:
-				// I don't really care what the key going up is,
-				// unless it is a modifier going away.
-				// Dump everything else on the floor.
-				switch(s) {
-					case R_CTRL & 0xff:
-						keyboard_modifiers &= ~CONTROL_FLAG;
-						break;
-
-					case R_ALT & 0xff:
-						keyboard_modifiers &= ~ALT_FLAG;
-						break;
-
-					default:
-						break;
-				}
-				keyboard_state = KB_NORMAL;
-				break;
-
-			default:
-				break;
-		}
+		// Decode it.
+		keyboard_decode(scan_code);
 	}
 
 	asm(" andi.w #~0x0700, %sr");	// Unmask interrupts
