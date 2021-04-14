@@ -49,7 +49,7 @@ main()
 		}
 
 		// Should be about 15 minutes.
-		if(inactive > 52200000) {
+		if(inactive > 40000000) {
 			// We've been inactive too long.  Blank the screen.
 			*pControl = 0;
 			blanked = 1;

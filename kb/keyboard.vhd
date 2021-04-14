@@ -2,8 +2,8 @@
 --
 -- (c) 2021 Steven A. Falco
 --
--- This is a simple wrapper for ps2_keyboard.v to interface it to our
--- Z80 bus.  We provide a few registers and some interrupt logic.
+-- Keyboard interface.  We return scan codes, and the C code turns them
+-- into key strokes.
 
 library ieee;
 use ieee.std_logic_1164.all;

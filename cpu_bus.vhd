@@ -2,9 +2,8 @@
 --
 -- (c) 2021 Steven A. Falco
 --
--- The Z80 core that we are using requires a tri-state bus.  This
--- file controls which peripheral is to drive the bus, and also
--- generates the necessary peripheral control signals.
+-- This file controls which peripheral is to drive the cpu input bus,
+-- and also generates the necessary peripheral control signals.
 --
 -- We also generate a shared interrupt line.
 
@@ -61,12 +60,6 @@ entity cpu_bus is
 end cpu_bus;
 
 architecture a of cpu_bus is
-
-	--signal cpuUartCS_D0	: std_logic;
-	--signal cpuUartCS_D1	: std_logic;
-
-	--signal cpuKbCS_D0	: std_logic;
-	--signal cpuKbCS_D1	: std_logic;
 
 	type bus_FSM_type is (
 		busIdle_state,

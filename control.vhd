@@ -2,7 +2,7 @@
 --
 -- (c) 2021 Steven A. Falco
 --
--- This file contains a control register whereby the Z80 code can control
+-- This file contains a control register whereby the C code can control
 -- the hardware.
 --
 -- So far, we are only using this to control a screen saver that is reset by
