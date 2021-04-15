@@ -18,7 +18,7 @@ main()
 	*pControl = 1;
 
 	uart_initialize();
-	screen_initialize();
+	screen_initialize(1);
 	keyboard_initialize();
 
 	// Enable interrupts.

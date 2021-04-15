@@ -11,9 +11,4 @@ testbench/
 greybox_tmp
 *_sim/
 cpu_rom.mif
-
-firmware/*.o
-firmware/fw
-firmware/fw.bin
-firmware/fw.dump
-firmware/fw.map
+firmware/build

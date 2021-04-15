@@ -12,6 +12,7 @@
 #include "screen.h"
 #include "uart.h"
 #include "debug.h"
+#include "build/version.h"
 
 // Dual-ported video memory - 1920 shorts.
 #define screen_cols		(80)					// Number of columns
@@ -55,8 +56,73 @@ static uint8_t	screen_dec_top_margin;		// Prevent scrolling above the top margin
 static uint8_t	screen_dec_bottom_margin;	// Prevent scrolling below the bottom margin.  Range 0-23
 static uint8_t	screen_origin_mode;		// Absolute (0) or Relative (1)
 
+// Forward references:
+static void screen_announce();
+static void screen_escape_handler_start_csi();
+static void screen_start_sharp();
+static void screen_save_cursor_position();
+static void screen_restore_cursor_position();
+static int screen_cursor_in_line();
+static volatile uint16_t *screen_cursor_start_of_line();
+static void screen_scroll_up();
+static void screen_scroll_down();
+static void screen_handle_lf();
+static void screen_handle_cr();
+static void screen_handle_esc_lf();
+static void screen_handle_esc_cr_lf();
+static void screen_handle_reverse_scroll();
+static void screen_escape_handler_first(uint8_t c);
+static void screen_got_csi_group_N_digit(uint8_t c);
+static void screen_parse_dec_command(uint8_t c);
+static void screen_handle_bs();
+static void screen_handle_ht();
+static void screen_begin_escape();
+static void screen_next_argument();
+static void screen_send_primary_device_attributes();
+static void screen_move_cursor_numeric();
+static void screen_set_margins();
+static void screen_move_cursor_up();
+static void screen_move_cursor_down();
+static void screen_move_cursor_right();
+static void screen_move_cursor_left();
+static void screen_clear_rows();
+static void screen_clear_columns();
+static void screen_set_dec_flag();
+static void screen_escape_handler_in_csi(uint8_t c);
+static void screen_escape_in_sharp(uint8_t c);
+static void screen_escape_handler(uint8_t c);
+static void screen_normal_char(uint8_t c);
+
+static void
+screen_announce()
+{
+	char *p;
+
+	static char line0[] = "ANSI Terminal (c) 2021 Falco Engineering";
+	static char line1[] = "Version: ";
+
+	for(p = line0; *p; p++) {
+		screen_normal_char(*p);
+	}
+	screen_handle_lf();
+	screen_handle_cr();
+
+	for(p = line1; *p; p++) {
+		screen_normal_char(*p);
+	}
+	for(p = VERSION; *p; p++) {
+		screen_normal_char(*p);
+	}
+	for(p = STATE; *p; p++) {
+		screen_normal_char(*p);
+	}
+	screen_handle_lf();
+	screen_handle_lf();
+	screen_handle_cr();
+}
+
 void
-screen_initialize()
+screen_initialize(int cold)
 {
 	int i;
 	volatile uint16_t *p = screen_base;
@@ -92,6 +158,11 @@ screen_initialize()
 
 	// Start off with absolute origin mode.
 	screen_origin_mode = 0;
+
+	// On a cold-start, print our version info to the screen.
+	if(cold) {
+		screen_announce();
+	}
 }
 
 static void
@@ -417,7 +488,7 @@ screen_parse_dec_command(uint8_t c)
 			// so we don't care if the last character is "l" or 'h'.
 			//
 			// Instead, we just reset everything.
-			screen_initialize();
+			screen_initialize(0);
 			break;
 
 		case 6:

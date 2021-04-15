@@ -3,7 +3,7 @@
 
 #include "types.h"
 
-extern void screen_initialize();
+extern void screen_initialize(int cold);
 extern void screen_handler();
 
 #endif // _SCREEN_H_
