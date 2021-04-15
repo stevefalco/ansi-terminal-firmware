@@ -7,10 +7,7 @@
 // a subset of the vt100 escape sequences, sufficient to work properly with
 // 2.11bsd.
 //
-// There is a partial implementation of scroll regions, but it is buggy - at
-// least on Linux, vim doesn't behave properly.  As a workaround, we have a
-// reduced-functionality terminfo file for Linux, which simply eliminates
-// the scroll region escape sequences.
+// I also tested on Linux with vim, and we behave correctly.
 
 #include "screen.h"
 #include "uart.h"
@@ -49,13 +46,14 @@ static volatile uint16_t	*screen_current_fwa;		// FWA changes with scroll region
 static volatile uint16_t	*screen_current_lwa_p1;		// LWA+1 changes with scroll region
 
 static uint8_t	screen_escape_state;		// State machine variable.
-static uint8_t	screen_group_0_digits;		// Group 0 accumulated digits.
-static uint8_t	screen_group_1_digits;		// Group 1 accumulated digits.
+static uint8_t	screen_group_0_digits;		// Group 0 accumulated digits (often means row number).
+static uint8_t	screen_group_1_digits;		// Group 1 accumulated digits (often means column number).
 static uint8_t	*screen_group_pointer;		// Pointer into the group that we are accumulating digits for.
 static uint8_t	screen_col79_flag;		// Column 79 flag.
 static uint8_t	screen_dec_flag;		// Processing a DEC escape sequence.
 static uint8_t	screen_dec_top_margin;		// Prevent scrolling above the top margin.  Range 0-23
-static uint8_t	screen_dec_bottom_margin;	// Prevent scrolling below the bottom margin.
+static uint8_t	screen_dec_bottom_margin;	// Prevent scrolling below the bottom margin.  Range 0-23
+static uint8_t	screen_origin_mode;		// Absolute (0) or Relative (1)
 
 void
 screen_initialize()
@@ -91,6 +89,9 @@ screen_initialize()
 	// Start off with the screen start and end properly set.
 	screen_current_fwa = screen_base;
 	screen_current_lwa_p1 = screen_end;
+
+	// Start off with absolute origin mode.
+	screen_origin_mode = 0;
 }
 
 static void
@@ -412,10 +413,21 @@ screen_parse_dec_command(uint8_t c)
 	// reinitializing the screen, and we need that to pass vttest.
 	switch(screen_group_0_digits) {
 		case 3:
-			// We don't care if the last character is "l" or 'h', because we don't
-			// support 132 column mode.  So there is no need to test what is in
-			// c here.
+			// Sets the number of columns, but we don't support 132-column mode,
+			// so we don't care if the last character is "l" or 'h'.
+			//
+			// Instead, we just reset everything.
 			screen_initialize();
+			break;
+
+		case 6:
+			// Sets the origin mode.  'h' means relative origin, and
+			// 'l' means absolute origin.
+			if(c == 'l') {
+				screen_origin_mode = 0;
+			} else if(c == 'h') {
+				screen_origin_mode = 1;
+			}
 			break;
 
 		default:
@@ -552,6 +564,15 @@ screen_move_cursor_numeric()
 		digits0 = (screen_lines - 1);
 	}
 
+	// If we are in relative mode, we have to bias down from the top margin
+	// value, and we have to limit to the bottom margin value.
+	if(screen_origin_mode == 1) {
+		digits0 += screen_dec_top_margin;
+		if(digits0 > screen_dec_bottom_margin) {
+			digits0 = screen_dec_bottom_margin;
+		}
+	}
+
 	// Get the column parameter, and map it to our notation.
 	digits1 = screen_group_1_digits;
 	if(digits1 != 0) {
@@ -646,12 +667,19 @@ screen_move_cursor_up()
 {
 	int i;
 	int to_move;
+	volatile uint16_t *limit;
 	volatile uint16_t *proposed_new_position;
 
 	// If we are still in the escape_csi_state state, we didn't get any
 	// digits, so we just move the cursor up one line.  Start by assuming
 	// that.
 	to_move = 1;
+
+	// If we are in relative mode, the upper limit depends on the scroll region.
+	limit = screen_base;
+	if(screen_origin_mode == 1) {
+		limit = screen_base + (screen_dec_top_margin * screen_cols);
+	}
 	
 	//  Test the assumption.
 	if(screen_escape_state != escape_csi_state) {
@@ -665,9 +693,10 @@ screen_move_cursor_up()
 
 	for(i = 0; i < to_move; i++) {
 		// Move cursor 80 characters backwards, but if that would
-		// move us off the screen, then do nothing.
+		// move us off the screen (or out of the scroll region),
+		// then do nothing.
 		proposed_new_position = screen_cursor_location - screen_cols;
-		if(proposed_new_position < screen_base) {
+		if(proposed_new_position < limit) {
 			// No room.
 			break;
 		}
@@ -689,12 +718,19 @@ screen_move_cursor_down()
 {
 	int i;
 	int to_move;
+	volatile uint16_t *limit;
 	volatile uint16_t *proposed_new_position;
 
 	// If we are still in the escape_csi_state state, we didn't get any
 	// digits, so we just move the cursor down one line.  Start by assuming
 	// that.
 	to_move = 1;
+	
+	// If we are in relative mode, the lower limit depends on the scroll region.
+	limit = screen_end;
+	if(screen_origin_mode == 1) {
+		limit = screen_end - (((screen_lines - 1) - screen_dec_bottom_margin) * screen_cols);
+	}
 	
 	//  Test the assumption.
 	if(screen_escape_state != escape_csi_state) {
@@ -708,9 +744,10 @@ screen_move_cursor_down()
 
 	for(i = 0; i < to_move; i++) {
 		// Move cursor 80 characters forward, but if that would
-		// move us off the screen, then do nothing.
+		// move us off the screen (or out of the scroll region),
+		// then do nothing.
 		proposed_new_position = screen_cursor_location + screen_cols;
-		if(proposed_new_position >= screen_end) {
+		if(proposed_new_position >= limit) {
 			// No room.
 			break;
 		}

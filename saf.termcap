@@ -6,21 +6,10 @@ sf|saf|saf terminal:\
 	:cl=50\E[;H\E[2J:\
 	:cm=5\E[%i%d;%dH:\
 	:co#80:\
+	:cs=\E[%i%d;%dr:\
 	:do=^J:\
 	:ho=\E[H:\
 	:is=\E[24;1H:\
-	:kb=^H:\
-	:le=^H:\
-	:li#24:\
-	:nd=2\E[C:\
-	:pt:\
-	:rc=\E8:\
-	:rs=\E[H:\
-	:sc=\E7:\
-	:sf=2*\ED:\
-	:sr=2*\EM:\
-	:up=2\E[A:\
-	:vt#3:\
 	:k1=\EOP:\
 	:k2=\EOQ:\
 	:k3=\EOR:\
@@ -31,12 +20,24 @@ sf|saf|saf terminal:\
 	:k8=\E[19~:\
 	:k9=\E[20~:\
 	:k;=\E[21~:\
-	:kh=\E[H:\
 	:kI=\E[2~:\
-	:kP=\E[5~:\
 	:kN=\E[6~:\
-	:ku=\EOA:\
+	:kP=\E[5~:\
+	:kb=^H:\
 	:kd=\EOB:\
-	:kr=\EOC:\
+	:kh=\E[H:\
 	:kl=\EOD:\
+	:kr=\EOC:\
+	:ku=\EOA:\
+	:le=^H:\
+	:li#24:\
+	:nd=2\E[C:\
+	:pt:\
+	:rc=\E8:\
+	:rs=\E>\E[?3l\E[?4l\E[?5l\E[?7h\E[?8h:\
+	:sc=\E7:\
+	:sf=2*\ED:\
+	:sr=2*\EM:\
+	:up=2\E[A:\
+	:vt#3:\
 	:xn:
