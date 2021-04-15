@@ -1,6 +1,8 @@
 #include "debug.h"
 #include "uart.h"
 
+// We cannot afford a full-blown printf.  Instead, just print a string followed
+// by a hex dump of a single value.
 void
 dump(char *prefix, unsigned int c)
 {
@@ -25,6 +27,7 @@ dump(char *prefix, unsigned int c)
 	uart_transmit_string("\r\n");
 }
 
+// Print a simple string.  We supply the <CR> <LF>.
 void
 msg(char *str)
 {

@@ -79,7 +79,7 @@ initBssDone:
 
 	jsr	main
 
-	| Main should never exit, but if it does, we restart.
+	| Main should never exit, but if it does, we will do a cold restart.
 	bra.s	_start
 
 _spurious:

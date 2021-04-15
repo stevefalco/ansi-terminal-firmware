@@ -6,6 +6,8 @@
 static int inactive = 0;
 static int blanked = 0;
 
+// Initialize the world and go into a loop handling whatever comes in from
+// the keyboard and uart.  Also, run the screen-saver timer.
 void
 main()
 {

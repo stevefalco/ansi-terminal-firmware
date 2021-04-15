@@ -132,6 +132,7 @@ static uint16_t baud_table[] = {
 	28,	// sw=15 for 115200 baud
 };
 
+// uart_set_baud - set the baud rate based on the dip switches
 static void
 uart_set_baud()
 {
@@ -156,6 +157,7 @@ static int uart_rb_input;
 static int uart_rb_output;
 static int uart_rb_count;
 
+// uart_initialize - get the uart ready
 void
 uart_initialize()
 {
@@ -186,6 +188,9 @@ uart_initialize()
 	uart_MCR |= uart_MCR_RTS_v;
 }
 
+// uart_store_char - store a character in the receive buffer
+//
+// This runs from the interrupt service routine with interrupts disabled.
 static void
 uart_store_char()
 {
@@ -209,6 +214,9 @@ uart_store_char()
 	}
 }
 
+// uart_test_interrupt - see if the uart has posted an interrupt
+//
+// This runs from the interrupt service routine with interrupts disabled.
 void
 uart_test_interrupt()
 {
@@ -228,6 +236,7 @@ uart_test_interrupt()
 	}
 }
 
+// uart_transmit - transmit a character
 void
 uart_transmit(unsigned char c)
 {
@@ -238,6 +247,7 @@ uart_transmit(unsigned char c)
 	uart_THR = c;
 }
 
+// uart_transmit - transmit a null-terminated string
 void
 uart_transmit_string(char *pString)
 {
@@ -248,6 +258,12 @@ uart_transmit_string(char *pString)
 	}
 }
 
+// uart_receive - get a character from the receiver queue
+//
+// We have to disable interrupts for mutual exclusion with the
+// uart_test_interrupt routine.
+//
+// Return the next character in our buffer, or -1 if nothing available.
 int
 uart_receive()
 {

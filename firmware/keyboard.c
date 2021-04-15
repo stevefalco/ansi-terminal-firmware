@@ -39,6 +39,7 @@ static int keyboard_rb_count;
 #define KEY_NOT_FOUND		(0xff)
 static int keyboard_modifiers;
 
+// keyboard_initialize - get the keyboard ready
 void
 keyboard_initialize()
 {
@@ -51,6 +52,9 @@ keyboard_initialize()
 	keyboard_state = KB_NORMAL;
 }
 
+// keyboard_test_interrupt - see if the keyboard has posted an interrupt
+//
+// This runs from the interrupt service routine with interrupts disabled.
 void
 keyboard_test_interrupt()
 {
@@ -274,6 +278,8 @@ static SCAN_TABLE scan_table[] = {
 };
 #define SCAN_ELEMENTS (sizeof(scan_table) / sizeof(SCAN_TABLE))
 
+// Do a linear search through our scan table, looking for an entry with
+// the right code and extension flags.
 static uint8_t
 keyboard_find(uint8_t scan_code)
 {
@@ -290,6 +296,9 @@ keyboard_find(uint8_t scan_code)
 	return KEY_NOT_FOUND;
 }
 
+// State machine to respond to scan codes.  We have to handle both
+// key down (make) and key up (break) events so we can correctly
+// process control / shift / alt modifiers.
 static void
 keyboard_decode(uint8_t scan_code)
 {
@@ -485,6 +494,10 @@ keyboard_decode(uint8_t scan_code)
 	}
 }
 
+// keyboard_handler - process any keystrokes we may have received.
+//
+// Return 0 if nothing available, for use by our screen-saver.
+// Return 1 if we processed a new scan code.
 int
 keyboard_handler()
 {

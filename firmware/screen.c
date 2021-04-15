@@ -93,6 +93,7 @@ static void screen_escape_in_sharp(uint8_t c);
 static void screen_escape_handler(uint8_t c);
 static void screen_normal_char(uint8_t c);
 
+// Announce our information on the screen - only for cold-start.
 static void
 screen_announce()
 {
@@ -121,6 +122,7 @@ screen_announce()
 	screen_handle_cr();
 }
 
+// screen_initialize - clear our working storage.
 void
 screen_initialize(int cold)
 {
@@ -165,18 +167,21 @@ screen_initialize(int cold)
 	}
 }
 
+// screen_escape_handler_start_csi - we received a '['.
 static void
 screen_escape_handler_start_csi()
 {
 	screen_escape_state = escape_csi_state;
 }
 
+// screen_start_sharp - we received a '#'.
 static void
 screen_start_sharp()
 {
 	screen_escape_state = escape_sharp_state;
 }
 
+// screen_save_cursor_position - esc-7
 static void
 screen_save_cursor_position()
 {
@@ -186,6 +191,7 @@ screen_save_cursor_position()
 	screen_escape_state = escape_none_state;
 }
 
+// screen_restore_cursor_position - esc-8
 static void
 screen_restore_cursor_position()
 {
@@ -202,14 +208,20 @@ screen_restore_cursor_position()
 	screen_escape_state = escape_none_state;
 }
 
+// screen_cursor_in_line - Figure out which line the cursor is in.
+//
+// Return the cursor line number in the range of 0 to 23.
 static int
 screen_cursor_in_line()
 {
 	int diff = screen_cursor_location - screen_base;
 	int line = 0;
 
-	// I tried using modulo here, but the program crashes.  There must be some sort of
-	// exception generated.
+	// I tried using modulo here, but the program crashes.
+	// There must be some sort of exception generated.
+	//
+	// This version is likely faster and generates a whole
+	// lot less code. :-)
 	while(diff >= screen_cols) {
 		++line;
 		diff -= screen_cols;
@@ -218,6 +230,9 @@ screen_cursor_in_line()
 	return line;
 }
 
+// screen_cursor_start_of_line - Find the address of the start of the line containing cursor
+//
+// Return the FWA of the line containing the cursor.
 static volatile uint16_t *
 screen_cursor_start_of_line()
 {
@@ -230,6 +245,7 @@ screen_cursor_start_of_line()
 	return tmp;
 }
 
+// screen_scroll_up - scroll up one line.
 static void
 screen_scroll_up()
 {
@@ -264,6 +280,7 @@ screen_scroll_up()
 	}
 }
 
+// screen_scroll_down - scroll down one line
 static void
 screen_scroll_down()
 {
@@ -302,6 +319,7 @@ screen_scroll_down()
 	}
 }
 
+// screen_handle_lf - handle a line feed
 static void
 screen_handle_lf()
 {
@@ -351,6 +369,7 @@ screen_handle_lf()
 	*screen_cursor_location |= null_cursor;
 }
 
+// screen_handle_cr - handle a carriage return
 static void
 screen_handle_cr()
 {
@@ -368,6 +387,7 @@ screen_handle_cr()
 	*screen_cursor_location |= null_cursor;
 }
 
+// screen_handle_esc_lf - ESC D
 static void
 screen_handle_esc_lf()
 {
@@ -378,6 +398,7 @@ screen_handle_esc_lf()
 	screen_escape_state = escape_none_state;
 }
 
+// screen_handle_esc_cr_lf - ESC E
 static void
 screen_handle_esc_cr_lf()
 {
@@ -389,6 +410,7 @@ screen_handle_esc_cr_lf()
 	screen_escape_state = escape_none_state;
 }
 
+// screen_handle_reverse_scroll - ESC M
 static void
 screen_handle_reverse_scroll()
 {
@@ -414,6 +436,8 @@ screen_handle_reverse_scroll()
 	screen_escape_state = escape_none_state;
 }
 
+// We have the first character after an escape.  Based on what we've got,
+// change states.
 static void
 screen_escape_handler_first(uint8_t c)
 {
@@ -461,6 +485,7 @@ screen_escape_handler_first(uint8_t c)
 	}
 }
 
+// screen_got_csi_group_N_digit
 static void
 screen_got_csi_group_N_digit(uint8_t c)
 {
@@ -477,11 +502,15 @@ screen_got_csi_group_N_digit(uint8_t c)
 	*p = (*p * 10) + (c - '0');
 }
 
+// screen_parse_dec_command
 static void
 screen_parse_dec_command(uint8_t c)
 {
 	// We don't handle most of these, but DECCOLM has the side-effect of
 	// reinitializing the screen, and we need that to pass vttest.
+	//
+	// Similarly, we need to support "origin mode".  That one is important
+	// on Linux, because vim uses scroll regions.
 	switch(screen_group_0_digits) {
 		case 3:
 			// Sets the number of columns, but we don't support 132-column mode,
@@ -513,6 +542,7 @@ screen_parse_dec_command(uint8_t c)
 	return;
 }
 
+// screen_handle_bs - handle a backspace
 static void
 screen_handle_bs()
 {
@@ -542,6 +572,7 @@ screen_handle_bs()
 	}
 }
 
+// screen_handle_ht - handle a horizontal tab
 static void
 screen_handle_ht()
 {
@@ -576,6 +607,7 @@ screen_handle_ht()
 	*screen_cursor_location |= null_cursor;
 }
 
+// screen_begin_escape - begin an escape sequence
 static void
 screen_begin_escape()
 {
@@ -587,6 +619,7 @@ screen_begin_escape()
 	screen_escape_state = escape_need_first_state;
 }
 
+// screen_next_argument - we got a semicolon, so there may be a second argument
 static void
 screen_next_argument()
 {
@@ -594,6 +627,7 @@ screen_next_argument()
 	screen_group_pointer = &screen_group_1_digits;
 }
 
+// screen_send_primary_device_attributes Esc [ c
 static void
 screen_send_primary_device_attributes()
 {
@@ -603,6 +637,7 @@ screen_send_primary_device_attributes()
 	screen_escape_state = escape_none_state;
 }
 
+// screen_move_cursor_numeric - ESC [ H or ESC [ f
 static void
 screen_move_cursor_numeric()
 {
@@ -668,6 +703,7 @@ screen_move_cursor_numeric()
 	screen_escape_state = escape_none_state;
 }
 
+// screen_set_margins - ESC [ r
 static void
 screen_set_margins()
 {
@@ -733,6 +769,7 @@ screen_set_margins()
 	screen_escape_state = escape_none_state;
 }
 
+// screen_move_cursor_up - ESC [ A
 static void
 screen_move_cursor_up()
 {
@@ -784,6 +821,7 @@ screen_move_cursor_up()
 	screen_escape_state = escape_none_state;
 }
 
+// screen_move_cursor_down - ESC [ B
 static void
 screen_move_cursor_down()
 {
@@ -835,6 +873,7 @@ screen_move_cursor_down()
 	screen_escape_state = escape_none_state;
 }
 
+// screen_move_cursor_right - ESC [ C
 static void
 screen_move_cursor_right()
 {
@@ -881,6 +920,7 @@ screen_move_cursor_right()
 	screen_escape_state = escape_none_state;
 }
 
+// screen_move_cursor_left - ESC [ D
 static void
 screen_move_cursor_left()
 {
@@ -925,6 +965,7 @@ screen_move_cursor_left()
 	screen_escape_state = escape_none_state;
 }
 
+// screen_clear_rows - ESC [ J
 static void
 screen_clear_rows()
 {
@@ -964,6 +1005,7 @@ screen_clear_rows()
 	screen_escape_state = escape_none_state;
 }
 
+// screen_clear_columns - ESC [ K
 static void
 screen_clear_columns()
 {
@@ -1009,6 +1051,7 @@ screen_clear_columns()
 	screen_escape_state = escape_none_state;
 }
 
+// screen_set_dec_flag - ESC [ ?
 static void
 screen_set_dec_flag()
 {
@@ -1016,6 +1059,7 @@ screen_set_dec_flag()
 	screen_dec_flag = 1;
 }
 
+// screen_escape_handler_in_csi - Got first char after ESC [
 static void
 screen_escape_handler_in_csi(uint8_t c)
 {
@@ -1141,6 +1185,7 @@ screen_escape_handler_in_csi(uint8_t c)
 	return;
 }
 
+// screen_escape_in_sharp - got the first char after ESC #
 static void
 screen_escape_in_sharp(uint8_t c)
 {
@@ -1168,6 +1213,9 @@ screen_escape_in_sharp(uint8_t c)
 	return;
 }
 
+// screen_escape_handler - Run the escape state machine.
+//
+// Called for each new character until the escape sequence ends.
 static void
 screen_escape_handler(uint8_t c)
 {
@@ -1209,6 +1257,7 @@ screen_escape_handler(uint8_t c)
 	}
 }
 
+// screen_normal_char - handle a normal printing character.
 static void
 screen_normal_char(uint8_t c)
 {
@@ -1275,6 +1324,7 @@ screen_normal_char(uint8_t c)
 	return;
 }
 
+// screen_handler - read from the uart and update the screen
 void
 screen_handler()
 {
