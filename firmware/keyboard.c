@@ -90,7 +90,8 @@ keyboard_test_interrupt()
 #define CONTROL_FLAG	0x02
 #define ALT_FLAG	0x04
 
-// Non-ASCII scan codes
+// Non-ASCII scan codes.  I haven't bothered with the keypad, because my keyboards
+// don't have one.  But they would be easy enough to add.
 #define CAPS_LOCK	0x58
 #define L_SHIFT		0x12
 #define L_CTRL		0x14
@@ -271,18 +272,11 @@ static SCAN_TABLE scan_table_control[] = {
 	{ 0x1c, 0x5d },	// ^BACKSLASH
 	{ 0x1d, 0x5b },	// ^]
 	{ 0x1e, 0x36 },	// ^6
+	{ 0x1e, 0x0e }, // ^`
 	{ 0x1f, 0x4e },	// ^-
-	{ 0x7f, 0x4a },	// ^/
+	{ 0x1f, 0x4a },	// ^/
 };
 #define SCAN_ELEMENTS_CONTROL (sizeof(scan_table_control) / sizeof(SCAN_TABLE))
-
-static SCAN_TABLE scan_table_control_shift[] = {
-	{ 0x00, 0x1e },	// ^@
-	{ 0x1e, 0x36 },	// ^^
-	{ 0x1f, 0x4e },	// ^_
-	{ 0x7f, 0x4a },	// ^?
-};
-#define SCAN_ELEMENTS_CONTROL_SHIFT (sizeof(scan_table_control_shift) / sizeof(SCAN_TABLE))
 
 // Do a linear search through our scan table, looking for an entry with
 // the right code and extension flags.
@@ -302,19 +296,17 @@ keyboard_find(uint8_t scan_code)
 			limit = SCAN_ELEMENTS_NO_MODIFIERS;
 			break;
 
-		case CONTROL_FLAG:
-			p = scan_table_control;
-			limit = SCAN_ELEMENTS_CONTROL;
-			break;
-
 		case SHIFT_FLAG:
 			p = scan_table_shift;
 			limit = SCAN_ELEMENTS_SHIFT;
 			break;
 
+		// Control overrides shift, meaning that we effectively
+		// ignore shift if control is active.
+		case CONTROL_FLAG:
 		case CONTROL_FLAG | SHIFT_FLAG:
-			p = scan_table_control_shift;
-			limit = SCAN_ELEMENTS_CONTROL_SHIFT;
+			p = scan_table_control;
+			limit = SCAN_ELEMENTS_CONTROL;
 			break;
 
 		default: // Unhandled modifier.

@@ -63,6 +63,7 @@ static void screen_start_sharp();
 static void screen_save_cursor_position();
 static void screen_restore_cursor_position();
 static int screen_cursor_in_line();
+static int screen_cursor_in_column();
 static volatile uint16_t *screen_cursor_start_of_line();
 static void screen_scroll_up();
 static void screen_scroll_down();
@@ -81,6 +82,8 @@ static void screen_next_argument();
 static void screen_send_primary_device_attributes();
 static void screen_move_cursor_numeric();
 static void screen_set_margins();
+static void screen_num_to_uart(int n);
+static void screen_report();
 static void screen_move_cursor_up();
 static void screen_move_cursor_down();
 static void screen_move_cursor_right();
@@ -206,6 +209,21 @@ screen_restore_cursor_position()
 
 	// Escape sequence complete.
 	screen_escape_state = escape_none_state;
+}
+
+// screen_cursor_in_column - Figure out which column the cursor is in.
+//
+// Return the cursor column number in the range of 0 to 79.
+static int
+screen_cursor_in_column()
+{
+	int line = screen_cursor_in_line(); // 0 to 23.
+	volatile uint16_t *lineFWA = screen_base + (line * screen_cols);
+	int column;
+       
+	column = screen_cursor_location - lineFWA; // 0 to 79.
+
+	return column;
 }
 
 // screen_cursor_in_line - Figure out which line the cursor is in.
@@ -456,23 +474,28 @@ screen_escape_handler_first(uint8_t c)
 			screen_start_sharp();
 			break;
 
-		case '7':
+		case '7': // DECSC
 			screen_save_cursor_position();
 			break;
 
-		case '8':
+		case 'c': // RIS
+			screen_initialize(1);
+			screen_escape_state = escape_none_state;
+			break;
+
+		case '8': // DECRC
 			screen_restore_cursor_position();
 			break;
 
-		case 'D':
+		case 'D': // IND
 			screen_handle_esc_lf();
 			break;
 
-		case 'E':
+		case 'E': // NEL
 			screen_handle_esc_cr_lf();
 			break;
 
-		case 'M':
+		case 'M': // RI
 			screen_handle_reverse_scroll();
 			break;
 
@@ -512,7 +535,7 @@ screen_parse_dec_command(uint8_t c)
 	// Similarly, we need to support "origin mode".  That one is important
 	// on Linux, because vim uses scroll regions.
 	switch(screen_group_0_digits) {
-		case 3:
+		case 3: // DECCOLM
 			// Sets the number of columns, but we don't support 132-column mode,
 			// so we don't care if the last character is "l" or 'h'.
 			//
@@ -520,7 +543,7 @@ screen_parse_dec_command(uint8_t c)
 			screen_initialize(0);
 			break;
 
-		case 6:
+		case 6: // DECOM
 			// Sets the origin mode.  'h' means relative origin, and
 			// 'l' means absolute origin.
 			if(c == 'l') {
@@ -632,7 +655,7 @@ static void
 screen_send_primary_device_attributes()
 {
 	// This is a request for our attributes.  Claim that we are a VT100.
-	uart_transmit_string("1;2c");
+	uart_transmit_string("[?1;0c");
 	
 	screen_escape_state = escape_none_state;
 }
@@ -698,6 +721,74 @@ screen_move_cursor_numeric()
 
 	// Any move means we must clear the col79 flag.
 	screen_col79_flag = 0;
+
+	// Escape sequence complete.
+	screen_escape_state = escape_none_state;
+}
+
+// Send a number out the uart as a base-10 string.
+// We use this for position reports, so we don't
+// need much range.
+#define NUM_PLACES 3
+static void
+screen_num_to_uart(int n)
+{
+	int i;
+	int power;
+	int suppress;
+	int powers_of_10[NUM_PLACES] = { 1, 10, 100 };
+	int result[NUM_PLACES] = { 0, 0, 0 };
+
+	for(i = (NUM_PLACES - 1); i >= 0; i--) {
+		// Weight of this column.
+		power = powers_of_10[i];
+
+		// Subtract until we go below 0.
+		while(n >= power){
+			n -= power;
+			result[i]++;
+		}
+	}
+
+	suppress = 1;
+	for(i = (NUM_PLACES -1); i >= 0; i--) {
+		// If we are still suppressing, and this column is zero, and
+		// it is not the units column...
+		if((suppress == 1) && (result[i] == 0) && (i != 0)) {
+			// then drop the leading zero.
+			continue;
+		}
+
+		// Send this digit out.
+		uart_transmit('0' + result[i]);
+		
+		// Once we print something, we are no longer suppressing
+		// leading zeros.
+		suppress = 0;
+	}
+}
+
+// screen_report - ESC [ n
+static void
+screen_report()
+{
+	int line = screen_cursor_in_line() + 1;
+	int column = screen_cursor_in_column() + 1;
+
+	// There are various report requests, as selected by the
+	// screen_group_0_digits value.
+	switch(screen_group_0_digits) {
+		case 6: // Cursor position report.
+			uart_transmit_string("[");
+			screen_num_to_uart(line);
+			uart_transmit(';');
+			screen_num_to_uart(column);
+			uart_transmit('R');
+			break;
+
+		default:
+			break;
+	}
 
 	// Escape sequence complete.
 	screen_escape_state = escape_none_state;
@@ -971,10 +1062,13 @@ screen_clear_rows()
 {
 	volatile uint16_t *p;
 
-	// There are three subsets:
+	// There are several subsets:
 	// 0 = erase below
 	// 1 = erase above
 	// 2 = erase all
+	// 3 = erase all including scrollback (which we don't have)
+	//
+	// Linux uses ESC [ 3 J to clear the screen, so we will support it.
 	switch(screen_group_0_digits) {
 		case 0: // erase below
 			for(p = screen_cursor_location; p < screen_end; p++) {
@@ -989,6 +1083,7 @@ screen_clear_rows()
 			break;
 
 		case 2: // erase all
+		case 3: // erase all including scrollback
 			for(p = screen_base; p < screen_end; p++) {
 				*p = 0;
 			}
@@ -1129,43 +1224,47 @@ screen_escape_handler_in_csi(uint8_t c)
 			} else {
 				switch(c) {
 					// Test for some of the simple commands.
-					case 'c':
+					case 'c': // DA
 						screen_send_primary_device_attributes();
 						return;
 
-					case 'f':
+					case 'f': // HVP
 						screen_move_cursor_numeric();
 						return;
 
-					case 'r':
+					case 'n':
+						screen_report();
+						return;
+
+					case 'r': // DECSTBM
 						screen_set_margins();
 						return;
 
-					case 'A':
+					case 'A': // CUU
 						screen_move_cursor_up();
 						return;
 					
-					case 'B':
+					case 'B': // CUD
 						screen_move_cursor_down();
 						return;
 
-					case 'C':
+					case 'C': // CUF
 						screen_move_cursor_right();
 						return;
 
-					case 'D':
+					case 'D': // CUB
 						screen_move_cursor_left();
 						return;
 
-					case 'H':
+					case 'H': // CUP
 						screen_move_cursor_numeric();
 						return;
 
-					case 'J':
+					case 'J': // ED
 						screen_clear_rows();
 						return;
 
-					case 'K':
+					case 'K': // EL
 						screen_clear_columns();
 						return;
 
@@ -1193,7 +1292,7 @@ screen_escape_in_sharp(uint8_t c)
 	int i;
 
 	switch(c) {
-		case '8':
+		case '8': // DECALN
 			// Fill the screen with the letter 'E'.
 			p = screen_base;
 			for(i = 0; i < screen_length; i++) {
