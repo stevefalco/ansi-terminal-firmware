@@ -85,6 +85,7 @@ keyboard_test_interrupt()
 }
 
 // Extension flag bits
+#define NO_FLAG		0x00
 #define SHIFT_FLAG	0x01
 #define CONTROL_FLAG	0x02
 #define ALT_FLAG	0x04
@@ -127,156 +128,161 @@ keyboard_test_interrupt()
 
 typedef struct {
 	uint8_t		ascii_value;
-	uint8_t		make_code;
-	uint8_t		extension_flags;
+	uint8_t		scan_code;
 } SCAN_TABLE;
 
-// These are more-or-less in the likely order of use, to speed up the searching.
-static SCAN_TABLE scan_table[] = {
-	{ 'a', 0x1c, 0x00 },
-	{ 'b', 0x32, 0x00 },
-	{ 'c', 0x21, 0x00 },
-	{ 'd', 0x23, 0x00 },
-	{ 'e', 0x24, 0x00 },
-	{ 'f', 0x2b, 0x00 },
-	{ 'g', 0x34, 0x00 },
-	{ 'h', 0x33, 0x00 },
-	{ 'i', 0x43, 0x00 },
-	{ 'j', 0x3b, 0x00 },
-	{ 'k', 0x42, 0x00 },
-	{ 'l', 0x4b, 0x00 },
-	{ 'm', 0x3a, 0x00 },
-	{ 'n', 0x31, 0x00 },
-	{ 'o', 0x44, 0x00 },
-	{ 'p', 0x4d, 0x00 },
-	{ 'q', 0x15, 0x00 },
-	{ 'r', 0x2d, 0x00 },
-	{ 's', 0x1b, 0x00 },
-	{ 't', 0x2c, 0x00 },
-	{ 'u', 0x3c, 0x00 },
-	{ 'v', 0x2a, 0x00 },
-	{ 'w', 0x1d, 0x00 },
-	{ 'x', 0x22, 0x00 },
-	{ 'y', 0x35, 0x00 },
-	{ 'z', 0x1a, 0x00 },
-
-	{ 'A', 0x1c, SHIFT_FLAG },
-	{ 'B', 0x32, SHIFT_FLAG },
-	{ 'C', 0x21, SHIFT_FLAG },
-	{ 'D', 0x23, SHIFT_FLAG },
-	{ 'E', 0x24, SHIFT_FLAG },
-	{ 'F', 0x2b, SHIFT_FLAG },
-	{ 'G', 0x34, SHIFT_FLAG },
-	{ 'H', 0x33, SHIFT_FLAG },
-	{ 'I', 0x43, SHIFT_FLAG },
-	{ 'J', 0x3b, SHIFT_FLAG },
-	{ 'K', 0x42, SHIFT_FLAG },
-	{ 'L', 0x4b, SHIFT_FLAG },
-	{ 'M', 0x3a, SHIFT_FLAG },
-	{ 'N', 0x31, SHIFT_FLAG },
-	{ 'O', 0x44, SHIFT_FLAG },
-	{ 'P', 0x4d, SHIFT_FLAG },
-	{ 'Q', 0x15, SHIFT_FLAG },
-	{ 'R', 0x2d, SHIFT_FLAG },
-	{ 'S', 0x1b, SHIFT_FLAG },
-	{ 'T', 0x2c, SHIFT_FLAG },
-	{ 'U', 0x3c, SHIFT_FLAG },
-	{ 'V', 0x2a, SHIFT_FLAG },
-	{ 'W', 0x1d, SHIFT_FLAG },
-	{ 'X', 0x22, SHIFT_FLAG },
-	{ 'Y', 0x35, SHIFT_FLAG },
-	{ 'Z', 0x1a, SHIFT_FLAG },
-
-	{ ' ', 0x29, 0x00 },
-	{ '0', 0x45, 0x00 },
-	{ '1', 0x16, 0x00 },
-	{ '2', 0x1e, 0x00 },
-	{ '3', 0x26, 0x00 },
-	{ '4', 0x25, 0x00 },
-	{ '5', 0x2e, 0x00 },
-	{ '6', 0x36, 0x00 },
-	{ '7', 0x3d, 0x00 },
-	{ '8', 0x3e, 0x00 },
-	{ '9', 0x46, 0x00 },
-
-	{ '-',  0x4e, 0x00 },
-	{ '=',  0x55, 0x00 },
-	{ '\\', 0x5d, 0x00 },
-	{ '`',  0x0e, 0x00 },
-	{ '[',  0x54, 0x00 },
-	{ ']',  0x5b, 0x00 },
-	{ ';',  0x4c, 0x00 },
-	{ '\'', 0x52, 0x00 },
-	{ ',',  0x41, 0x00 },
-	{ '.',  0x49, 0x00 },
-	{ '/',  0x4a, 0x00 },
-
-	{ '!',  0x16, SHIFT_FLAG },
-	{ '@',  0x1e, SHIFT_FLAG },
-	{ '#',  0x26, SHIFT_FLAG },
-	{ '$',  0x25, SHIFT_FLAG },
-	{ '%',  0x2e, SHIFT_FLAG },
-	{ '^',  0x36, SHIFT_FLAG },
-	{ '&',  0x3d, SHIFT_FLAG },
-	{ '*',  0x3e, SHIFT_FLAG },
-	{ '(',  0x46, SHIFT_FLAG },
-	{ ')',  0x45, SHIFT_FLAG },
-	{ '_',  0x4e, SHIFT_FLAG },
-	{ '+',  0x55, SHIFT_FLAG },
-	{ '|',  0x5d, SHIFT_FLAG },
-	{ '~',  0x0e, SHIFT_FLAG },
-	{ '{',  0x54, SHIFT_FLAG },
-	{ '}',  0x5b, SHIFT_FLAG },
-	{ ':',  0x4c, SHIFT_FLAG },
-	{ '"',  0x52, SHIFT_FLAG },
-	{ '<',  0x41, SHIFT_FLAG },
-	{ '>',  0x49, SHIFT_FLAG },
-	{ '?',  0x4a, SHIFT_FLAG },
-
-	{ 0x00, 0x29, CONTROL_FLAG },			// ^SPACE
-	{ 0x00, 0x1e, CONTROL_FLAG },			// ^2
-	{ 0x00, 0x1e, CONTROL_FLAG | SHIFT_FLAG },	// ^@
-	{ 0x01, 0x1c, CONTROL_FLAG },			// ^A
-	{ 0x02, 0x32, CONTROL_FLAG },			// ^B
-	{ 0x03, 0x21, CONTROL_FLAG },			// ^C
-	{ 0x04, 0x23, CONTROL_FLAG },			// ^D
-	{ 0x05, 0x24, CONTROL_FLAG },			// ^E
-	{ 0x06, 0x2b, CONTROL_FLAG },			// ^F
-	{ 0x07, 0x34, CONTROL_FLAG },			// ^G
-	{ 0x08, 0x33, CONTROL_FLAG },			// ^H
-	{ 0x08, 0x66, 0x00 },				// BACKSPACE
-	{ 0x09, 0x43, CONTROL_FLAG },			// ^I
-	{ 0x09, 0x0d, 0x00 },				// TAB
-	{ 0x0a, 0x3b, CONTROL_FLAG },			// ^J
-	{ 0x0b, 0x42, CONTROL_FLAG },			// ^K
-	{ 0x0c, 0x4b, CONTROL_FLAG },			// ^L
-	{ 0x0d, 0x3a, CONTROL_FLAG },			// ^M
-	{ 0x0d, 0x5a, 0x00 },				// ENTER
-	{ 0x0e, 0x31, CONTROL_FLAG },			// ^N
-	{ 0x0f, 0x44, CONTROL_FLAG },			// ^O
-	{ 0x10, 0x4d, CONTROL_FLAG },			// ^P
-	{ 0x11, 0x15, CONTROL_FLAG },			// ^Q
-	{ 0x12, 0x2d, CONTROL_FLAG },			// ^R
-	{ 0x13, 0x1b, CONTROL_FLAG },			// ^S
-	{ 0x14, 0x2c, CONTROL_FLAG },			// ^T
-	{ 0x15, 0x3c, CONTROL_FLAG },			// ^U
-	{ 0x16, 0x2a, CONTROL_FLAG },			// ^V
-	{ 0x17, 0x1d, CONTROL_FLAG },			// ^W
-	{ 0x18, 0x22, CONTROL_FLAG },			// ^X
-	{ 0x19, 0x35, CONTROL_FLAG },			// ^Y
-	{ 0x1a, 0x1a, CONTROL_FLAG },			// ^Z
-	{ 0x1b, 0x76, 0x00 }, 				// ESCAPE
-	{ 0x1b, 0x54, CONTROL_FLAG }, 			// ^[
-	{ 0x1c, 0x5d, CONTROL_FLAG },			// ^backslash
-	{ 0x1d, 0x5b, CONTROL_FLAG },			// ^]
-	{ 0x1e, 0x36, CONTROL_FLAG },			// ^6
-	{ 0x1e, 0x36, CONTROL_FLAG | SHIFT_FLAG },	// ^^
-	{ 0x1f, 0x4e, CONTROL_FLAG },			// ^-
-	{ 0x1f, 0x4e, CONTROL_FLAG | SHIFT_FLAG },	// ^_
-	{ 0x7f, 0x4a, CONTROL_FLAG },			// ^/
-	{ 0x7f, 0x4a, CONTROL_FLAG | SHIFT_FLAG },	// ^?
+static SCAN_TABLE scan_table_no_modifiers[] = {
+	{ ' ',  0x29 }, // SPACE BAR
+	{ 0x08, 0x66 },	// BACKSPACE
+	{ 0x09, 0x0d },	// TAB
+	{ 0x0d, 0x5a },	// ENTER
+	{ 0x1b, 0x76 },	// ESCAPE
+	{ 'a',  0x1c },
+	{ 'b',  0x32 },
+	{ 'c',  0x21 },
+	{ 'd',  0x23 },
+	{ 'e',  0x24 },
+	{ 'f',  0x2b },
+	{ 'g',  0x34 },
+	{ 'h',  0x33 },
+	{ 'i',  0x43 },
+	{ 'j',  0x3b },
+	{ 'k',  0x42 },
+	{ 'l',  0x4b },
+	{ 'm',  0x3a },
+	{ 'n',  0x31 },
+	{ 'o',  0x44 },
+	{ 'p',  0x4d },
+	{ 'q',  0x15 },
+	{ 'r',  0x2d },
+	{ 's',  0x1b },
+	{ 't',  0x2c },
+	{ 'u',  0x3c },
+	{ 'v',  0x2a },
+	{ 'w',  0x1d },
+	{ 'x',  0x22 },
+	{ 'y',  0x35 },
+	{ 'z',  0x1a },
+	{ '0',  0x45 },
+	{ '1',  0x16 },
+	{ '2',  0x1e },
+	{ '3',  0x26 },
+	{ '4',  0x25 },
+	{ '5',  0x2e },
+	{ '6',  0x36 },
+	{ '7',  0x3d },
+	{ '8',  0x3e },
+	{ '9',  0x46 },
+	{ '-',  0x4e },
+	{ '=',  0x55 },
+	{ '\\', 0x5d },
+	{ '`',  0x0e },
+	{ '[',  0x54 },
+	{ ']',  0x5b },
+	{ ';',  0x4c },
+	{ '\'', 0x52 },
+	{ ',',  0x41 },
+	{ '.',  0x49 },
+	{ '/',  0x4a },
 };
-#define SCAN_ELEMENTS (sizeof(scan_table) / sizeof(SCAN_TABLE))
+#define SCAN_ELEMENTS_NO_MODIFIERS (sizeof(scan_table_no_modifiers) / sizeof(SCAN_TABLE))
+
+static SCAN_TABLE scan_table_shift[] = {
+	{ 'A',  0x1c },
+	{ 'B',  0x32 },
+	{ 'C',  0x21 },
+	{ 'D',  0x23 },
+	{ 'E',  0x24 },
+	{ 'F',  0x2b },
+	{ 'G',  0x34 },
+	{ 'H',  0x33 },
+	{ 'I',  0x43 },
+	{ 'J',  0x3b },
+	{ 'K',  0x42 },
+	{ 'L',  0x4b },
+	{ 'M',  0x3a },
+	{ 'N',  0x31 },
+	{ 'O',  0x44 },
+	{ 'P',  0x4d },
+	{ 'Q',  0x15 },
+	{ 'R',  0x2d },
+	{ 'S',  0x1b },
+	{ 'T',  0x2c },
+	{ 'U',  0x3c },
+	{ 'V',  0x2a },
+	{ 'W',  0x1d },
+	{ 'X',  0x22 },
+	{ 'Y',  0x35 },
+	{ 'Z',  0x1a },
+	{ '!',  0x16 },
+	{ '@',  0x1e },
+	{ '#',  0x26 },
+	{ '$',  0x25 },
+	{ '%',  0x2e },
+	{ '^',  0x36 },
+	{ '&',  0x3d },
+	{ '*',  0x3e },
+	{ '(',  0x46 },
+	{ ')',  0x45 },
+	{ '_',  0x4e },
+	{ '+',  0x55 },
+	{ '|',  0x5d },
+	{ '~',  0x0e },
+	{ '{',  0x54 },
+	{ '}',  0x5b },
+	{ ':',  0x4c },
+	{ '"',  0x52 },
+	{ '<',  0x41 },
+	{ '>',  0x49 },
+	{ '?',  0x4a },
+};
+#define SCAN_ELEMENTS_SHIFT (sizeof(scan_table_shift) / sizeof(SCAN_TABLE))
+
+static SCAN_TABLE scan_table_control[] = {
+	{ 0x00, 0x29 },	// ^SPACE
+	{ 0x00, 0x1e },	// ^2
+	{ 0x01, 0x1c },	// ^A
+	{ 0x02, 0x32 },	// ^B
+	{ 0x03, 0x21 },	// ^C
+	{ 0x04, 0x23 },	// ^D
+	{ 0x05, 0x24 },	// ^E
+	{ 0x06, 0x2b },	// ^F
+	{ 0x07, 0x34 },	// ^G
+	{ 0x08, 0x33 },	// ^H
+	{ 0x09, 0x43 },	// ^I
+	{ 0x0a, 0x3b },	// ^J
+	{ 0x0b, 0x42 },	// ^K
+	{ 0x0c, 0x4b },	// ^L
+	{ 0x0d, 0x3a },	// ^M
+	{ 0x0e, 0x31 },	// ^N
+	{ 0x0f, 0x44 },	// ^O
+	{ 0x10, 0x4d },	// ^P
+	{ 0x11, 0x15 },	// ^Q
+	{ 0x12, 0x2d },	// ^R
+	{ 0x13, 0x1b },	// ^S
+	{ 0x14, 0x2c },	// ^T
+	{ 0x15, 0x3c },	// ^U
+	{ 0x16, 0x2a },	// ^V
+	{ 0x17, 0x1d },	// ^W
+	{ 0x18, 0x22 },	// ^X
+	{ 0x19, 0x35 },	// ^Y
+	{ 0x1a, 0x1a },	// ^Z
+	{ 0x1b, 0x54 },	// ^[
+	{ 0x1c, 0x5d },	// ^BACKSLASH
+	{ 0x1d, 0x5b },	// ^]
+	{ 0x1e, 0x36 },	// ^6
+	{ 0x1f, 0x4e },	// ^-
+	{ 0x7f, 0x4a },	// ^/
+};
+#define SCAN_ELEMENTS_CONTROL (sizeof(scan_table_control) / sizeof(SCAN_TABLE))
+
+static SCAN_TABLE scan_table_control_shift[] = {
+	{ 0x00, 0x1e },	// ^@
+	{ 0x1e, 0x36 },	// ^^
+	{ 0x1f, 0x4e },	// ^_
+	{ 0x7f, 0x4a },	// ^?
+};
+#define SCAN_ELEMENTS_CONTROL_SHIFT (sizeof(scan_table_control_shift) / sizeof(SCAN_TABLE))
 
 // Do a linear search through our scan table, looking for an entry with
 // the right code and extension flags.
@@ -284,12 +290,42 @@ static uint8_t
 keyboard_find(uint8_t scan_code)
 {
 	int i;
+	int limit;
 	SCAN_TABLE *p;
+	SCAN_TABLE *q;
 
-	for(i = 0; i < SCAN_ELEMENTS; i++) {
-		p = scan_table + i;
-		if((scan_code == p->make_code) && (keyboard_modifiers == p->extension_flags)) {
-			return p->ascii_value;
+	i = sizeof(SCAN_TABLE);
+
+	switch(keyboard_modifiers) {
+		case NO_FLAG:
+			p = scan_table_no_modifiers;
+			limit = SCAN_ELEMENTS_NO_MODIFIERS;
+			break;
+
+		case CONTROL_FLAG:
+			p = scan_table_control;
+			limit = SCAN_ELEMENTS_CONTROL;
+			break;
+
+		case SHIFT_FLAG:
+			p = scan_table_shift;
+			limit = SCAN_ELEMENTS_SHIFT;
+			break;
+
+		case CONTROL_FLAG | SHIFT_FLAG:
+			p = scan_table_control_shift;
+			limit = SCAN_ELEMENTS_CONTROL_SHIFT;
+			break;
+
+		default: // Unhandled modifier.
+			return KEY_NOT_FOUND;
+
+	}
+
+	for(i = 0; i < limit; i++) {
+		q = p + i;
+		if(scan_code == q->scan_code) {
+			return q->ascii_value;
 		}
 	}
 
