@@ -217,11 +217,13 @@ screen_restore_cursor_position()
 static int
 screen_cursor_in_column()
 {
-	int line = screen_cursor_in_line(); // 0 to 23.
-	volatile uint16_t *lineFWA = screen_base + (line * screen_cols);
-	int column;
-       
-	column = screen_cursor_location - lineFWA; // 0 to 79.
+	// We work with pointers.  Find the difference between the current
+	// position and the start of the screen.
+	int diff = screen_cursor_location - screen_base;
+
+	// Columns run from 0 to 79, so we can find the column number as
+	// "diff modulo 80".
+	int column = diff % screen_cols;
 
 	return column;
 }
@@ -232,18 +234,13 @@ screen_cursor_in_column()
 static int
 screen_cursor_in_line()
 {
+	// We work with pointers.  Find the difference between the current
+	// position and the start of the screen.
 	int diff = screen_cursor_location - screen_base;
-	int line = 0;
 
-	// I tried using modulo here, but the program crashes.
-	// There must be some sort of exception generated.
-	//
-	// This version is likely faster and generates a whole
-	// lot less code. :-)
-	while(diff >= screen_cols) {
-		++line;
-		diff -= screen_cols;
-	}
+	// Columns run from 0 to 79, so we can find the line number as
+	// "diff / 80".
+	int line = diff / screen_cols;
 
 	return line;
 }
@@ -256,8 +253,8 @@ screen_cursor_start_of_line()
 {
 	volatile uint16_t *tmp;
 
-	// Find what line we are on.  The call returns 0 to 23 in register A.
-	// As a side effect, it also clears carry.
+	// Find what line we are on, scale up by the number of columns per line,
+	// then add that to the screen base address.
 	tmp = screen_base + (screen_cursor_in_line() * screen_cols);
 
 	return tmp;
@@ -736,25 +733,26 @@ screen_num_to_uart(int n)
 	int i;
 	int power;
 	int suppress;
-	int powers_of_10[NUM_PLACES] = { 1, 10, 100 };
-	int result[NUM_PLACES] = { 0, 0, 0 };
+	int result[NUM_PLACES];
 
+	// Work from right to left, extracting digits from n.
 	for(i = (NUM_PLACES - 1); i >= 0; i--) {
-		// Weight of this column.
-		power = powers_of_10[i];
+		// Get this digit.
+		result[i] = n % 10;
 
-		// Subtract until we go below 0.
-		while(n >= power){
-			n -= power;
-			result[i]++;
-		}
+		// Divide n by 10 to move to the next place.
+		n /= 10;
 	}
 
+	// Work from left to right, printing digits.  We suppress
+	// leading zero digits.
+	//
+	// If n is zero, we will print a single '0' character.
 	suppress = 1;
-	for(i = (NUM_PLACES -1); i >= 0; i--) {
-		// If we are still suppressing, and this column is zero, and
+	for(i = 0; i < NUM_PLACES; i++) {
+		// If we are still suppressing, and this column contains zero, and
 		// it is not the units column...
-		if((suppress == 1) && (result[i] == 0) && (i != 0)) {
+		if((suppress == 1) && (result[i] == 0) && (i != (NUM_PLACES - 1))) {
 			// then drop the leading zero.
 			continue;
 		}

@@ -23,16 +23,18 @@ $(BUILD_DIR)/fw.bin: $(BUILD_DIR)/fw
 $(BUILD_DIR)/fw.dump: $(BUILD_DIR)/fw
 	m68k-linux-gnu-objdump -d $^ > $@
 
-$(BUILD_DIR)/fw: $(OBJ)
+$(BUILD_DIR)/fw: $(OBJ) lib/build/lib.a
 	m68k-linux-gnu-gcc \
 		-Wl,--build-id=none \
 		-Wl,-M -Wl,-T,fw.ld \
 		-m68000 -nostdlib \
 		-o $@ $^ \
-		-lgcc \
 		> $(BUILD_DIR)/fw.map
 
 -include $(DEP)
+
+$(BUILD_DIR)/%.o: %.S
+	m68k-linux-gnu-gcc -m68000 -c $< -o $@
 
 $(BUILD_DIR)/%.o: %.s
 	m68k-linux-gnu-gcc -m68000 -c $< -o $@
@@ -42,6 +44,10 @@ $(BUILD_DIR)/%.o: %.c
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
+
+.PHONY:
+lib/build/lib.a:
+	cd lib ; make
 
 .PHONY: version
 version:
@@ -53,3 +59,4 @@ version:
 .PHONY: clean
 clean:
 	rm -fr $(BUILD_DIR)
+	cd lib ; make clean

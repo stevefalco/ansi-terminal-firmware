@@ -12,3 +12,4 @@ greybox_tmp
 *_sim/
 cpu_rom.mif
 firmware/build
+firmware/lib/build
