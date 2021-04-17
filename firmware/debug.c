@@ -4,10 +4,10 @@
 // We cannot afford a full-blown printf.  Instead, just print a string followed
 // by a hex dump of a single value.
 void
-dump(char *prefix, unsigned int c)
+dump(char *prefix, uint32_t c)
 {
 	int i;
-	unsigned char tmp;
+	uint8_t tmp;
 
 	uart_transmit_string(prefix);
 	uart_transmit(' ');
@@ -33,4 +33,13 @@ msg(char *str)
 {
 	uart_transmit_string(str);
 	uart_transmit_string("\r\n");
+}
+
+// Send a bit pattern to the diagnostic LEDs.
+void
+write_led(uint8_t led)
+{
+	volatile uint8_t *p = (volatile uint8_t *)0xc080;
+
+	*p = led;
 }

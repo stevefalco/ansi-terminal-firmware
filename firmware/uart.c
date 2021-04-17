@@ -13,6 +13,7 @@
 // flow control, although it can be turned on in his VHDL if needed.
 
 #include "uart.h"
+#include "debug.h"
 
 // UART registers
 #define uart_base		(0xc000)
@@ -109,9 +110,18 @@
 // Baud rate, etc. dip switches
 #define dipSW			(*(volatile uint8_t *)(0xc020))
 #define dipBaudMask		(0x0f)
+#define dipFlowMask		(0x10)						// 0 = RTS/CTS, 1 = XON/XOFF
 
 #define uart_depth		(128)						// SW receiver fifo depth
 #define uart_high_water		(64)
+
+#define XON			(0x11)						// ^Q (DC1)
+#define XOFF			(0x13)						// ^S (DC3)
+#define HW_FLOW			(0)
+#define SW_FLOW			(1)
+
+static int uart_flow;
+static int uart_flow_state;							// 1 if paused, else 0
 
 static uint16_t baud_table[] = {
 	29318,	// sw=0 for 110 baud
@@ -150,6 +160,9 @@ uart_set_baud()
 
 	// Lock divisor registers.
 	uart_LCR &= ~uart_LCR_DLAB_v;
+
+	// Determine the flow-control type.
+	uart_flow = !!(switches & dipFlowMask);
 }
 
 static uint8_t uart_rb[uart_depth];
@@ -184,8 +197,15 @@ uart_initialize()
 	// buffer.
 	uart_IER = uart_IER_INIT;
 
-	// Unblock the sender.
+	// Unblock the sender.  We always set the RTS bit, because that is
+	// harmless.  We only send XON when using software flow control.
+	//
+	// Remember the state for later.
 	uart_MCR |= uart_MCR_RTS_v;
+	if(uart_flow == SW_FLOW) {
+		uart_transmit(XON);
+	}
+	uart_flow_state = 0;
 }
 
 // uart_store_char - store a character in the receive buffer
@@ -199,8 +219,14 @@ uart_store_char()
 	uint8_t val = uart_RBR;
 
 	if(uart_rb_count > uart_high_water) {
-		// Above high water - clear RTS so the sender will pause.
-		uart_MCR &= ~uart_MCR_RTS_v;
+		if(uart_flow == HW_FLOW) {
+			// Above high water - clear RTS so the sender will pause.
+			uart_MCR &= ~uart_MCR_RTS_v;
+		} else {
+			// Above high water - send XOFF so the sender will pause.
+			uart_transmit(XOFF);
+		}
+		uart_flow_state = 1; // Remember that we are paused.
 	}
 
 	if(uart_rb_count < uart_depth) {
@@ -283,7 +309,14 @@ uart_receive()
 	} else {
 		// If there is nothing available, make sure we haven't blocked
 		// the sender.
-		uart_MCR |= uart_MCR_RTS_v;
+		if(uart_flow_state) {
+			if(uart_flow == HW_FLOW) {
+				uart_MCR |= uart_MCR_RTS_v;
+			} else {
+				uart_transmit(XON);
+			}
+			uart_flow_state = 0; // No longer paused
+		}
 	}
 
 	asm(" andi.w #~0x0700, %sr");	// Unmask interrupts
