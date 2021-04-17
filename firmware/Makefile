@@ -4,10 +4,12 @@
 
 BUILD_DIR = build
 
-A_SRC = init.s
+# We use .S rather than .s because that runs the preprocessor, which has some
+# benefits, like // comments, #defines, etc.
+A_SRC = init.S
 C_SRC = main.c screen.c keyboard.c uart.c debug.c
 
-OBJ = $(A_SRC:%.s=$(BUILD_DIR)/%.o)
+OBJ = $(A_SRC:%.S=$(BUILD_DIR)/%.o)
 OBJ += $(C_SRC:%.c=$(BUILD_DIR)/%.o)
 
 DEP = $(C_SRC:%.c=$(BUILD_DIR)/%.d)
@@ -34,9 +36,6 @@ $(BUILD_DIR)/fw: $(OBJ) lib/build/lib.a
 -include $(DEP)
 
 $(BUILD_DIR)/%.o: %.S
-	m68k-linux-gnu-gcc -m68000 -c $< -o $@
-
-$(BUILD_DIR)/%.o: %.s
 	m68k-linux-gnu-gcc -m68000 -c $< -o $@
 
 $(BUILD_DIR)/%.o: %.c
