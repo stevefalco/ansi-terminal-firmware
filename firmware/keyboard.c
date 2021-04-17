@@ -540,7 +540,9 @@ keyboard_handler()
 	// See if there is anything waiting to be processed.
 	if(keyboard_rb_count != 0) {
 		// We have a new scan code.  Flag it for use by the screensaver
-		// timeout logic.
+		// timeout logic.  Note that just pressing "shift" or "control"
+		// will wake the screensaver, and that is exactly the behavior
+		// that we want.
 		rv = 1;
 
 		// Get the scan code.

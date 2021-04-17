@@ -182,8 +182,9 @@ uart_initialize()
 	// Set an initial baud rate
 	uart_set_baud();
 
-	// Word length 8, 1 stop, no parity
-	// (No need to preserve other bits via read-modify-write)
+	// Word length 8, no parity, 1 stop bit, i.e. 8-N-1.
+	// We could add other modes, selectable by dip-switch,
+	// but I've never seen a need...
 	uart_LCR = uart_LCR_WLS8;
 
 	// Reset FIFOs and enable them
