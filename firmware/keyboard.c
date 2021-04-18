@@ -2,6 +2,19 @@
 //
 // (c) 2021 Steven A. Falco
 //
+// ANSI Terminal is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// ANSI Terminal is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with ANSI Terminal.  If not, see <https://www.gnu.org/licenses/>.
+
 // Keyboard driver.  We receive interrupts, and then store incoming ASCII
 // keystrokes in a circular buffer.  We are also called periodically by
 // the main loop, and we transmit any characters in the circular buffer
