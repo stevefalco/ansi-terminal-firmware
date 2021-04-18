@@ -1,0 +1,14 @@
+The divisors.c program was used to generate the divtable, which shows the
+baud rate error associated with different cpu clock frequencies.  We used
+that to determine that 51.6 MHz was a good cpu clock frequency, with very
+low baud rate errors.
+
+This project uses a_vhd_16550_uart:
+	https://opencores.org/projects/a_vhd_16550_uart
+
+See vhdl_16550_uart_2_2.pdf for the license terms for a_vhd_16550_uart.
+
+This project uses gh_vhdl_library:
+	https://opencores.org/projects/gh_vhdl_library
+
+See gh_vhdl_lib_3_48.pdf for the license terms for gh_vhdl_library.
