@@ -7,6 +7,14 @@
 // TODO:
 // - Everything except bus retry already implemented.
 
+// SAF - 2021-04-18.  Slightly modified the official source to change the
+// way the CPU registers are initialized.  My copy of ModelSim refused to
+// allow the initialization present around lines 1184 to 1192.  Instead, I
+// added the initialization around line 1532 - 1537.
+//
+// I also had to put full paths in for the microrom.mem and nanorom.mem
+// files.  File fx68k.sv.diff contains a diff of the changes I made.
+
 `timescale 1 ns / 1 ns
 
 //`define USE_E_CLKEN

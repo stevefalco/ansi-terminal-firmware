@@ -1,0 +1,83 @@
+--- fx68k.sv	2021-04-15 10:32:10.170841364 -0400
++++ /home/sfalco/fpga/terminal/saf.68k/fx68k/fx68k.sv	2021-04-18 15:55:43.658568303 -0400
+@@ -7,6 +7,14 @@
+ // TODO:
+ // - Everything except bus retry already implemented.
+ 
++// SAF - 2021-04-18.  Slightly modified the official source to change the
++// way the CPU registers are initialized.  My copy of ModelSim refused to
++// allow the initialization present around lines 1184 to 1192.  Instead, I
++// added the initialization around line 1532 - 1537.
++//
++// I also had to put full paths in for the microrom.mem and nanorom.mem
++// files.  File fx68k.sv.diff contains a diff of the changes I made.
++
+ `timescale 1 ns / 1 ns
+ 
+ //`define USE_E_CLKEN
+@@ -1182,7 +1190,6 @@
+ 		Simulator power ups the registers with 'X, as they are really undetermined at the real hardware.
+ 		But the simulator doesn't realize (it can't) that the same value is substracting from itself,
+ 		and that the result should be zero even when it's 'X - 'X.
+-	*/
+ 	
+ 	initial begin
+ 		for( int i = 0; i < 18; i++) begin
+@@ -1190,6 +1197,7 @@
+ 			regs68H[i] <= '0;
+ 		end
+ 	end
++	*/
+ 	
+ 	// For simulation display only
+ 	wire [31:0] SSP = { regs68H[REG_SSP], regs68L[REG_SSP]};
+@@ -1518,7 +1526,20 @@
+ 	
+ 	// Main A/D registers
+ 	
+-	always_ff @( posedge Clks.clk) begin
++	always_ff @( posedge Clks.clk
++// synthesis translate_off 
++	       	or posedge Clks.pwrUp
++// synthesis translate_on
++		) begin
++
++// synthesis translate_off 
++		if (Clks.pwrUp) begin
++			for( int i = 0; i < 18; i++) begin
++				regs68L[i] <= '0;
++				regs68H[i] <= '0;
++			end
++		end else begin
++// synthesis translate_on
+ 		if( enT3) begin
+ 			if( Nanod.dbl2rxl | Nanod.abl2rxl) begin
+ 				if( ~rxIsAreg) begin
+@@ -1547,6 +1568,9 @@
+ 				regs68H[ actualRy] <= Nanod.dbh2ryh ? Dbh : Abh;
+ 				
+ 		end	
++// synthesis translate_off 
++		end
++// synthesis translate_on
+ 	end
+ 		
+ 	// PC & AT
+@@ -2471,7 +2495,7 @@
+ module uRom( input clk, input [UADDR_WIDTH-1:0] microAddr, output logic [UROM_WIDTH-1:0] microOutput);
+ 	reg [UROM_WIDTH-1:0] uRam[ UROM_DEPTH];		
+ 	initial begin
+-		$readmemb("microrom.mem", uRam);
++		$readmemb("/home/sfalco/fpga/terminal/saf.68k/fx68k/microrom.mem", uRam);
+ 	end
+ 	
+ 	always_ff @( posedge clk) 
+@@ -2482,7 +2506,7 @@
+ module nanoRom( input clk, input [NADDR_WIDTH-1:0] nanoAddr, output logic [NANO_WIDTH-1:0] nanoOutput);
+ 	reg [NANO_WIDTH-1:0] nRam[ NANO_DEPTH];		
+ 	initial begin
+-		$readmemb("nanorom.mem", nRam);
++		$readmemb("/home/sfalco/fpga/terminal/saf.68k/fx68k/nanorom.mem", nRam);
+ 	end
+ 	
+ 	always_ff @( posedge clk) 
