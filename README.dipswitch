@@ -1,0 +1,34 @@
+The 8-pole dip switch is managed by firmware/uart.c.
+
+The switches are numbered in this file as shown on the top of the switch body.
+
+Switches 1 through 4 select the baud rate:
+
+SW4 SW3 SW2 SW1     Baud
+========================
+ON  ON  ON  ON  =    110
+ON  ON  ON  OFF =    300
+ON  ON  OFF ON  =    600
+ON  ON  OFF OFF =   1200
+ON  OFF ON  ON  =   2400
+ON  OFF ON  OFF =   4800
+ON  OFF OFF ON  =   9600
+ON  OFF OFF OFF =  19200
+OFF ON  ON  ON  =  38400
+OFF ON  ON  OFF =  57600
+OFF ON  OFF ON  = 115200
+
+All unlisted combinations result in 115200 baud.
+
+Switch 5 selects between hardware and software flow control.
+
+SW5
+===================================================================
+OFF = Software flow control using XON / XOFF (in-band signaling)
+ON  = Hardware flow control using RTS / CTS (out-of-band signaling)
+
+Flow control is only impemented on data sent from the computer to
+the terminal.  The terminal keyboard does not honor requests from
+the computer to stop sending.
+
+The remaining switches are currently unallocated.
