@@ -17,7 +17,11 @@ Here are photos of the case, pcb, schematic and displayed text.  There is a high
 
 <img src="screenshots/hardware.jpg" >
 
+<img src="screenshots/interior.jpg" >
+
 <img src="screenshots/pcb.jpg" >
+
+<img src="screenshots/underside.jpg" >
 
 <img src="screenshots/schematic.png" >
 
