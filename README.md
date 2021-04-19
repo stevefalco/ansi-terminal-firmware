@@ -1,4 +1,10 @@
-ANSI Terminal is a "dumb" terminal that emulates part of a VT100.  It is sufficient to use with vi under 2.11bsd, and it also works well as a dumb terminal for Linux.  It successfully allows editing using the "vim" editor.
+ANSI Terminal is a "dumb" terminal that emulates part of a VT100.  It is sufficient to use with vi under 2.11bsd, and it also works well as a dumb terminal for Linux.  It successfully allows editing using the "vim" editor.  An M68K (M68000) soft-core processor is contained in an FPGA on a CYC1000 module, and handles all the processing chores.
+
+This project contains IP cores as follows:
+
+https://github.com/ijor/fx68k provides the M68000 processor.
+
+https://opencores.org/projects/a_vhd_16550_uart provides a 16550 compatible uart.
 
 Unlike many existing terminal projects, this project targets 1280x1024 monitors, which are much more common than the 640x480 monitors of days gone by.  This also allows higher quality characters, using 16x32 glyphs, rather than the more common 8x16 glyphs.
 
