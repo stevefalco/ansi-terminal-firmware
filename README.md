@@ -13,11 +13,13 @@ escape sequences.
 
 A companion project, ansi-terminal-kicad contains the KiCAD design files and a 3-D printable case.
 
-Here are photos of the case, pcb, and displayed text.
+Here are photos of the case, pcb, schematic and displayed text.  There is a higher resolution copy of the schematic in file terminal.pdf.
 
 <img src="screenshots/hardware.jpg" >
 
 <img src="screenshots/pcb.jpg" >
+
+<img src="screenshots/schematic.png" >
 
 <img src="screenshots/display.jpg" >
 
