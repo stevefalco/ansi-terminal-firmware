@@ -17,7 +17,7 @@ This project contains the FPGA code and software for a CYC1000 FPGA board:
 Both a termcap and terminfo file are provided, to enumerate the supported
 escape sequences.
 
-A companion project, ansi-terminal-kicad contains the KiCAD design files and a 3-D printable case.
+A companion project, https://github.com/stevefalco/ansi-terminal-hardware contains the KiCAD design files (schematic, pcb layout, and gerbers) and a 3-D printable case.
 
 Here are photos of the case, pcb, schematic and displayed text.  There is a higher resolution copy of the schematic in file terminal.pdf.
 
