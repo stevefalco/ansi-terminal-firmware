@@ -52,7 +52,7 @@ $(BUILD_DIR)/%.o: %.S
 	m68k-linux-gnu-gcc -m68000 -c $< -o $@
 
 $(BUILD_DIR)/%.o: %.c
-	m68k-linux-gnu-gcc -MMD -O1 -m68000 -c $< -o $@
+	m68k-linux-gnu-gcc -Wall -Werror -MMD -O1 -m68000 -c $< -o $@
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)

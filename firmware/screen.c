@@ -68,6 +68,7 @@ static uint8_t	screen_dec_flag;		// Processing a DEC escape sequence.
 static uint8_t	screen_dec_top_margin;		// Prevent scrolling above the top margin.  Range 0-23
 static uint8_t	screen_dec_bottom_margin;	// Prevent scrolling below the bottom margin.  Range 0-23
 static uint8_t	screen_origin_mode;		// Absolute (0) or Relative (1)
+static uint8_t	screen_autowrap_mode;		// 1 = autowrap, 0 = no autowrap
 
 // Forward references:
 static void screen_announce();
@@ -165,6 +166,9 @@ screen_initialize(int cold)
 	// Clear the column 79 and DEC flags.
 	screen_col79_flag = 0;
 	screen_dec_flag = 0;
+
+	// Autowrap defaults to on.
+	screen_autowrap_mode = 1;
 
 	// Top margin starts out as 0, bottom margin starts out as 23.
 	screen_dec_top_margin = 0;
@@ -563,6 +567,17 @@ screen_parse_dec_command(uint8_t c)
 			}
 			break;
 
+		case 7: // DECAWM
+			// Sets autowrap mode.  'h' means autowrap is on, and 'l'
+			// means autowrap is off.
+			if(c == 'h') {
+				screen_autowrap_mode = 1;
+			} else if(c == 'l') {
+				screen_autowrap_mode = 0;
+			}
+			screen_col79_flag = 0;
+			break;
+
 		default:
 			break;
 	}
@@ -744,7 +759,6 @@ static void
 screen_num_to_uart(int n)
 {
 	int i;
-	int power;
 	int suppress;
 	int result[NUM_PLACES];
 
@@ -1377,10 +1391,10 @@ screen_normal_char(uint8_t c)
 	// There is one tricky bit.  If the column is 0 through 78, then
 	// we place the character and advance the cursor one column.
 	//
-	// But, if we are in column 79, we don't advance the cursor until
-	// we get one more character.  That new character goes into column
-	// 0 on the next line, with scrolling if needed, and the cursor
-	// winds up in column 1.
+	// But, if we are in column 79, and we are in autowrap mode,
+	// we don't advance the cursor until we get one more character.
+	// That new character goes into column 0 on the next line, with
+	// scrolling if needed, and the cursor winds up in column 1.
 	//
 	// If the column 79 flag is set, this character needs special
 	// handling.
@@ -1425,10 +1439,13 @@ screen_normal_char(uint8_t c)
 		return;
 	}
 
-	// This is the special case.  Put it on screen, and make it a cursor, but
-	// then set a flag rather than moving the cursor.
+	// This is the special case.  Put it on screen, and make it a cursor.  If
+	// autowrap mode is on, then set a flag rather than moving the cursor.  If
+	// autowrap mode is off, don't set the flag.  We'll stay locked in this row.
 	*screen_cursor_location = c | null_cursor;
-	screen_col79_flag = 1;
+	if(screen_autowrap_mode) {
+		screen_col79_flag = 1;
+	}
 
 	// We don't move the cursor, so we are done.
 	return;

@@ -71,7 +71,7 @@ keyboard_initialize()
 void
 keyboard_test_interrupt()
 {
-	uint8_t junk;
+	uint8_t scan_code;
 
 	while(1) {
 		// Read the status register to see if this interrupt is for us.
@@ -80,19 +80,18 @@ keyboard_test_interrupt()
 			return;
 		}
 
-		// Store the scan code.
+		// It is for us.  Get the scan code.
+		scan_code = keyboard_SCAN_CODE;
+
+		// Store the scan code if there is room.
 		if(keyboard_rb_count < keyboard_depth) {
-			// There is room to store this character.
-			keyboard_rb[keyboard_rb_input] = keyboard_SCAN_CODE;
+			keyboard_rb[keyboard_rb_input] = scan_code;
 
 			// One more now available.
 			++keyboard_rb_count;
 
 			// Move the input pointer, keeping it in range.
 			keyboard_rb_input = (keyboard_rb_input + 1) & (keyboard_depth - 1);
-		} else {
-			// No room - just flush it.
-			junk = keyboard_SCAN_CODE;
 		}
 	}
 }

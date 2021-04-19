@@ -27,12 +27,9 @@ static int blanked = 0;
 
 // Initialize the world and go into a loop handling whatever comes in from
 // the keyboard and uart.  Also, run the screen-saver timer.
-void
+int
 main()
 {
-	int i;
-	int sr;
-
 	volatile char *pControl = (volatile char *)0x0000c060;
 
 	// Enable video sync
@@ -78,4 +75,6 @@ main()
 			blanked = 1;
 		}
 	}
+
+	return 0;
 }
