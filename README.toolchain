@@ -1,0 +1,17 @@
+The FPGA is compiled using Quartus Prime.  I'm currently using
+quartus-prime-lite-20.1.1.720.
+
+The project could be converted to another vendor's tools.  The IP that we
+need consists of PLLs to generate the CPU and video clocks, as well as ROMs
+and RAMs for the CPU, character generator, and frame store.  The frame store
+in particular has to be dual-ported so both the CPU and the display logic
+can access it.  Naturally, the pin map would have to be changed if a different
+board was chosen.
+
+For compiling the code in the firmware directories, I'm using the Fedora Linux
+binutils-m68k-linux-gnu and gcc-m68k-linux-gnu packages.  Similar packages
+should exist for other Linux desktops.  My current compiler tool versions are:
+
+binutils-m68k-linux-gnu-2.35.1-1.fc33.x86_64
+gcc-m68k-linux-gnu-10.2.1-3.fc33.x86_64
+
