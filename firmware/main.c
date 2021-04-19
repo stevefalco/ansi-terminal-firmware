@@ -69,8 +69,10 @@ main()
 			*pControl = 1;
 		}
 
-		// Should be about 15 minutes.
-		if(inactive > 40000000) {
+		// Based on our CPU clock of 88.5 MHz, I've found that this
+		// value should give about 15 minutes before inactivity
+		// timeout and blanking of the monitor.
+		if(inactive > 70000000) {
 			// We've been inactive too long.  Blank the screen.
 			*pControl = 0;
 			blanked = 1;

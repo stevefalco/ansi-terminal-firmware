@@ -23,9 +23,10 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use ieee.std_logic_unsigned.all;
 
+-- CPU clock is 88.5 MHz
 entity keyboard is
 	generic (
-		clk_freq	: integer := 51_600_000;	-- Hz
+		clk_freq	: integer := 88_500_000;	-- Hz
 		stable_time	: integer := 5			-- us
 	);
 	port (

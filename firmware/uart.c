@@ -136,23 +136,24 @@
 static int uart_flow;
 static int uart_flow_state;							// 1 if paused, else 0
 
+// These divisors are based on our 88.5 MHz CPU clock.
 static uint16_t baud_table[] = {
-	29318,	// sw=0 for 110 baud
-	10750,	// sw=1 for 300 baud
-	5375,	// sw=2 for 600 baud
-	2688,	// sw=3 for 1200 baud
-	1344,	// sw=4 for 2400 baud
-	672,	// sw=5 for 4800 baud
-	336,	// sw=6 for 9600 baud
-	168,	// sw=7 for 19200 baud
-	84,	// sw=8 for 38400 baud
-	56,	// sw=9 for 57600 baud
-	28,	// sw=10 for 115200 baud
-	28,	// sw=11 for 115200 baud
-	28,	// sw=12 for 115200 baud
-	28,	// sw=13 for 115200 baud
-	28,	// sw=14 for 115200 baud
-	28,	// sw=15 for 115200 baud
+	50284,	// sw=0 for 110 baud
+	18438,	// sw=1 for 300 baud
+	9219,	// sw=2 for 600 baud
+	4609,	// sw=3 for 1200 baud
+	2305,	// sw=4 for 2400 baud
+	1152,	// sw=5 for 4800 baud
+	576,	// sw=6 for 9600 baud
+	288,	// sw=7 for 19200 baud
+	144,	// sw=8 for 38400 baud
+	96,	// sw=9 for 57600 baud
+	48,	// sw=10 for 115200 baud
+	24,	// sw=11 for 230400 baud
+	12,	// sw=12 for 460800 baud
+	6,	// sw=13 for 921600 baud
+	6,	// sw=14 for 921600 baud
+	6,	// sw=15 for 921600 baud
 };
 
 // uart_set_baud - set the baud rate based on the dip switches

@@ -17,8 +17,15 @@ ON  OFF OFF OFF =  19200
 OFF ON  ON  ON  =  38400
 OFF ON  ON  OFF =  57600
 OFF ON  OFF ON  = 115200
+OFF ON  OFF OFF = 230400
+OFF OFF ON  ON  = 460800
+OFF OFF ON  OFF = 921600
+OFF OFF OFF ON  = 921600
+OFF OFF OFF OFF = 921600
 
-All unlisted combinations result in 115200 baud.
+Note that rates faster than 230400 may have overrun problems.
+I successfully tested up to 230400 baud, but saw dropouts at
+460800 and 921600 baud.
 
 Switch 5 selects between hardware and software flow control.
 

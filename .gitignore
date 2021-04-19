@@ -1,6 +1,7 @@
 .*.sw?
 *~
 *.rpt
+*.bak
 db/
 terminal.qws
 incremental_db/
@@ -13,3 +14,4 @@ greybox_tmp
 cpu_rom.mif
 firmware/build
 firmware/lib/build
+uart/divisors

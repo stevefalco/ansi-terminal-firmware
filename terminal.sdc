@@ -62,6 +62,20 @@ derive_pll_clocks
 derive_clock_uncertainty
 
 #**************************************************************
+# Set multicycle paths
+#**************************************************************
+
+set_multicycle_path -start -setup -from [get_keepers fx68k:cpu|Ir[*]] -to [get_keepers fx68k:cpu|microAddr[*]] 2
+set_multicycle_path -start -hold -from [get_keepers fx68k:cpu|Ir[*]] -to [get_keepers fx68k:cpu|microAddr[*]] 1
+set_multicycle_path -start -setup -from [get_keepers fx68k:cpu|Ir[*]] -to [get_keepers fx68k:cpu|nanoAddr[*]] 2
+set_multicycle_path -start -hold -from [get_keepers fx68k:cpu|Ir[*]] -to [get_keepers fx68k:cpu|nanoAddr[*]] 1
+
+set_multicycle_path -start -setup -from [get_keepers fx68k:cpu|nanoLatch[*]] -to [get_keepers fx68k:cpu|excUnit:excUnit|fx68kAlu:alu|pswCcr[*]] 2
+set_multicycle_path -start -setup -from [get_keepers fx68k:cpu|excUnit:excUnit|fx68kAlu:alu|oper[*]] -to [get_keepers fx68k:cpu|excUnit:excUnit|fx68kAlu:alu|pswCcr[*]] 2
+set_multicycle_path -start -hold -from [get_keepers fx68k:cpu|nanoLatch[*]] -to [get_keepers fx68k:cpu|excUnit:excUnit|fx68kAlu:alu|pswCcr[*]] 1
+set_multicycle_path -start -hold -from [get_keepers fx68k:cpu|excUnit:excUnit|fx68kAlu:alu|oper[*]] -to [get_keepers fx68k:cpu|excUnit:excUnit|fx68kAlu:alu|pswCcr[*]] 1
+
+#**************************************************************
 # Set Input Delay
 #**************************************************************
 

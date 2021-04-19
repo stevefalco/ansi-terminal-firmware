@@ -19,7 +19,7 @@
 // wind up with in our baud rate generation.
 //
 // We want to choose the highest speed clock for best CPU performance,
-// while still having accurate baud rates.  It turns out that 51.6 MHz
+// while still having accurate baud rates.  It turns out that 88.5 MHz
 // was a reasonably high frequency that would meet timing with accurate baud
 // rates.  We might be able to go a little faster, but 100 MHz failed timing.
 //
@@ -40,12 +40,15 @@ int baudTable[] = {
 	38400,
 	57600,
 	115200,
+	230400,
+	460800,
+	921600,
 };
 
 int
 main()
 {
-	double clockStart = 50E6;
+	double clockStart = 80E6;
 	double clock;
 	double txActual;
 	double rxActual;
