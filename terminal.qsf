@@ -241,4 +241,18 @@ set_global_assignment -name VHDL_FILE pel_select.vhd
 set_global_assignment -name VHDL_FILE cpu_bus.vhd
 set_global_assignment -name VHDL_FILE testbench.vhd
 set_global_assignment -name VHDL_FILE char_rom.vhd
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to DBG_UART_CTS
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to DBG_UART_RTS
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to DBG_UART_RX
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to DBG_UART_TX
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to DBG_UART_CTS
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to DBG_UART_RTS
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to DBG_UART_RX
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to DBG_UART_TX
+set_instance_assignment -name SLEW_RATE 2 -to DBG_UART_RTS
+set_instance_assignment -name SLEW_RATE 2 -to DBG_UART_TX
+set_location_assignment PIN_C15 -to DBG_UART_CTS
+set_location_assignment PIN_D15 -to DBG_UART_RTS
+set_location_assignment PIN_B16 -to DBG_UART_RX
+set_location_assignment PIN_C16 -to DBG_UART_TX
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

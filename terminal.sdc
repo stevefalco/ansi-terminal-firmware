@@ -99,6 +99,9 @@ set_clock_groups -exclusive \
 set_false_path -from [get_ports {UART_RX UART_CTS}] -to *
 set_false_path -from * -to [get_ports {UART_TX UART_RTS}]
 
+set_false_path -from [get_ports {DBG_UART_RX DBG_UART_CTS}] -to *
+set_false_path -from * -to [get_ports {DBG_UART_TX DBG_UART_RTS}]
+
 set_false_path -from [get_ports {KBD_CLK}] -to *
 set_false_path -from * -to [get_ports {KBD_CLK}]
 

@@ -23,6 +23,7 @@
 // I also tested on Linux with vim, and we behave correctly.
 
 #include "screen.h"
+#include "vtparse.h"
 #include "uart.h"
 #include "debug.h"
 #include "build/version.h"
@@ -52,6 +53,8 @@
 
 #define null_cursor		(0x80)			// A null character plus cursor
 
+static vtparse_t		screen_parser;		// Parses all received uart characters
+
 static volatile uint16_t	*screen_base = (volatile uint16_t *)(0x8000);
 
 static volatile uint16_t	*screen_cursor_location;	// Pointer into video memory.
@@ -59,12 +62,7 @@ static volatile uint16_t	*screen_cursor_location_save;	// A place to save the cu
 static volatile uint16_t	*screen_current_fwa;		// FWA changes with scroll region
 static volatile uint16_t	*screen_current_lwa_p1;		// LWA+1 changes with scroll region
 
-static uint8_t	screen_escape_state;		// State machine variable.
-static uint8_t	screen_group_0_digits;		// Group 0 accumulated digits (often means row number).
-static uint8_t	screen_group_1_digits;		// Group 1 accumulated digits (often means column number).
-static uint8_t	*screen_group_pointer;		// Pointer into the group that we are accumulating digits for.
 static uint8_t	screen_col79_flag;		// Column 79 flag.
-static uint8_t	screen_dec_flag;		// Processing a DEC escape sequence.
 static uint8_t	screen_dec_top_margin;		// Prevent scrolling above the top margin.  Range 0-23
 static uint8_t	screen_dec_bottom_margin;	// Prevent scrolling below the bottom margin.  Range 0-23
 static uint8_t	screen_origin_mode;		// Absolute (0) or Relative (1)
@@ -72,8 +70,6 @@ static uint8_t	screen_autowrap_mode;		// 1 = autowrap, 0 = no autowrap
 
 // Forward references:
 static void screen_announce();
-static void screen_escape_handler_start_csi();
-static void screen_start_sharp();
 static void screen_save_cursor_position();
 static void screen_restore_cursor_position();
 static int screen_cursor_in_line();
@@ -86,29 +82,28 @@ static void screen_handle_cr();
 static void screen_handle_esc_lf();
 static void screen_handle_esc_cr_lf();
 static void screen_handle_reverse_scroll();
-static void screen_escape_handler_first(uint8_t c);
-static void screen_got_csi_group_N_digit(uint8_t c);
-static void screen_parse_dec_command(uint8_t c);
 static void screen_handle_bs();
 static void screen_handle_ht();
-static void screen_begin_escape();
-static void screen_next_argument();
 static void screen_send_primary_device_attributes();
-static void screen_move_cursor_numeric();
-static void screen_set_margins();
+static void screen_move_cursor_numeric(vtparse_t *parser);
+static void screen_set_margins(vtparse_t *parser);
 static void screen_num_to_uart(int n);
-static void screen_report();
-static void screen_move_cursor_up();
-static void screen_move_cursor_down();
-static void screen_move_cursor_right();
-static void screen_move_cursor_left();
-static void screen_clear_rows();
-static void screen_clear_columns();
-static void screen_set_dec_flag();
-static void screen_escape_handler_in_csi(uint8_t c);
+static void screen_report(vtparse_t *parser);
+static void screen_move_cursor_up(vtparse_t *parser);
+static void screen_move_cursor_down(vtparse_t *parser);
+static void screen_move_cursor_right(vtparse_t *parser);
+static void screen_move_cursor_left(vtparse_t *parser);
+static void screen_clear_rows(vtparse_t *parser);
+static void screen_clear_columns(vtparse_t *parser);
 static void screen_escape_in_sharp(uint8_t c);
-static void screen_escape_handler(uint8_t c);
 static void screen_normal_char(uint8_t c);
+static void screen_control_char(uint8_t c);
+static void screen_simple_escape(uint8_t c);
+static void screen_parse_ansi_csi_command(vtparse_t *parser, uint8_t c);
+static void screen_parse_dec_csi_command(vtparse_t *parser, uint8_t c);
+static void screen_csi_escape(vtparse_t *parser, uint8_t c);
+static void screen_non_csi_escape(vtparse_t *parser, uint8_t c);
+static void screen_parser_callback(vtparse_t *parser, vtparse_action_t action, unsigned char c);
 
 // Announce our information on the screen - only for cold-start.
 static void
@@ -131,7 +126,7 @@ screen_announce()
 	for(p = VERSION; *p; p++) {
 		screen_normal_char(*p);
 	}
-	for(p = STATE; *p; p++) {
+	for(p = GIT_STATE; *p; p++) {
 		screen_normal_char(*p);
 	}
 	screen_handle_lf();
@@ -156,16 +151,8 @@ screen_initialize(int cold)
 	screen_cursor_location_save = screen_base;
 	screen_base[0] = null_cursor;
 
-	// Not handling an escape sequence.
-	screen_escape_state = escape_none_state;
-	screen_group_0_digits = 0;
-	screen_group_1_digits = 0;
-	screen_group_pointer = &screen_group_0_digits;
-	
-
-	// Clear the column 79 and DEC flags.
+	// Clear the column 79.
 	screen_col79_flag = 0;
-	screen_dec_flag = 0;
 
 	// Autowrap defaults to on.
 	screen_autowrap_mode = 1;
@@ -185,20 +172,9 @@ screen_initialize(int cold)
 	if(cold) {
 		screen_announce();
 	}
-}
 
-// screen_escape_handler_start_csi - we received a '['.
-static void
-screen_escape_handler_start_csi()
-{
-	screen_escape_state = escape_csi_state;
-}
-
-// screen_start_sharp - we received a '#'.
-static void
-screen_start_sharp()
-{
-	screen_escape_state = escape_sharp_state;
+	// Set up the parser.
+	vtparse_init(&screen_parser, screen_parser_callback);
 }
 
 // screen_save_cursor_position - esc-7
@@ -206,9 +182,6 @@ static void
 screen_save_cursor_position()
 {
 	screen_cursor_location_save = screen_cursor_location;
-
-	// Escape sequence complete.
-	screen_escape_state = escape_none_state;
 }
 
 // screen_restore_cursor_position - esc-8
@@ -223,9 +196,6 @@ screen_restore_cursor_position()
 
 	// Make the new position a cursor.
 	*screen_cursor_location |= null_cursor;
-
-	// Escape sequence complete.
-	screen_escape_state = escape_none_state;
 }
 
 // screen_cursor_in_column - Figure out which column the cursor is in.
@@ -425,9 +395,6 @@ screen_handle_esc_lf()
 {
 	//This seems to be like <LF>
 	screen_handle_lf();
-
-	// Escape sequence complete.
-	screen_escape_state = escape_none_state;
 }
 
 // screen_handle_esc_cr_lf - ESC E
@@ -437,9 +404,6 @@ screen_handle_esc_cr_lf()
 	// This seems to be like <CR><LF>
 	screen_handle_cr();
 	screen_handle_lf();
-
-	// Escape sequence complete.
-	screen_escape_state = escape_none_state;
 }
 
 // screen_handle_reverse_scroll - ESC M
@@ -463,92 +427,79 @@ screen_handle_reverse_scroll()
 
 	// The new position is a cursor.
 	*screen_cursor_location |= null_cursor;
-
-	// Escape sequence complete.
-	screen_escape_state = escape_none_state;
 }
 
-// We have the first character after an escape.  Based on what we've got,
-// change states.
+// screen_parse_ansi_csi_command
 static void
-screen_escape_handler_first(uint8_t c)
+screen_parse_ansi_csi_command(vtparse_t *parser, uint8_t c)
 {
-	// Clear our working storage.
-	screen_group_0_digits = 0;
-	screen_group_1_digits = 0;
-	screen_group_pointer = &screen_group_0_digits;
-
-	// This is the first character after an escape.
 	switch(c) {
-		case '[':
-			screen_escape_handler_start_csi();
+		case 'c': // DA
+			screen_send_primary_device_attributes();
 			break;
 
-		case '#':
-			screen_start_sharp();
+		case 'f': // HVP
+			screen_move_cursor_numeric(parser);
 			break;
 
-		case '7': // DECSC
-			screen_save_cursor_position();
+		case 'n':
+			screen_report(parser);
 			break;
 
-		case 'c': // RIS
-			screen_initialize(1);
-			screen_escape_state = escape_none_state;
+		case 'r': // DECSTBM
+			screen_set_margins(parser);
 			break;
 
-		case '8': // DECRC
-			screen_restore_cursor_position();
+		case 'A': // CUU
+			screen_move_cursor_up(parser);
 			break;
 
-		case 'D': // IND
-			screen_handle_esc_lf();
+		case 'B': // CUD
+			screen_move_cursor_down(parser);
 			break;
 
-		case 'E': // NEL
-			screen_handle_esc_cr_lf();
+		case 'C': // CUF
+			screen_move_cursor_right(parser);
 			break;
 
-		case 'M': // RI
-			screen_handle_reverse_scroll();
+		case 'D': // CUB
+			screen_move_cursor_left(parser);
 			break;
 
-		// Eventually there may be additional first chars.  This is the
-		// catch-all, which we shouldn't ever hit.  So, clear the escape
-		// state and give up.
+		case 'H': // CUP
+			screen_move_cursor_numeric(parser);
+			break;
+
+		case 'J': // ED
+			screen_clear_rows(parser);
+			break;
+
+		case 'K': // EL
+			screen_clear_columns(parser);
+			break;
+
 		default:
-			screen_escape_state = escape_none_state;
+			// This is not a sequence we handle.
 			break;
 	}
 }
 
-// screen_got_csi_group_N_digit
+// screen_parse_dec_csi_command
 static void
-screen_got_csi_group_N_digit(uint8_t c)
-{
-	uint8_t	*p;
-
-	// We have a digit.  Go into the group N digits state.
-	screen_escape_state = escape_csi_d_N_state;
-
-	// Find the buffer we are using.
-	p = screen_group_pointer;
-
-	// Save this digit.  First, multiply the previous digits, if any, by 10.
-	// Then merge in the new digit.
-	*p = (*p * 10) + (c - '0');
-}
-
-// screen_parse_dec_command
-static void
-screen_parse_dec_command(uint8_t c)
+screen_parse_dec_csi_command(vtparse_t *parser, uint8_t c)
 {
 	// We don't handle most of these, but DECCOLM has the side-effect of
 	// reinitializing the screen, and we need that to pass vttest.
 	//
 	// Similarly, we need to support "origin mode".  That one is important
 	// on Linux, because vim uses scroll regions.
-	switch(screen_group_0_digits) {
+	//
+	// We need exactly one parameter, in order to process this.
+	if(parser->num_params != 1) {
+		return;
+	}
+
+	switch(parser->params[0]) {
 		case 3: // DECCOLM
 			// Sets the number of columns, but we don't support 132-column mode,
 			// so we don't care if the last character is "l" or 'h'.
@@ -579,14 +530,10 @@ screen_parse_dec_command(uint8_t c)
 			break;
 
 		default:
+			// This is not a sequence we handle.
 			break;
 	}
 
-	// Clear the DEC flag.
-	screen_dec_flag = 0;
-	
-	// Done with this escape sequence
-	screen_escape_state = escape_none_state;
 	return;
 }
 
@@ -655,42 +602,20 @@ screen_handle_ht()
 	*screen_cursor_location |= null_cursor;
 }
 
-// screen_begin_escape - begin an escape sequence
-static void
-screen_begin_escape()
-{
-	// An escape sequence is variable length.  We need a state-machine to
-	// keep track of where we are in a potential sequence.
-	//
-	// We have seen an escape character, so we now must wait for the next
-	// character to see what it means.
-	screen_escape_state = escape_need_first_state;
-}
-
-// screen_next_argument - we got a semicolon, so there may be a second argument
-static void
-screen_next_argument()
-{
-	// We only handle up to two arguments.  So, just switch to group 1.
-	screen_group_pointer = &screen_group_1_digits;
-}
-
 // screen_send_primary_device_attributes Esc [ c
 static void
 screen_send_primary_device_attributes()
 {
 	// This is a request for our attributes.  Claim that we are a VT100.
 	uart_transmit_string("[?1;0c");
-	
-	screen_escape_state = escape_none_state;
 }
 
 // screen_move_cursor_numeric - ESC [ H or ESC [ f
 static void
-screen_move_cursor_numeric()
+screen_move_cursor_numeric(vtparse_t *parser)
 {
-	int digits0;
-	int digits1;
+	int digits0 = parser->params[0];
+	int digits1 = parser->params[1];
 
 	// There may be digits or not, but it doesn't matter.  If there are
 	// no digits, our numeric buffers have 0,0 which means the same thing
@@ -708,7 +633,6 @@ screen_move_cursor_numeric()
 	*screen_cursor_location &= ~null_cursor;
 
 	// Get the line parameter, and map it to our notation.
-	digits0 = screen_group_0_digits;
 	if(digits0 != 0) {
 		--digits0; // Convert to 0-based.
 	}
@@ -728,7 +652,6 @@ screen_move_cursor_numeric()
 	}
 
 	// Get the column parameter, and map it to our notation.
-	digits1 = screen_group_1_digits;
 	if(digits1 != 0) {
 		--digits1; // Convert to 0-based.
 	}
@@ -746,9 +669,6 @@ screen_move_cursor_numeric()
 
 	// Any move means we must clear the col79 flag.
 	screen_col79_flag = 0;
-
-	// Escape sequence complete.
-	screen_escape_state = escape_none_state;
 }
 
 // Send a number out the uart as a base-10 string.
@@ -795,14 +715,14 @@ screen_num_to_uart(int n)
 
 // screen_report - ESC [ n
 static void
-screen_report()
+screen_report(vtparse_t *parser)
 {
 	int line = screen_cursor_in_line() + 1;
 	int column = screen_cursor_in_column() + 1;
 
 	// There are various report requests, as selected by the
-	// screen_group_0_digits value.
-	switch(screen_group_0_digits) {
+	// first parameter.
+	switch(parser->params[0]) {
 		case 6: // Cursor position report.
 			uart_transmit_string("[");
 			screen_num_to_uart(line);
@@ -814,24 +734,21 @@ screen_report()
 		default:
 			break;
 	}
-
-	// Escape sequence complete.
-	screen_escape_state = escape_none_state;
 }
 
 // screen_set_margins - ESC [ r
 static void
-screen_set_margins()
+screen_set_margins(vtparse_t *parser)
 {
-	int digits0;
-	int digits1;
+	int digits0 = parser->params[0];
+	int digits1 = parser->params[1];
 
-	// Special case - if screen_group_0_digits and screen_group_1_digits
-	// are both zero, set the full range.
+	// Special case - if parameter 0 and parameter 1 are both zero,
+	// set the full range.
 	//
 	// Do this test first; it is the only time A = B is allowed - i.e. when
 	// A and B are both zero.
-	if(screen_group_0_digits == 0 && screen_group_1_digits == 0) {
+	if(digits0 == 0 && digits1 == 0) {
 		// Reset top margin to 0, bottom margin to 23.
 		screen_dec_top_margin = 0;
 		screen_dec_bottom_margin = screen_lines - 1;
@@ -840,13 +757,12 @@ screen_set_margins()
 		screen_current_fwa = screen_base;
 		screen_current_lwa_p1 = screen_end;
 
-	} else if(screen_group_0_digits < screen_group_1_digits) {
+	} else if(digits0 < digits1) {
 		// For all other cases, the top margin must be strictly less than the bottom margin.
 		// Good - we can proceed.
 	
 		// Get top row number.  Note that row numbers are 1-based, so we have 
 		// to decrement, but cannot go below zero.
-		digits0 = screen_group_0_digits;
 		if(digits0 != 0) {
 			--digits0; // Convert to 0-based.
 		}
@@ -857,7 +773,6 @@ screen_set_margins()
 		
 		// Get bottom row number.  Note that row numbers are 1-based, so we have 
 		// to decrement, but cannot go below zero.
-		digits1 = screen_group_1_digits;
 		if(digits1 != 0) {
 			--digits1; // Convert to 0-based.
 		}
@@ -880,24 +795,16 @@ screen_set_margins()
 
 	// Any move means we must clear the col79 flag.
 	screen_col79_flag = 0;
-
-	// Escape sequence complete.
-	screen_escape_state = escape_none_state;
 }
 
 // screen_move_cursor_up - ESC [ A
 static void
-screen_move_cursor_up()
+screen_move_cursor_up(vtparse_t *parser)
 {
 	int i;
-	int to_move;
+	int to_move = parser->params[0];
 	volatile uint16_t *limit;
 	volatile uint16_t *proposed_new_position;
-
-	// If we are still in the escape_csi_state state, we didn't get any
-	// digits, so we just move the cursor up one line.  Start by assuming
-	// that.
-	to_move = 1;
 
 	// If we are in relative mode, the upper limit depends on the scroll region.
 	limit = screen_base;
@@ -905,14 +812,9 @@ screen_move_cursor_up()
 		limit = screen_base + (screen_dec_top_margin * screen_cols);
 	}
 	
-	//  Test the assumption.
-	if(screen_escape_state != escape_csi_state) {
-		// Assumption was wrong; get the distance to move up.  This is tricky
-		// because 0 or 1 means 1.
-		to_move = screen_group_0_digits;
-		if(to_move == 0) {
-			to_move = 1;
-		}
+	// A movement of 0 really means 1.
+	if(to_move == 0) {
+		to_move = 1;
 	}
 
 	for(i = 0; i < to_move; i++) {
@@ -932,39 +834,26 @@ screen_move_cursor_up()
 		screen_cursor_location = proposed_new_position;
 		*screen_cursor_location |= null_cursor;
 	}
-
-	// Escape sequence complete.
-	screen_escape_state = escape_none_state;
 }
 
 // screen_move_cursor_down - ESC [ B
 static void
-screen_move_cursor_down()
+screen_move_cursor_down(vtparse_t *parser)
 {
 	int i;
-	int to_move;
+	int to_move = parser->params[0];
 	volatile uint16_t *limit;
 	volatile uint16_t *proposed_new_position;
 
-	// If we are still in the escape_csi_state state, we didn't get any
-	// digits, so we just move the cursor down one line.  Start by assuming
-	// that.
-	to_move = 1;
-	
 	// If we are in relative mode, the lower limit depends on the scroll region.
 	limit = screen_end;
 	if(screen_origin_mode == 1) {
 		limit = screen_end - (((screen_lines - 1) - screen_dec_bottom_margin) * screen_cols);
 	}
 	
-	//  Test the assumption.
-	if(screen_escape_state != escape_csi_state) {
-		// Assumption was wrong; get the distance to move down.  This is tricky
-		// because 0 or 1 means 1.
-		to_move = screen_group_0_digits;
-		if(to_move == 0) {
-			to_move = 1;
-		}
+	// A movement of 0 really means 1.
+	if(to_move == 0) {
+		to_move = 1;
 	}
 
 	for(i = 0; i < to_move; i++) {
@@ -984,33 +873,20 @@ screen_move_cursor_down()
 		screen_cursor_location = proposed_new_position;
 		*screen_cursor_location |= null_cursor;
 	}
-
-	// Escape sequence complete.
-	screen_escape_state = escape_none_state;
 }
 
 // screen_move_cursor_right - ESC [ C
 static void
-screen_move_cursor_right()
+screen_move_cursor_right(vtparse_t *parser)
 {
-	int to_move;
+	int to_move = parser->params[0];
 	volatile uint16_t *start_of_line;
 	volatile uint16_t *end_of_line;
 	volatile uint16_t *proposed_new_position;
 
-	// If we are still in the escape_csi_state state, we didn't get any
-	// digits, so we just move the cursor right one character.  Start
-	// by assuming that.
-	to_move = 1;
-	
-	//  Test the assumption.
-	if(screen_escape_state != escape_csi_state) {
-		// Assumption was wrong; get the distance to move right.  This is tricky
-		// because 0 or 1 means 1.
-		to_move = screen_group_0_digits;
-		if(to_move == 0) {
-			to_move = 1;
-		}
+	// A movement of 0 really means 1.
+	if(to_move == 0) {
+		to_move = 1;
 	}
 
 	// FInd the start and end of the current line.
@@ -1031,32 +907,19 @@ screen_move_cursor_right()
 	// The new position is a cursor.
 	screen_cursor_location = proposed_new_position;
 	*screen_cursor_location |= null_cursor;
-
-	// Escape sequence complete.
-	screen_escape_state = escape_none_state;
 }
 
 // screen_move_cursor_left - ESC [ D
 static void
-screen_move_cursor_left()
+screen_move_cursor_left(vtparse_t *parser)
 {
-	int to_move;
+	int to_move = parser->params[0];
 	volatile uint16_t *start_of_line;
 	volatile uint16_t *proposed_new_position;
 
-	// If we are still in the escape_csi_state state, we didn't get any
-	// digits, so we just move the cursor left one character.  Start
-	// by assuming that.
-	to_move = 1;
-	
-	//  Test the assumption.
-	if(screen_escape_state != escape_csi_state) {
-		// Assumption was wrong; get the distance to move left.  This is tricky
-		// because 0 or 1 means 1.
-		to_move = screen_group_0_digits;
-		if(to_move == 0) {
-			to_move = 1;
-		}
+	// A movement of 0 really means 1.
+	if(to_move == 0) {
+		to_move = 1;
 	}
 
 	// FInd the start of the current line.
@@ -1076,14 +939,11 @@ screen_move_cursor_left()
 	// The new position is a cursor.
 	screen_cursor_location = proposed_new_position;
 	*screen_cursor_location |= null_cursor;
-
-	// Escape sequence complete.
-	screen_escape_state = escape_none_state;
 }
 
 // screen_clear_rows - ESC [ J
 static void
-screen_clear_rows()
+screen_clear_rows(vtparse_t *parser)
 {
 	volatile uint16_t *p;
 
@@ -1094,7 +954,7 @@ screen_clear_rows()
 	// 3 = erase all including scrollback (which we don't have)
 	//
 	// Linux uses ESC [ 3 J to clear the screen, so we will support it.
-	switch(screen_group_0_digits) {
+	switch(parser->params[0]) {
 		case 0: // erase below
 			for(p = screen_cursor_location; p < screen_end; p++) {
 				*p = 0;
@@ -1120,14 +980,11 @@ screen_clear_rows()
 
 	// Put the cursor back on screen.
 	*screen_cursor_location |= null_cursor;
-
-	// Escape sequence complete.
-	screen_escape_state = escape_none_state;
 }
 
 // screen_clear_columns - ESC [ K
 static void
-screen_clear_columns()
+screen_clear_columns(vtparse_t *parser)
 {
 	volatile uint16_t *p;
 	volatile uint16_t *line_start;
@@ -1140,7 +997,7 @@ screen_clear_columns()
 	// 0 = erase to the right
 	// 1 = erase to the left
 	// 2 = erase the whole line
-	switch(screen_group_0_digits) {
+	switch(parser->params[0]) {
 		case 0: // erase right
 			for(p = screen_cursor_location; p < line_end; p++) {
 				*p = 0;
@@ -1166,147 +1023,6 @@ screen_clear_columns()
 
 	// Put the cursor back on screen.
 	*screen_cursor_location |= null_cursor;
-
-	// Escape sequence complete.
-	screen_escape_state = escape_none_state;
-}
-
-// screen_set_dec_flag - ESC [ ?
-static void
-screen_set_dec_flag()
-{
-	// Mark that this is a special DEC sequence
-	screen_dec_flag = 1;
-}
-
-// screen_escape_handler_in_csi - Got first char after ESC [
-static void
-screen_escape_handler_in_csi(uint8_t c)
-{
-	// If a control character appears in the middle of an escape sequence,
-	// we simply execute it.  This is an error recovery behavior, and should
-	// not be sent by an OS.
-	switch(c) {
-		case char_bs:
-			screen_handle_bs();
-			return;
-
-		case char_ht:
-			screen_handle_ht();
-			return;
-
-		case char_lf:
-			screen_handle_lf();
-			return;
-
-		case char_vt:
-			screen_handle_lf();
-			return;
-
-		case char_ff:
-			screen_handle_lf();
-			return;
-
-		case char_cr:
-			screen_handle_cr();
-			return;
-
-		// An escape while handing an escape is also an error condition.  Terminate
-		// the previous sequence and begin a new one.
-		case char_escape:
-			screen_begin_escape();
-			return;
-		
-		// Semicolon and digits are common to DEC and ANSI, so handle them
-		// before checking the DEC flag.
-
-		// If it is a semicolon, we have collected all the digits in an argument.
-		// Note that there may be no digits before the semicolon, which implies zero.
-		case ';':
-			screen_next_argument();
-			return;
-
-		// If this is a digit, go to an "accumulating digits" state, until we
-		// see a non-digit.
-		case '0':
-		case '1':
-		case '2':
-		case '3':
-		case '4':
-		case '5':
-		case '6':
-		case '7':
-		case '8':
-		case '9':
-			screen_got_csi_group_N_digit(c);
-			return;
-			
-		default:
-			if(screen_dec_flag) {
-				// If the DEC flag is set, go to an alternate parser.
-				screen_parse_dec_command(c);
-				return;
-			} else {
-				switch(c) {
-					// Test for some of the simple commands.
-					case 'c': // DA
-						screen_send_primary_device_attributes();
-						return;
-
-					case 'f': // HVP
-						screen_move_cursor_numeric();
-						return;
-
-					case 'n':
-						screen_report();
-						return;
-
-					case 'r': // DECSTBM
-						screen_set_margins();
-						return;
-
-					case 'A': // CUU
-						screen_move_cursor_up();
-						return;
-					
-					case 'B': // CUD
-						screen_move_cursor_down();
-						return;
-
-					case 'C': // CUF
-						screen_move_cursor_right();
-						return;
-
-					case 'D': // CUB
-						screen_move_cursor_left();
-						return;
-
-					case 'H': // CUP
-						screen_move_cursor_numeric();
-						return;
-
-					case 'J': // ED
-						screen_clear_rows();
-						return;
-
-					case 'K': // EL
-						screen_clear_columns();
-						return;
-
-					case '?':
-						screen_set_dec_flag();
-						return;
-
-					default:
-						// This is not a sequence we handle yet.
-						break;
-				}
-			}
-			break;
-	}
-		
-	screen_escape_state = escape_none_state;
-	return;
 }
 
 // screen_escape_in_sharp - got the first char after ESC #
@@ -1333,52 +1049,7 @@ screen_escape_in_sharp(uint8_t c)
 			break;
 	}
 
-	screen_escape_state = escape_none_state;
 	return;
-}
-
-// screen_escape_handler - Run the escape state machine.
-//
-// Called for each new character until the escape sequence ends.
-static void
-screen_escape_handler(uint8_t c)
-{
-	// We are in an escape sequence, and we've gotten the next character
-	// of it.
-
-	// FIXME
-	//
-	// Our UART returns 8-bit characters, and some documents suggest that
-	// escape sequence characters might have 0x40 added to them.  For example,
-	// a left square bracket might be 0x5b, or it might be 0x9b.  If that
-	// turns out to be the case, we may have to make an adjustment and handle
-	// both forms here...
-
-	// What state are we in?
-	switch(screen_escape_state) {
-		case escape_need_first_state:
-			screen_escape_handler_first(c); // Got first char after escape
-			break;
-
-		case escape_csi_state:
-			screen_escape_handler_in_csi(c); // Got first char after '['
-			break;
-
-		case escape_csi_d_N_state:
-			screen_escape_handler_in_csi(c); // Accumulating d0 or d1
-			break;
-
-		case escape_sharp_state:
-			screen_escape_in_sharp(c); // Got first char after '#'
-			break;
-
-		default:
-			// Eventually there may be more states above.  This is the catch-all,
-			// which we shouldn't ever hit.  So, clear the escape state and give
-			// up.
-			screen_escape_state = escape_none_state;
-			break;
-	}
 }
 
 // screen_normal_char - handle a normal printing character.
@@ -1456,66 +1127,184 @@ void
 screen_handler()
 {
 	int rv;
+	unsigned char c;
 
-	if((rv = uart_receive()) == -1) {
-		return; // Nothing available.
+	if((rv = uart_receive()) != -1) {
+		// We process one character at a time.
+		c = rv & 0xff;
+		vtparse(&screen_parser, &c, 1);
 	}
 
-	// We first have to determine if we are collecting an escape
-	// sequence.
-	if(screen_escape_state != escape_none_state) {
-		screen_escape_handler(rv & 0xff); // We are handling an escape sequence.
-		return;
-	}
+	return;
+}
 
-	// Not in an escape sequence, so treat it as a normal character.
-	//
-	// Printing characters run from 0x20 through 0x7f.
-	if(rv >= ' ') {
-		screen_normal_char(rv);
-		return;
-	}
-
-	switch(rv) {
-		// Is it a backspace?
+static void
+screen_control_char(uint8_t c)
+{
+	// For now, we are just handling a few C0 controls.
+	switch(c) {
 		case char_bs:
+			// Backspace
 			screen_handle_bs();
 			break;
 
-		// Is it a horizontal tab?
 		case char_ht:
+			// Horizontal tab
 			screen_handle_ht();
 			break;
 
-		// Is it a line feed?
 		case char_lf:
+			// Line feed
 			screen_handle_lf();
 			break;
 
-		// Is it a vertical tab?  This is handled like a line-feed according to a
-		// VT102 document I found.
 		case char_vt:
+			// Vertical tab is handled like line feed
 			screen_handle_lf();
 			break;
 
-		// Is it a form feed?  This is handled like a line-feed according to a
-		// VT102 document I found.
 		case char_ff:
+			// Form feed is handled like line feed
 			screen_handle_lf();
 			break;
 
-		// Is it a carriage return?
 		case char_cr:
+			// Carriage return
 			screen_handle_cr();
 			break;
 
-		// Is it an escape?
-		case char_escape:
-			screen_begin_escape();
+		default:
+			break;
+	}
+}
+
+static void
+screen_simple_escape(uint8_t c)
+{
+	switch(c) {
+		case '7': // DECSC
+			screen_save_cursor_position();
 			break;
 
-		// Nothing we care about.  Toss it.
+		case '8': // DECRC
+			screen_restore_cursor_position();
+			break;
+
+		case 'D': // IND
+			screen_handle_esc_lf();
+			break;
+
+		case 'E': // NEL
+			screen_handle_esc_cr_lf();
+			break;
+
+		case 'M': // RI
+			screen_handle_reverse_scroll();
+			break;
+
+		case 'c': // RIS
+			screen_initialize(1);
+			break;
+
 		default:
+			// No idea what to do with this case.
+			break;
+	}
+}
+
+static void
+screen_csi_escape(vtparse_t *parser, uint8_t c)
+{
+	// The only intermediate character we expect here is '?'.
+	switch(parser->num_intermediate_chars) {
+		case 0:
+			// These are ANSI escapes.
+			screen_parse_ansi_csi_command(parser, c);
+			break;
+
+		case 1:
+			// Handle a DEC private '?' sequence.  Ignore other
+			// intermediate characters.
+			if(parser->intermediate_chars[0] == '?') {
+				screen_parse_dec_csi_command(parser, c);
+			}
+			break;
+
+		default:
+			// No idea what to do with this case.
+			break;
+	}
+}
+
+static void
+screen_non_csi_escape(vtparse_t *parser, uint8_t c)
+{
+	// The only intermediate character we expect here is '#'.
+	switch(parser->num_intermediate_chars) {
+		case 0:
+			// These are generally single-character escapes.
+			screen_simple_escape(c);
+			break;
+
+		case 1:
+			// Handle a sharp sequence.  Ignore other
+			// intermediate characters.
+			if(parser->intermediate_chars[0] == '#') {
+				screen_escape_in_sharp(c);
+			}
+			break;
+
+		default:
+			// No idea what to do with this case.
+			break;
+	}
+}
+
+static void
+screen_parser_callback(
+		vtparse_t		*parser,
+		vtparse_action_t	action,
+		unsigned char		c
+		)
+{
+	switch(action) {
+		// Some states are handled internally by the parser.  These
+		// are the only ones that are sent to this callback.
+		case VTPARSE_ACTION_PRINT:
+			// Normal character to be printed on the screen.
+			screen_normal_char(c);
+			break;
+
+		case VTPARSE_ACTION_EXECUTE:
+			// This is a C0 or C1 (control) character.
+			screen_control_char(c);
+			break;
+
+		case VTPARSE_ACTION_CSI_DISPATCH:
+			// This is an escape sequence of the CSI type.
+			screen_csi_escape(parser, c);
+			break;
+
+		case VTPARSE_ACTION_ESC_DISPATCH:
+			// This is a non-CSI escape sequence.
+			screen_non_csi_escape(parser, c);
+			break;
+
+		case VTPARSE_ACTION_HOOK:
+		case VTPARSE_ACTION_PUT:
+		case VTPARSE_ACTION_UNHOOK:
+			// These are associated with DCS, which we don't implement.
+			break;
+
+		case VTPARSE_ACTION_OSC_START:
+		case VTPARSE_ACTION_OSC_PUT:
+		case VTPARSE_ACTION_OSC_END:
+			// These are associated with OSC, which we don't implement.
+			break;
+
+		case VTPARSE_ACTION_ERROR:
+		default:
+			// Not sure what to do here yet.
 			break;
 	}
 }

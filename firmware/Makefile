@@ -20,7 +20,15 @@ BUILD_DIR = build
 # We use .S rather than .s because that runs the preprocessor, which has some
 # benefits, like // comments, #defines, etc.
 A_SRC = init.S
-C_SRC = main.c screen.c keyboard.c uart.c debug.c
+C_SRC =					\
+	main.c				\
+	screen.c			\
+	keyboard.c			\
+	uart.c				\
+	vtparse.c			\
+	vtparse_table.c			\
+	debug.c				\
+	#
 
 OBJ = $(A_SRC:%.S=$(BUILD_DIR)/%.o)
 OBJ += $(C_SRC:%.c=$(BUILD_DIR)/%.o)
@@ -64,7 +72,7 @@ lib/build/lib.a:
 .PHONY: version
 version:
 	@git describe | sed -e 's/.*/#define VERSION "&"/' > $(BUILD_DIR)/new_version.h
-	@if [ -z "`git status -s`" ] ; then echo '#define STATE "-clean"' >> $(BUILD_DIR)/new_version.h ; else echo '#define STATE "-dirty"' >> $(BUILD_DIR)/new_version.h ; fi
+	@if [ -z "`git status -s`" ] ; then echo '#define GIT_STATE "-clean"' >> $(BUILD_DIR)/new_version.h ; else echo '#define GIT_STATE "-dirty"' >> $(BUILD_DIR)/new_version.h ; fi
 	@cmp -s $(BUILD_DIR)/new_version.h $(BUILD_DIR)/version.h || mv -f $(BUILD_DIR)/new_version.h $(BUILD_DIR)/version.h
 	@rm -f $(BUILD_DIR)/new_version.h
 

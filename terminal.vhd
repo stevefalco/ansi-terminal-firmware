@@ -53,6 +53,11 @@ entity terminal is
 		UART_RTS		: out std_logic;			-- P1
 		UART_CTS		: in std_logic;				-- R1
 
+		DBG_UART_RX		: in std_logic;				-- B16
+		DBG_UART_TX		: out std_logic;			-- C16
+		DBG_UART_RTS		: out std_logic;			-- D15
+		DBG_UART_CTS		: in std_logic;				-- C15
+
 		LEDS			: out std_logic_vector(7 downto 0)	-- M6, T4, T3, R3, T2, R4, N5, N3
 	);
 end terminal;
