@@ -70,14 +70,18 @@
 #define uart_FCR_FEN_b		(0)						// FIFO Enable
 #define uart_FCR_RFR_b		(1)						// Receive FIFO Reset
 #define uart_FCR_XFR_b		(2)						// Transmit FIFO Reset
+#define uart_FCR_TRGL_b		(6)						// Receive FIFO Trigger LSB
+#define uart_FCR_TRGM_b		(7)						// Receive FIFO Trigger MSB
 
 // FCR bits as values
 #define uart_FCR_FEN_v		(1 << uart_FCR_FEN_b)
 #define uart_FCR_RFR_v		(1 << uart_FCR_RFR_b)
 #define uart_FCR_XFR_v		(1 << uart_FCR_XFR_b)
+#define uart_FCR_TRGL_v		(1 << uart_FCR_TRGL_b)
+#define uart_FCR_TRGM_v		(1 << uart_FCR_TRGM_b)
 
 // FCR convenience
-#define uart_FCR_INIT		(uart_FCR_FEN_v | uart_FCR_RFR_v | uart_FCR_XFR_v)
+#define uart_FCR_INIT		(uart_FCR_FEN_v | uart_FCR_RFR_v | uart_FCR_XFR_v | uart_FCR_TRGM_v)
 
 // LCR
 #define uart_LCR_WLS0_b		(0)						// Word Length Select Bit 0
@@ -203,7 +207,8 @@ uart_initialize()
 	// but I've never seen a need...
 	uart_LCR = uart_LCR_WLS8;
 
-	// Reset FIFOs and enable them
+	// Reset FIFOs and enable them.  We set the receive threshold to 8
+	// which will reduce the number of interrupts we have to process.
 	uart_FCR = uart_FCR_INIT;
 
 	// Set the MODEM control bits
@@ -268,15 +273,15 @@ uart_store_char()
 void
 uart_test_interrupt()
 {
-	// Read characters and store them until the uart is empty.  
+	// We will be interrupted either when the receive FIFO goes above
+	// threshold, or when a receive FIFO timeout occurs.
 	//
-	// It would be nice if we could set a FIFO threshold greater than
-	// "1", to avoid taking an interrupt per character.  But, the
-	// 16550 uart hardware doesn't have any sort of timeout interrupt
-	// mechanism.  So, if we set the interrupt threshold above "1",
-	// we'd need a software timer to go check the uart periodically,
-	// to see if something arrived, but not enough data to cause an
-	// interrupt.  Seems like more trouble than it is worth.
+	// The timeout is generated automatically by the uart if there is
+	// something in the FIFO and enough time has passed between when
+	// we last read from the FIFO.  Thus, we'll get an interrupt even
+	// if only one byte sits in the receive FIFO long enough.
+	//
+	// Either way, read characters and store them until the uart is empty.  
 	while(uart_LSR & uart_LSR_DR_v) {
 		uart_store_char();
 	}
