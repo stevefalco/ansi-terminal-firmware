@@ -13,7 +13,7 @@
 extern "C" {
 #endif
 
-#include "vtparse_table.h"
+#include "build/vtparse_table.h"
 
 #define MAX_INTERMEDIATE_CHARS 2
 #define ACTION(state_change) (state_change & 0x0F)

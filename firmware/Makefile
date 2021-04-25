@@ -25,8 +25,6 @@ C_SRC =					\
 	screen.c			\
 	keyboard.c			\
 	uart.c				\
-	vtparse.c			\
-	vtparse_table.c			\
 	debug.c				\
 	#
 
@@ -35,7 +33,7 @@ OBJ += $(C_SRC:%.c=$(BUILD_DIR)/%.o)
 
 DEP = $(C_SRC:%.c=$(BUILD_DIR)/%.d)
 
-all: $(BUILD_DIR) version ../cpu_rom.mif $(BUILD_DIR)/fw.dump
+all: $(BUILD_DIR) version lib/build/lib.a parser/build/parser.a ../cpu_rom.mif $(BUILD_DIR)/fw.dump
 
 ../cpu_rom.mif: $(BUILD_DIR)/fw.bin
 	../cvt_obj_mif/cvt_obj_mif -i $^ -o $@
@@ -46,7 +44,7 @@ $(BUILD_DIR)/fw.bin: $(BUILD_DIR)/fw
 $(BUILD_DIR)/fw.dump: $(BUILD_DIR)/fw
 	m68k-linux-gnu-objdump -d $^ > $@
 
-$(BUILD_DIR)/fw: $(OBJ) lib/build/lib.a
+$(BUILD_DIR)/fw: $(OBJ) lib/build/lib.a parser/build/parser.a
 	m68k-linux-gnu-gcc \
 		-Wl,--build-id=none \
 		-Wl,-M -Wl,-T,fw.ld \
@@ -69,6 +67,10 @@ $(BUILD_DIR):
 lib/build/lib.a:
 	cd lib ; make
 
+.PHONY:
+parser/build/parser.a:
+	cd parser ; make
+
 .PHONY: version
 version:
 	@git describe | sed -e 's/.*/#define VERSION "&"/' > $(BUILD_DIR)/new_version.h
@@ -80,3 +82,4 @@ version:
 clean:
 	rm -fr $(BUILD_DIR)
 	cd lib ; make clean
+	cd parser ; make clean

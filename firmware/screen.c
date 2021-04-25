@@ -23,9 +23,9 @@
 // I also tested on Linux with vim, and we behave correctly.
 
 #include "screen.h"
-#include "vtparse.h"
 #include "uart.h"
 #include "debug.h"
+#include "parser/vtparse.h"
 #include "build/version.h"
 
 // Dual-ported video memory - 1920 shorts.
