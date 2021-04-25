@@ -115,9 +115,11 @@
 #define uart_MCR_INIT		(uart_MCR_DTR_v | uart_MCR_RTS_v)
 
 // LSR
+#define uart_LSR_DR_b		(0)						// Received data ready
 #define uart_LSR_THRE_b		(5)						// Transmitter Holding Register Empty
 
 // LSR bits as values
+#define uart_LSR_DR_v		(1 << uart_LSR_DR_b)
 #define uart_LSR_THRE_v		(1 << uart_LSR_THRE_b)
 
 // Baud rate, etc. dip switches
@@ -266,18 +268,16 @@ uart_store_char()
 void
 uart_test_interrupt()
 {
-	// Interrupt-pending bit is active-low.
-	// (Bit_0 = 1) means no interrupt
+	// Read characters and store them until the uart is empty.  
 	//
-	// Read characters and store them until the uart is empty.  This
-	// is ugly because we really cannot tell how much data is in the
-	// fifo.  However, we have set the threshold to "1", so when the
-	// interrupt clears, the fifo must be empty.  If we had set any
-	// other threshold, we'd have to burst "threshold" characters out.
-	// We couldn't use the interrupt flag, because it would clear as
-	// soon as we went below threshold, which would leave some characters
-	// in the fifo.  With threshold = 1, that cannot happen.
-	while(!(uart_IIR & uart_IIR_PENDING_v)) {
+	// It would be nice if we could set a FIFO threshold greater than
+	// "1", to avoid taking an interrupt per character.  But, the
+	// 16550 uart hardware doesn't have any sort of timeout interrupt
+	// mechanism.  So, if we set the interrupt threshold above "1",
+	// we'd need a software timer to go check the uart periodically,
+	// to see if something arrived, but not enough data to cause an
+	// interrupt.  Seems like more trouble than it is worth.
+	while(uart_LSR & uart_LSR_DR_v) {
 		uart_store_char();
 	}
 }
@@ -286,11 +286,13 @@ uart_test_interrupt()
 void
 uart_transmit(unsigned char c)
 {
+	//write_led(0xff);
 	while(!(uart_LSR & uart_LSR_THRE_v)) {
 		; // Wait for the transmit buffer to be free.
 	}
 
 	uart_THR = c;
+	//write_led(0x00);
 }
 
 // uart_transmit - transmit a null-terminated string

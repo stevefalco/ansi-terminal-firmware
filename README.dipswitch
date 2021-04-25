@@ -38,4 +38,8 @@ Flow control is only impemented on data sent from the computer to
 the terminal.  The terminal keyboard does not honor requests from
 the computer to stop sending.
 
+It is strongly recommended to use hardware flow control at the higher
+baud rates.  We seem to be able to keep up at 57600 baud and below, but
+above that, hardware flow control is necessary.
+
 The remaining switches are currently unallocated.
