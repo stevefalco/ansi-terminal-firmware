@@ -1132,6 +1132,9 @@ screen_handler()
 	if((rv = uart_receive()) != -1) {
 		// We process one character at a time.
 		c = rv & 0xff;
+		if(c >= 0xa0) {
+			c -= 0x80;
+		}
 		vtparse(&screen_parser, &c, 1);
 	}
 
