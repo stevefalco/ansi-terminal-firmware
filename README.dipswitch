@@ -23,10 +23,6 @@ OFF OFF ON  OFF = 921600
 OFF OFF OFF ON  = 921600
 OFF OFF OFF OFF = 921600
 
-Note that rates faster than 230400 may have overrun problems.
-I successfully tested up to 230400 baud, but saw dropouts at
-460800 and 921600 baud.
-
 Switch 5 selects between hardware and software flow control.
 
 SW5
