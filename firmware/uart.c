@@ -233,6 +233,11 @@ uart_store_char()
 	// room to store it, because reading clears the interrupt.
 	uint8_t val = uart_RBR;
 
+	if(!val) {
+		// Toss nulls
+		return;
+	}
+
 	if(uart_rb_count > uart_high_water) {
 		if(uart_flow == HW_FLOW) {
 			// Above high water - clear RTS so the sender will pause.
