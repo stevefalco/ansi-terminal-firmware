@@ -109,6 +109,7 @@ keyboard_test_interrupt()
 // Non-ASCII scan codes.  I haven't bothered with the keypad, because my keyboards
 // don't have one.  But they would be easy enough to add.
 #define CAPS_LOCK	0x58
+#define NUM_LOCK	0x77		// Scan code shared with BREAK_2
 #define L_SHIFT		0x12
 #define L_CTRL		0x14		// Scan code shared with BREAK_1
 #define L_GUI		0xe01f
@@ -118,7 +119,7 @@ keyboard_test_interrupt()
 #define R_GUI		0xe027
 #define R_ALT		0xe011
 #define BREAK_1		0x14		// Scan code shared with L_CTRL
-#define BREAK_2		0x77
+#define BREAK_2		0x77		// Scan code shared with NUM_LOCK
 #define F1		0x05
 #define F2		0x06
 #define F3		0x04
