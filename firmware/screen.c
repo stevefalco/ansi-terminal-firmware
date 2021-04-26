@@ -607,7 +607,7 @@ static void
 screen_send_primary_device_attributes()
 {
 	// This is a request for our attributes.  Claim that we are a VT100.
-	uart_transmit_string("[?1;0c");
+	uart_transmit_string("[?1;0c", UART_WAIT);
 }
 
 // screen_move_cursor_numeric - ESC [ H or ESC [ f
@@ -705,7 +705,7 @@ screen_num_to_uart(int n)
 		}
 
 		// Send this digit out.
-		uart_transmit('0' + result[i]);
+		uart_transmit('0' + result[i], UART_WAIT);
 		
 		// Once we print something, we are no longer suppressing
 		// leading zeros.
@@ -724,11 +724,11 @@ screen_report(vtparse_t *parser)
 	// first parameter.
 	switch(parser->params[0]) {
 		case 6: // Cursor position report.
-			uart_transmit_string("[");
+			uart_transmit_string("[", UART_WAIT);
 			screen_num_to_uart(line);
-			uart_transmit(';');
+			uart_transmit(';', UART_WAIT);
 			screen_num_to_uart(column);
-			uart_transmit('R');
+			uart_transmit('R', UART_WAIT);
 			break;
 
 		default:

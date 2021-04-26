@@ -74,6 +74,16 @@ main()
 			*pControl = 0;
 			blanked = 1;
 		}
+
+		// If the uart is currently sending a line break, decrement
+		// its timer.  When the timer hits zero, we stop the line
+		// break;
+		if(uart_break_timer != 0) {
+			--uart_break_timer;
+			if(uart_break_timer == 0) {
+				uart_stop_break();
+			}
+		}
 	}
 
 	return 0;

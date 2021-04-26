@@ -121,10 +121,12 @@
 // LSR
 #define uart_LSR_DR_b		(0)						// Received data ready
 #define uart_LSR_THRE_b		(5)						// Transmitter Holding Register Empty
+#define uart_LSR_TEMT_b		(5)						// Transmitter Empty
 
 // LSR bits as values
 #define uart_LSR_DR_v		(1 << uart_LSR_DR_b)
 #define uart_LSR_THRE_v		(1 << uart_LSR_THRE_b)
+#define uart_LSR_TEMT_v		(1 << uart_LSR_TEMT_b)
 
 // Baud rate, etc. dip switches
 #define dipSW			(*(volatile uint8_t *)(0xc020))
@@ -138,6 +140,8 @@
 #define XOFF			(0x13)						// ^S (DC3)
 #define HW_FLOW			(0)
 #define SW_FLOW			(1)
+
+int uart_break_timer;
 
 static int uart_flow;
 static int uart_flow_state;							// 1 if paused, else 0
@@ -225,7 +229,7 @@ uart_initialize()
 	// Remember the state for later.
 	uart_MCR |= uart_MCR_RTS_v;
 	if(uart_flow == SW_FLOW) {
-		uart_transmit(XON);
+		uart_transmit(XON, UART_WAIT);
 	}
 	uart_flow_state = 0;
 }
@@ -241,19 +245,32 @@ uart_store_char()
 	uint8_t val = uart_RBR;
 
 	if(!val) {
-		// Toss nulls
+		// Toss nulls - we get lots of them as padding characters
+		// in escape sequences.
 		return;
 	}
 
+	// See if we are above the receiver's high water mark.
 	if(uart_rb_count > uart_high_water) {
-		if(uart_flow == HW_FLOW) {
-			// Above high water - clear RTS so the sender will pause.
-			uart_MCR &= ~uart_MCR_RTS_v;
-		} else {
-			// Above high water - send XOFF so the sender will pause.
-			uart_transmit(XOFF);
+		// See if we need to initiate a pause.
+		if(uart_flow_state == 0) {
+			// Start a pause.
+			if(uart_flow == HW_FLOW) {
+				// Using hardware flow control - clear RTS.
+				uart_MCR &= ~uart_MCR_RTS_v;
+				uart_flow_state = 1; // Remember that we are paused.
+			} else {
+				// Using software flow control - send XOFF.
+				// Don't wait - we are in an ISR.
+				if(uart_transmit(XOFF, UART_NO_WAIT)) {
+					// If the send was successful, remember that
+					// we are paused.  Otherwise, leave the flow
+					// state at 0 so we try to pause again when
+					// the next character is received.
+					uart_flow_state = 1;
+				}
+			}
 		}
-		uart_flow_state = 1; // Remember that we are paused.
 	}
 
 	if(uart_rb_count < uart_depth) {
@@ -288,26 +305,52 @@ uart_test_interrupt()
 }
 
 // uart_transmit - transmit a character
-void
-uart_transmit(unsigned char c)
+//
+// Return 0 if we cannot.
+int
+uart_transmit(unsigned char c, int wait)
 {
-	//write_led(0xff);
-	while(!(uart_LSR & uart_LSR_THRE_v)) {
-		; // Wait for the transmit buffer to be free.
+	// If we are in the middle of sending a break, reject any
+	// attempt to send a new character, even if the caller has
+	// asked us to wait.  Breaks last 100 ms and that is too
+	// long to stall here.  We might have been called from
+	// interrupt level to send a ^S, or the screen code might
+	// be trying to respond to ESC [ n.
+	//
+	// Break is a very rare event, so this should be ok...
+	if(uart_break_timer != 0) {
+		return 0;
+	}
+
+	// We are willing to wait for the fifo to be empty, because
+	// we never queue more than one character, so the fifo should
+	// go empty very quickly.
+	//
+	// uart_LSR_THRE_v = 1 means "fifo empty"
+	// uart_LSR_THRE_v = 0 means "fifo not empty"
+	//
+	// Note that even if the fifo is empty, the transmit shift
+	// register may still be sending out a character.
+	while((uart_LSR & uart_LSR_THRE_v) == 0) {
+		// The transmit fifo is not empty.  Should we wait?
+		if(wait == UART_NO_WAIT) {
+			// Nope.
+			return 0;
+		}
 	}
 
 	uart_THR = c;
-	//write_led(0x00);
+	return 1; // Character is queued.
 }
 
 // uart_transmit - transmit a null-terminated string
 void
-uart_transmit_string(char *pString)
+uart_transmit_string(char *pString, int wait)
 {
 	char *p = pString;
 
 	while(*p != 0) {
-		uart_transmit(*p++);
+		uart_transmit(*p++, wait);
 	}
 }
 
@@ -320,9 +363,10 @@ uart_transmit_string(char *pString)
 int
 uart_receive()
 {
-	asm(" ori.w #0x0700, %sr");	// Mask interrupts
-
+	// Assume nothing is available.
 	int rv = -1;
+
+	asm(" ori.w #0x0700, %sr");	// Mask interrupts
 
 	if(uart_rb_count) {
 		// Something available.
@@ -333,21 +377,64 @@ uart_receive()
 		
 		// Move the output pointer, keeping it in range.
 		uart_rb_output = (uart_rb_output + 1) & (uart_depth - 1);
-	} else {
-		// If there is nothing available, make sure we haven't blocked
-		// the sender.
-		if(uart_flow_state) {
-			if(uart_flow == HW_FLOW) {
-				uart_MCR |= uart_MCR_RTS_v;
-			} else {
-				uart_transmit(XON);
-			}
-			uart_flow_state = 0; // No longer paused
-		}
 	}
 
 	asm(" andi.w #~0x0700, %sr");	// Unmask interrupts
 
+	// If there is nothing available, make sure we haven't blocked the sender.
+	if(rv == -1) {
+		if(uart_flow_state) {
+			// Flow is currently blocked, and our buffer is empty.
+			// Allow data to flow.
+			if(uart_flow == HW_FLOW) {
+				// Using hardware flow control - set RTS and
+				// remember that flow is not blocked anymore.
+				uart_MCR |= uart_MCR_RTS_v;
+				uart_flow_state = 0;
+			} else {
+				// Using software flow control - try to send
+				// an XON to unblock.
+				//
+				// We are outside the interrupt mask, so we can
+				// wait for the uart.
+				if(uart_transmit(XON, UART_WAIT)) {
+					// If the send was successful, remember that
+					// we are now unblocked.
+					//
+					// Otherwise, leave the flow state at 0 so
+					// we try to unblock again the next time
+					// we are called.
+					uart_flow_state = 0;
+				}
+			}
+		}
+	}
+
 	return rv;
+}
+
+// Start a line break.
+void
+uart_start_break()
+{
+	// Set the break timer for 100 ms.  Do this first, so
+	// it can block any new output from being queued.
+	uart_break_timer = 7777;
+
+	// Wait for the transmitter to be completely idle.
+	while(!(uart_LSR & uart_LSR_TEMT_v)) {
+		;
+	}
+
+	// Start the break condition.
+	uart_LCR |= uart_LCR_SBRK_v;
+}
+
+// Stop a line break.
+void
+uart_stop_break()
+{
+	// Stop the break condition.
+	uart_LCR &= ~uart_LCR_SBRK_v;
 }
 

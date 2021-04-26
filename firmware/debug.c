@@ -28,8 +28,8 @@ dump(char *prefix, uint32_t c)
 	int i;
 	uint8_t tmp;
 
-	uart_transmit_string(prefix);
-	uart_transmit(' ');
+	uart_transmit_string(prefix, UART_WAIT);
+	uart_transmit(' ', UART_WAIT);
 
 	for(i = 7; i >= 0; i--) {
 		// Get a nibble.
@@ -40,18 +40,18 @@ dump(char *prefix, uint32_t c)
 		} else {
 			tmp += 'A' - 10;
 		}
-		uart_transmit(tmp);
+		uart_transmit(tmp, UART_WAIT);
 	}
 
-	uart_transmit_string("\r\n");
+	uart_transmit_string("\r\n", UART_WAIT);
 }
 
 // Print a simple string.  We supply the <CR> <LF>.
 void
 msg(char *str)
 {
-	uart_transmit_string(str);
-	uart_transmit_string("\r\n");
+	uart_transmit_string(str, UART_WAIT);
+	uart_transmit_string("\r\n", UART_WAIT);
 }
 
 // Send a bit pattern to the diagnostic LEDs.

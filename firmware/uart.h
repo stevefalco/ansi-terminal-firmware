@@ -20,10 +20,17 @@
 
 #include "types.h"
 
+#define UART_NO_WAIT	0
+#define UART_WAIT	1
+
 extern void uart_initialize();
 extern void uart_test_interrupt();
-extern void uart_transmit(unsigned char c);
-extern void uart_transmit_string(char *pString);
+extern int uart_transmit(unsigned char c, int wait);
+extern void uart_transmit_string(char *pString, int wait);
 extern int uart_receive();
+extern void uart_start_break();
+extern void uart_stop_break();
+
+extern int uart_break_timer;
 
 #endif // _UART_H_

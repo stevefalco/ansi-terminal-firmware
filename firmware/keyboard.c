@@ -25,23 +25,30 @@
 #include "debug.h"
 
 // Keyboard registers
-#define keyboard_base		(0xc040)
-#define keyboard_SCAN_CODE	(*(volatile uint8_t *)(keyboard_base + 0x00))	// Scan Code register
-#define keyboard_STATUS		(*(volatile uint8_t *)(keyboard_base + 0x02))	// Status register
+#define keyboard_base			(0xc040)
+#define keyboard_SCAN_CODE		(*(volatile uint8_t *)(keyboard_base + 0x00))	// Scan Code register
+#define keyboard_STATUS			(*(volatile uint8_t *)(keyboard_base + 0x02))	// Status register
 
 // Keyboard register bits
 
 // STATUS
-#define keyboard_Interrupt_b	(0)						// Interrupt received
+#define keyboard_Interrupt_b		(0)						// Interrupt received
 
-#define keyboard_Interrupt_v	(1 << keyboard_Interrupt_b)
+#define keyboard_Interrupt_v		(1 << keyboard_Interrupt_b)
 
-#define keyboard_depth		(128)						// Buffer depth.
+#define keyboard_depth			(128)						// Buffer depth.
 
-#define KB_NORMAL		(0)
-#define KB_NORMAL_GOING_UP	(1)
-#define KB_EXTENSION		(2)
-#define KB_EXTENSION_GOING_UP	(3)
+#define KB_NORMAL			(0)
+#define KB_NORMAL_GOING_UP		(1)
+#define KB_EXTENSION_E0			(2)
+#define KB_EXTENSION_E0_GOING_UP	(3)
+#define KB_EXTENSION_E1			(4)
+#define KB_EXTENSION_E1_CONSUME_0	(5)
+#define KB_EXTENSION_E1_CONSUME_1	(6)
+#define KB_EXTENSION_E1_CONSUME_2	(7)
+#define KB_EXTENSION_E1_CONSUME_3	(8)
+#define KB_EXTENSION_E1_CONSUME_4	(9)
+#define KB_EXTENSION_E1_CONSUME_5	(10)
 static int keyboard_state;
 
 static uint8_t keyboard_rb[keyboard_depth];
@@ -49,7 +56,7 @@ static int keyboard_rb_input;
 static int keyboard_rb_output;
 static int keyboard_rb_count;
 
-#define KEY_NOT_FOUND		(0xff)
+#define KEY_NOT_FOUND			(0xff)
 static int keyboard_modifiers;
 
 // keyboard_initialize - get the keyboard ready
@@ -67,7 +74,8 @@ keyboard_initialize()
 
 // keyboard_test_interrupt - see if the keyboard has posted an interrupt
 //
-// This runs from the interrupt service routine with interrupts disabled.
+// This runs from the interrupt service routine with interrupts disabled,
+// so we want to be quick.
 void
 keyboard_test_interrupt()
 {
@@ -113,6 +121,7 @@ keyboard_test_interrupt()
 #define R_CTRL		0xe014
 #define R_GUI		0xe027
 #define R_ALT		0xe011
+#define BREAK		0x77
 #define F1		0x05
 #define F2		0x06
 #define F3		0x04
@@ -137,7 +146,8 @@ keyboard_test_interrupt()
 #define D_ARROW		0xe072
 #define R_ARROW		0xe074
 #define KEY_UP		0xf0		// not a key - sent when a key is released
-#define EXTENSION	0xe0		// first code of an extended sequence
+#define EXTENSION_E0	0xe0		// first code of an extended E0 sequence
+#define EXTENSION_E1	0xe1		// first code of an extended E1 sequence
 
 typedef struct {
 	uint8_t		ascii_value;
@@ -201,6 +211,11 @@ static SCAN_TABLE scan_table_no_modifiers[] = {
 #define SCAN_ELEMENTS_NO_MODIFIERS (sizeof(scan_table_no_modifiers) / sizeof(SCAN_TABLE))
 
 static SCAN_TABLE scan_table_shift[] = {
+	{ ' ',  0x29 }, // SPACE BAR
+	{ 0x08, 0x66 },	// BACKSPACE
+	{ 0x09, 0x0d },	// TAB
+	{ 0x0d, 0x5a },	// ENTER
+	{ 0x1b, 0x76 },	// ESCAPE
 	{ 'A',  0x1c },
 	{ 'B',  0x32 },
 	{ 'C',  0x21 },
@@ -287,6 +302,10 @@ static SCAN_TABLE scan_table_control[] = {
 	{ 0x1e, 0x0e }, // ^`
 	{ 0x1f, 0x4e },	// ^-
 	{ 0x1f, 0x4a },	// ^/
+	{ 0x08, 0x66 },	// BACKSPACE
+	{ 0x09, 0x0d },	// TAB
+	{ 0x0d, 0x5a },	// ENTER
+	{ 0x1b, 0x76 },	// ESCAPE
 };
 #define SCAN_ELEMENTS_CONTROL (sizeof(scan_table_control) / sizeof(SCAN_TABLE))
 
@@ -344,14 +363,18 @@ keyboard_decode(uint8_t scan_code)
 {
 	uint8_t c;
 
-	//dump("scan code", scan_code);
+	// dump("scan code", scan_code);
 
 	// Figure out what we got.
 	switch(keyboard_state) {
 		case KB_NORMAL:
 			switch(scan_code) {
-				case EXTENSION: // starting extended sequence
-					keyboard_state = KB_EXTENSION;
+				case EXTENSION_E0: // starting extended sequence
+					keyboard_state = KB_EXTENSION_E0;
+					return;
+
+				case EXTENSION_E1:
+					keyboard_state = KB_EXTENSION_E1;
 					return;
 
 				case KEY_UP: // starting key-up sequence
@@ -372,107 +395,107 @@ keyboard_decode(uint8_t scan_code)
 					break;
 
 				case F1:
-					uart_transmit_string("OP");
+					uart_transmit_string("OP", UART_WAIT);
 					break;
 
 				case F2:
-					uart_transmit_string("OQ");
+					uart_transmit_string("OQ", UART_WAIT);
 					break;
 
 				case F3:
-					uart_transmit_string("OR");
+					uart_transmit_string("OR", UART_WAIT);
 					break;
 
 				case F4:
-					uart_transmit_string("OS");
+					uart_transmit_string("OS", UART_WAIT);
 					break;
 
 				case F5:
-					uart_transmit_string("[15~");
+					uart_transmit_string("[15~", UART_WAIT);
 					break;
 
 				case F6:
-					uart_transmit_string("[17~");
+					uart_transmit_string("[17~", UART_WAIT);
 					break;
 
 				case F7:
-					uart_transmit_string("[18~");
+					uart_transmit_string("[18~", UART_WAIT);
 					break;
 
 				case F8:
-					uart_transmit_string("[19~");
+					uart_transmit_string("[19~", UART_WAIT);
 					break;
 
 				case F9:
-					uart_transmit_string("[20~");
+					uart_transmit_string("[20~", UART_WAIT);
 					break;
 
 				case F10:
-					uart_transmit_string("[21~");
+					uart_transmit_string("[21~", UART_WAIT);
 					break;
 
 				case F11:
-					uart_transmit_string("[22~");
+					uart_transmit_string("[22~", UART_WAIT);
 					break;
 
 				case F12:
-					uart_transmit_string("[23~");
+					uart_transmit_string("[23~", UART_WAIT);
 					break;
 
 					// Everything else can be looked up in the ASCII table.
 				default:
 					c = keyboard_find(scan_code);
 					if(c != KEY_NOT_FOUND) {
-						uart_transmit(c);
+						uart_transmit(c, UART_WAIT);
 					}
 					break;
 			}
 			break;
 
-		case KB_EXTENSION:
+		case KB_EXTENSION_E0:
 			switch(scan_code) {
 				case KEY_UP: // starting key-up sequence
-					keyboard_state = KB_EXTENSION_GOING_UP;
+					keyboard_state = KB_EXTENSION_E0_GOING_UP;
 					return;
 
 				case INSERT & 0xff:
-					uart_transmit_string("[2~");
+					uart_transmit_string("[2~", UART_WAIT);
 					break;
 
 				case HOME & 0xff:
-					uart_transmit_string("[H");
+					uart_transmit_string("[H", UART_WAIT);
 					break;
 
 				case PG_UP & 0xff:
-					uart_transmit_string("[5~");
+					uart_transmit_string("[5~", UART_WAIT);
 					break;
 
 				case DELETE & 0xff:
-					uart_transmit(0x7f);
+					uart_transmit(0x7f, UART_WAIT);
 					break;
 
 				case END & 0xff:
-					uart_transmit_string("OF");
+					uart_transmit_string("OF", UART_WAIT);
 					break;
 
 				case PG_DOWN & 0xff:
-					uart_transmit_string("[6~");
+					uart_transmit_string("[6~", UART_WAIT);
 					break;
 
 				case U_ARROW & 0xff:
-					uart_transmit_string("OA");
+					uart_transmit_string("OA", UART_WAIT);
 					break;
 
 				case D_ARROW & 0xff:
-					uart_transmit_string("OB");
+					uart_transmit_string("OB", UART_WAIT);
 					break;
 
 				case R_ARROW & 0xff:
-					uart_transmit_string("OC");
+					uart_transmit_string("OC", UART_WAIT);
 					break;
 
 				case L_ARROW & 0xff:
-					uart_transmit_string("OD");
+					uart_transmit_string("OD", UART_WAIT);
 					break;
 
 				case R_CTRL & 0xff:
@@ -482,11 +505,110 @@ keyboard_decode(uint8_t scan_code)
 				case R_ALT & 0xff:
 					keyboard_modifiers |= ALT_FLAG;
 					break;
+
+				default:
+					break;
 			}
 			keyboard_state = KB_NORMAL;
 			break;
 
-		case KB_NORMAL_GOING_UP:
+		case KB_EXTENSION_E1:
+			switch(scan_code) {
+				case L_CTRL:
+					// The only sequence here is the wacky "BREAK" key,
+					// which is 8 scan_codes long!
+					keyboard_state = KB_EXTENSION_E1_CONSUME_0;
+					return;
+
+				default:
+					// If we get anything else, this sequence is bad.
+					break;
+			}
+			keyboard_state = KB_NORMAL;
+			break;
+
+		case KB_EXTENSION_E1_CONSUME_0:
+			// We've seen 0xE1 0x14.  We now expect 0x77.
+			switch(scan_code) {
+				case BREAK:
+					keyboard_state = KB_EXTENSION_E1_CONSUME_1;
+					return;
+
+				default:
+					break;
+			}
+			keyboard_state = KB_NORMAL;
+			break;
+
+		case KB_EXTENSION_E1_CONSUME_1:
+			// We've seen 0xE1 0x14 0x77.  We now expect 0xE1.
+			switch(scan_code) {
+				case EXTENSION_E1:
+					keyboard_state = KB_EXTENSION_E1_CONSUME_2;
+					return;
+
+				default:
+					break;
+			}
+			keyboard_state = KB_NORMAL;
+			break;
+
+		case KB_EXTENSION_E1_CONSUME_2:
+			// We've seen 0xE1 0x14 0x77 0xE1.  We now expect 0xF0.
+			switch(scan_code) {
+				case KEY_UP:
+					keyboard_state = KB_EXTENSION_E1_CONSUME_3;
+					return;
+
+				default:
+					break;
+			}
+			keyboard_state = KB_NORMAL;
+			break;
+
+		case KB_EXTENSION_E1_CONSUME_3:
+			// We've seen 0xE1 0x14 0x77 0xE1 0xF0.  We now expect 0x14.
+			switch(scan_code) {
+				case L_CTRL:
+					keyboard_state = KB_EXTENSION_E1_CONSUME_4;
+					return;
+
+				default:
+					break;
+			}
+			keyboard_state = KB_NORMAL;
+			break;
+
+		case KB_EXTENSION_E1_CONSUME_4:
+			// We've seen 0xE1 0x14 0x77 0xE1 0xF0 0x14.  We now expect 0xF0.
+			switch(scan_code) {
+				case KEY_UP:
+					keyboard_state = KB_EXTENSION_E1_CONSUME_5;
+					return;
+
+				default:
+					break;
+			}
+			keyboard_state = KB_NORMAL;
+			break;
+
+		case KB_EXTENSION_E1_CONSUME_5:
+			// We've seen 0xE1 0x14 0x77 0xE1 0xF0 0x14 0xF0.  We now expect 0x77.
+			switch(scan_code) {
+				case BREAK:
+					// That completes the sequence.  Generate a break and
+					// go back to the normal state.
+					uart_start_break();
+					keyboard_state = KB_NORMAL;
+					return;
+
+				default:
+					break;
+			}
+			keyboard_state = KB_NORMAL;
+			break;
+
+			case KB_NORMAL_GOING_UP:
 			// I don't really care what the key going up is,
 			// unless it is a modifier going away.
 			// Dump everything else on the floor.
@@ -510,7 +632,7 @@ keyboard_decode(uint8_t scan_code)
 			keyboard_state = KB_NORMAL;
 			break;
 
-		case KB_EXTENSION_GOING_UP:
+		case KB_EXTENSION_E0_GOING_UP:
 			// I don't really care what the key going up is,
 			// unless it is a modifier going away.
 			// Dump everything else on the floor.
@@ -541,13 +663,15 @@ keyboard_decode(uint8_t scan_code)
 int
 keyboard_handler()
 {
-	int rv;
-	uint8_t scan_code;
+	// Assume nothing available.
+	int rv = 0;
+
+	// I shouldn't need to initialize scan_code here, because rv != 0 protects
+	// the call to keyboard_decode().  But gcc gives an "uninitialized variable"
+	// warning.
+	uint8_t scan_code = 0;
 
 	asm(" ori.w #0x0700, %sr");	// Mask interrupts
-
-	// Assume nothing available.
-	rv = 0;
 
 	// See if there is anything waiting to be processed.
 	if(keyboard_rb_count != 0) {
@@ -565,12 +689,17 @@ keyboard_handler()
 
 		// Move the output pointer, keeping it in range.
 		keyboard_rb_output = (keyboard_rb_output + 1) & (keyboard_depth - 1);
-
-		// Decode it.
-		keyboard_decode(scan_code);
 	}
 
 	asm(" andi.w #~0x0700, %sr");	// Unmask interrupts
+
+	// We want to do the decode outside of the interrupt mask, because this process
+	// can be slow, especially if we have to wait for the uart when sending a
+	// keystroke.
+	if(rv != 0) {
+		// Decode it.
+		keyboard_decode(scan_code);
+	}
 
 	return rv;
 }
