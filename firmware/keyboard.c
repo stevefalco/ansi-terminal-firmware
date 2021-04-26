@@ -43,12 +43,8 @@
 #define KB_EXTENSION_E0			(2)
 #define KB_EXTENSION_E0_GOING_UP	(3)
 #define KB_EXTENSION_E1			(4)
-#define KB_EXTENSION_E1_CONSUME_0	(5)
-#define KB_EXTENSION_E1_CONSUME_1	(6)
-#define KB_EXTENSION_E1_CONSUME_2	(7)
-#define KB_EXTENSION_E1_CONSUME_3	(8)
-#define KB_EXTENSION_E1_CONSUME_4	(9)
-#define KB_EXTENSION_E1_CONSUME_5	(10)
+#define KB_EXTENSION_E1_GOT_BREAK_1	(5)
+#define KB_EXTENSION_E1_GOING_UP	(6)
 static int keyboard_state;
 
 static uint8_t keyboard_rb[keyboard_depth];
@@ -114,14 +110,15 @@ keyboard_test_interrupt()
 // don't have one.  But they would be easy enough to add.
 #define CAPS_LOCK	0x58
 #define L_SHIFT		0x12
-#define L_CTRL		0x14
+#define L_CTRL		0x14		// Scan code shared with BREAK_1
 #define L_GUI		0xe01f
 #define L_ALT		0x11
 #define R_SHIFT		0x59
 #define R_CTRL		0xe014
 #define R_GUI		0xe027
 #define R_ALT		0xe011
-#define BREAK		0x77
+#define BREAK_1		0x14		// Scan code shared with L_CTRL
+#define BREAK_2		0x77
 #define F1		0x05
 #define F2		0x06
 #define F3		0x04
@@ -369,11 +366,11 @@ keyboard_decode(uint8_t scan_code)
 	switch(keyboard_state) {
 		case KB_NORMAL:
 			switch(scan_code) {
-				case EXTENSION_E0: // starting extended sequence
+				case EXTENSION_E0: // starting extended 0xE0 sequence
 					keyboard_state = KB_EXTENSION_E0;
 					return;
 
-				case EXTENSION_E1:
+				case EXTENSION_E1: // starting extended 0xE1 sequence
 					keyboard_state = KB_EXTENSION_E1;
 					return;
 
@@ -514,10 +511,24 @@ keyboard_decode(uint8_t scan_code)
 
 		case KB_EXTENSION_E1:
 			switch(scan_code) {
-				case L_CTRL:
-					// The only sequence here is the wacky "BREAK" key,
-					// which is 8 scan_codes long!
-					keyboard_state = KB_EXTENSION_E1_CONSUME_0;
+				case KEY_UP: // starting key-up sequence
+					keyboard_state = KB_EXTENSION_E1_GOING_UP;
+					return;
+
+				case BREAK_1:
+					// So far, we've seen 0xE1 0x14.  Move to the
+					// KB_EXTENSION_E1_GOT_BREAK_1 state, where
+					// we expect to get the BREAK_2 code.
+					//
+					// The complete scan_code sequence for the BREAK key is:
+					//
+					// 0xE1 0x14 0x77 0xE1 0xF0 0x14 0xF0 0x77
+					//
+					// Note that all 8 scan_codes are sent when the BREAK
+					// key is pressed.  This is different from every other
+					// key, where the KEY_UP part comes when the key is
+					// released.
+					keyboard_state = KB_EXTENSION_E1_GOT_BREAK_1;
 					return;
 
 				default:
@@ -527,80 +538,15 @@ keyboard_decode(uint8_t scan_code)
 			keyboard_state = KB_NORMAL;
 			break;
 
-		case KB_EXTENSION_E1_CONSUME_0:
-			// We've seen 0xE1 0x14.  We now expect 0x77.
+		case KB_EXTENSION_E1_GOT_BREAK_1:
 			switch(scan_code) {
-				case BREAK:
-					keyboard_state = KB_EXTENSION_E1_CONSUME_1;
-					return;
-
-				default:
-					break;
-			}
-			keyboard_state = KB_NORMAL;
-			break;
-
-		case KB_EXTENSION_E1_CONSUME_1:
-			// We've seen 0xE1 0x14 0x77.  We now expect 0xE1.
-			switch(scan_code) {
-				case EXTENSION_E1:
-					keyboard_state = KB_EXTENSION_E1_CONSUME_2;
-					return;
-
-				default:
-					break;
-			}
-			keyboard_state = KB_NORMAL;
-			break;
-
-		case KB_EXTENSION_E1_CONSUME_2:
-			// We've seen 0xE1 0x14 0x77 0xE1.  We now expect 0xF0.
-			switch(scan_code) {
-				case KEY_UP:
-					keyboard_state = KB_EXTENSION_E1_CONSUME_3;
-					return;
-
-				default:
-					break;
-			}
-			keyboard_state = KB_NORMAL;
-			break;
-
-		case KB_EXTENSION_E1_CONSUME_3:
-			// We've seen 0xE1 0x14 0x77 0xE1 0xF0.  We now expect 0x14.
-			switch(scan_code) {
-				case L_CTRL:
-					keyboard_state = KB_EXTENSION_E1_CONSUME_4;
-					return;
-
-				default:
-					break;
-			}
-			keyboard_state = KB_NORMAL;
-			break;
-
-		case KB_EXTENSION_E1_CONSUME_4:
-			// We've seen 0xE1 0x14 0x77 0xE1 0xF0 0x14.  We now expect 0xF0.
-			switch(scan_code) {
-				case KEY_UP:
-					keyboard_state = KB_EXTENSION_E1_CONSUME_5;
-					return;
-
-				default:
-					break;
-			}
-			keyboard_state = KB_NORMAL;
-			break;
-
-		case KB_EXTENSION_E1_CONSUME_5:
-			// We've seen 0xE1 0x14 0x77 0xE1 0xF0 0x14 0xF0.  We now expect 0x77.
-			switch(scan_code) {
-				case BREAK:
-					// That completes the sequence.  Generate a break and
-					// go back to the normal state.
+				case BREAK_2:
+					// We've got the BREAK_2 code.  Start sending BREAK.
+					//
+					// Note that BREAK is 100 ms long, so a timer is used
+					// to stop sending BREAK.
 					uart_start_break();
-					keyboard_state = KB_NORMAL;
-					return;
+					break;
 
 				default:
 					break;
@@ -608,7 +554,30 @@ keyboard_decode(uint8_t scan_code)
 			keyboard_state = KB_NORMAL;
 			break;
 
-			case KB_NORMAL_GOING_UP:
+		case KB_EXTENSION_E1_GOING_UP:
+			switch(scan_code) {
+				case BREAK_1:
+					// We've gotten the KEY_UP of the BREAK_1 scan_code.
+					// We have to go back to the KB_EXTENSION_E1 state,
+					// because we are still expecting a KEY_UP of the
+					// BREAK_2 scan_code, and we won't get another 0xE1.
+					keyboard_state = KB_EXTENSION_E1;
+					return;
+
+				case BREAK_2:
+					// We've gotten the KEY_UP of the BREAK_2 scan code.
+					//
+					// This is the final scan_code of the sequence.  There
+					// is nothing further to do.
+					break;
+
+				default:
+					break;
+			}
+			keyboard_state = KB_NORMAL;
+			break;
+
+		case KB_NORMAL_GOING_UP:
 			// I don't really care what the key going up is,
 			// unless it is a modifier going away.
 			// Dump everything else on the floor.
