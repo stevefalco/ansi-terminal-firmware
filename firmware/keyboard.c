@@ -52,7 +52,6 @@ static int keyboard_rb_input;
 static int keyboard_rb_output;
 static int keyboard_rb_count;
 
-#define KEY_NOT_FOUND			(0xff)
 static int keyboard_modifiers;
 
 // keyboard_initialize - get the keyboard ready
@@ -105,9 +104,10 @@ keyboard_test_interrupt()
 #define SHIFT_FLAG	0x01
 #define CONTROL_FLAG	0x02
 #define ALT_FLAG	0x04
+#define CAPS_LOCK_FLAG	0x08
+#define NUM_LOCK_FLAG	0x10
 
-// Non-ASCII scan codes.  I haven't bothered with the keypad, because my keyboards
-// don't have one.  But they would be easy enough to add.
+// Non-ASCII scan codes.
 #define CAPS_LOCK	0x58
 #define NUM_LOCK	0x77		// Scan code shared with BREAK_2
 #define L_SHIFT		0x12
@@ -143,15 +143,27 @@ keyboard_test_interrupt()
 #define L_ARROW		0xe06b
 #define D_ARROW		0xe072
 #define R_ARROW		0xe074
+#define NUM_DIVIDE	0xe04a
+#define NUM_ENTER	0xe05a
 #define KEY_UP		0xf0		// not a key - sent when a key is released
 #define EXTENSION_E0	0xe0		// first code of an extended E0 sequence
 #define EXTENSION_E1	0xe1		// first code of an extended E1 sequence
 
+// Some scan_codes send a single ascii byte.  We keep them separated
+// from the scan_codes that send strings, for efficiency.
 typedef struct {
 	uint8_t		ascii_value;
 	uint8_t		scan_code;
 } SCAN_TABLE;
 
+// Some scan_codes send a string.   We keep them separated
+// from the scan_codes that send single ascii bytes, for efficiency.
+typedef struct {
+	char		*pString;
+	uint8_t		scan_code;
+} STRING_TABLE;
+
+// Normal characters.  No modifiers, no strings, no extensions.
 static SCAN_TABLE scan_table_no_modifiers[] = {
 	{ ' ',  0x29 }, // SPACE BAR
 	{ 0x08, 0x66 },	// BACKSPACE
@@ -208,6 +220,7 @@ static SCAN_TABLE scan_table_no_modifiers[] = {
 };
 #define SCAN_ELEMENTS_NO_MODIFIERS (sizeof(scan_table_no_modifiers) / sizeof(SCAN_TABLE))
 
+// Shifted characters.
 static SCAN_TABLE scan_table_shift[] = {
 	{ ' ',  0x29 }, // SPACE BAR
 	{ 0x08, 0x66 },	// BACKSPACE
@@ -264,6 +277,7 @@ static SCAN_TABLE scan_table_shift[] = {
 };
 #define SCAN_ELEMENTS_SHIFT (sizeof(scan_table_shift) / sizeof(SCAN_TABLE))
 
+// Control characters.
 static SCAN_TABLE scan_table_control[] = {
 	{ 0x00, 0x29 },	// ^SPACE
 	{ 0x00, 0x1e },	// ^2
@@ -307,50 +321,209 @@ static SCAN_TABLE scan_table_control[] = {
 };
 #define SCAN_ELEMENTS_CONTROL (sizeof(scan_table_control) / sizeof(SCAN_TABLE))
 
-// Do a linear search through our scan table, looking for an entry with
-// the right code and extension flags.
-static uint8_t
-keyboard_find(uint8_t scan_code)
+// Numeric pad, while NUM_LOCK is engaged.  Single characters, no extensions.
+//
+// Note that '/' and ENTER are not here, because they have an 0xE0 prefix.
+static SCAN_TABLE scan_table_num_pad_num_lock[] = {
+	{ '0',  0x70 },
+	{ '1',  0x69 },
+	{ '2',  0x72 },
+	{ '3',  0x7a },
+	{ '4',  0x6b },
+	{ '5',  0x73 },
+	{ '6',  0x74 },
+	{ '7',  0x6c },
+	{ '8',  0x75 },
+	{ '9',  0x7d },
+	{ '.',  0x71 },
+	{ '+',  0x79 },
+	{ '-',  0x7b },
+	{ '*',  0x7c },
+};
+#define SCAN_ELEMENTS_NUM_PAD_NUM_LOCK (sizeof(scan_table_num_pad_num_lock) / sizeof(SCAN_TABLE))
+
+// Numeric pad, without NUM_LOCK:  All send strings.  A few don't really
+// need strings, like 5, +, etc, but it is simpler to handle them all
+// the same way.
+static STRING_TABLE string_table_num_pad_no_num_lock[] = {
+	{ "[2~",  0x70 }, // INSERT
+	{ "OF",   0x69 }, // END
+	{ "OB",   0x72 }, // D_ARROW
+	{ "[6~",  0x7a }, // PG_DOWN
+	{ "OD",   0x6b }, // L_ARROW
+	{ "5",      0x73 }, // 5
+	{ "OC",   0x74 }, // R_ARROW
+	{ "[H",   0x6c }, // HOME
+	{ "OA",   0x75 }, // U_ARROW
+	{ "[5~",  0x7d }, // PG_UP
+	{ "\x7f",   0x71 }, // DELETE
+	{ "+",      0x79 }, // +
+	{ "-",      0x7b }, // -
+	{ "*",      0x7c }, // *
+};
+#define STRING_ELEMENTS_NUM_PAD_NO_NUM_LOCK (sizeof(string_table_num_pad_no_num_lock) / sizeof(STRING_TABLE))
+
+// These are the scan_codes that are prefixed with the 0xE0 extension.
+// They mostly result in strings, but a few don't.  We handle them all
+// together for simplicity.
+static STRING_TABLE string_table_e0[] = {
+	{ "[2~",	INSERT		& 0xff },
+	{ "[H",	HOME		& 0xff },
+	{ "[5~",	PG_UP		& 0xff },
+	{ "OF",	END		& 0xff },
+	{ "[6~",	PG_DOWN		& 0xff },
+	{ "OA",	U_ARROW		& 0xff },
+	{ "OB",	D_ARROW		& 0xff },
+	{ "OC",	R_ARROW		& 0xff },
+	{ "OD",	L_ARROW		& 0xff },
+	{ "/",		NUM_DIVIDE	& 0xff },
+	{ "\r",		NUM_ENTER	& 0xff },
+	{ "\x7f",	DELETE		& 0xff },
+};
+#define STRING_ELEMENTS_E0 (sizeof(string_table_e0) / sizeof(STRING_TABLE))
+
+// Function keys all send strings.
+static STRING_TABLE string_table_func[] = {
+	{ "OP",	F1  },
+	{ "OQ",	F2  },
+	{ "OR",	F3  },
+	{ "OS",	F4  },
+	{ "[15~",	F5  },
+	{ "[17~",	F6  },
+	{ "[18~",	F7  },
+	{ "[19~",	F8  },
+	{ "[20~",	F9  },
+	{ "[21~",	F10 },
+	{ "[22~",	F11 },
+	{ "[23~",	F12 },
+};
+#define STRING_ELEMENTS_FUNC (sizeof(string_table_func) / sizeof(STRING_TABLE))
+
+// Do a linear search through the given table, looking for an entry with
+// the right scan_code.
+//
+// Return 1 if found, 0 if not found.
+static int
+keyboard_search_table(
+		uint8_t		scan_code,
+		SCAN_TABLE	*pTable,
+		int		limit
+		)
 {
 	int i;
+
+	for(i = 0; i < limit; i++) {
+		if(scan_code == pTable[i].scan_code) {
+			uart_transmit(pTable[i].ascii_value, UART_WAIT);
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+// Do a linear search through the given table, looking for an entry with
+// the right scan_code.
+//
+// Return 1 if found, 0 if not found.
+static int
+keyboard_search_string(
+		uint8_t		scan_code,
+		STRING_TABLE	*pTable,
+		int		limit
+		)
+{
+	int i;
+
+	for(i = 0; i < limit; i++) {
+		if(scan_code == pTable[i].scan_code) {
+			uart_transmit_string(pTable[i].pString, UART_WAIT);
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+// Do a linear search through the various scan tables, looking for an
+// entry with the right code and extension flags.
+static void
+keyboard_find_scan(uint8_t scan_code)
+{
 	int limit;
 	SCAN_TABLE *p;
-	SCAN_TABLE *q;
 
-	i = sizeof(SCAN_TABLE);
-
-	switch(keyboard_modifiers) {
+	// We first deal with the most common keys: alphabetic, numeric, control.
+	//
+	// First, figure out which table to search, based on the modifiers.
+	switch(keyboard_modifiers & (SHIFT_FLAG | CONTROL_FLAG | CAPS_LOCK_FLAG)) {
+		// Shift reverses Caps Lock.  In other words, if Caps Lock
+		// is on, then the shift key brings you back to the unshifted
+		// state.  If Caps Lock is off, then the shift key selects the
+		// shifted state.
 		case NO_FLAG:
+		case CAPS_LOCK_FLAG | SHIFT_FLAG:
 			p = scan_table_no_modifiers;
 			limit = SCAN_ELEMENTS_NO_MODIFIERS;
 			break;
 
 		case SHIFT_FLAG:
+		case CAPS_LOCK_FLAG:
 			p = scan_table_shift;
 			limit = SCAN_ELEMENTS_SHIFT;
 			break;
 
 		// Control overrides shift, meaning that we effectively
-		// ignore shift if control is active.
+		// ignore shift if control is active.  The same is true
+		// for caps lock.
 		case CONTROL_FLAG:
 		case CONTROL_FLAG | SHIFT_FLAG:
+		case CONTROL_FLAG | CAPS_LOCK_FLAG:
+		case CONTROL_FLAG | SHIFT_FLAG | CAPS_LOCK_FLAG:
 			p = scan_table_control;
 			limit = SCAN_ELEMENTS_CONTROL;
 			break;
 
 		default: // Unhandled modifier.
-			return KEY_NOT_FOUND;
-
+			return;
 	}
 
-	for(i = 0; i < limit; i++) {
-		q = p + i;
-		if(scan_code == q->scan_code) {
-			return q->ascii_value;
-		}
+	// Search the chosen table.  Again, these are the most common single
+	// ASCII characters.
+	if(keyboard_search_table(scan_code, p, limit)) {
+		// The code was found, and it has been transmitted; we are
+		// done.
+		return;
 	}
 
-	return KEY_NOT_FOUND;
+	// The code was not found above, but it might be a function key.
+	// We keep those separate because they all send strings.
+	if(keyboard_search_string(scan_code, string_table_func, STRING_ELEMENTS_FUNC)) {
+		// The code was found, and the string has been transmitted;
+		// we are done.
+		return;
+	}
+
+	// The code was not found above, but it might be on the numeric
+	// pad.  We keep those separate, because they either send a single
+	// character or a string, mostly depending on the NUM_LOCK state.
+	//
+	// This is the last chance for this scan_code.
+	if(keyboard_modifiers & NUM_LOCK) {
+		// Try for single characters.
+		keyboard_search_table(
+				scan_code,
+				scan_table_num_pad_num_lock,
+				SCAN_ELEMENTS_NUM_PAD_NUM_LOCK);
+	} else {
+		// Try for strings.
+		keyboard_search_string(
+				scan_code,
+				string_table_num_pad_no_num_lock,
+				STRING_ELEMENTS_NUM_PAD_NO_NUM_LOCK);
+	}
+
+	return;
 }
 
 // State machine to respond to scan codes.  We have to handle both
@@ -359,9 +532,7 @@ keyboard_find(uint8_t scan_code)
 static void
 keyboard_decode(uint8_t scan_code)
 {
-	uint8_t c;
-
-	// dump("scan code", scan_code);
+	//dump("scan code", scan_code);
 
 	// Figure out what we got.
 	switch(keyboard_state) {
@@ -392,60 +563,33 @@ keyboard_decode(uint8_t scan_code)
 					keyboard_modifiers |= SHIFT_FLAG;
 					break;
 
-				case F1:
-					uart_transmit_string("OP", UART_WAIT);
-					break;
-
-				case F2:
-					uart_transmit_string("OQ", UART_WAIT);
-					break;
-
-				case F3:
-					uart_transmit_string("OR", UART_WAIT);
-					break;
-
-				case F4:
-					uart_transmit_string("OS", UART_WAIT);
-					break;
-
-				case F5:
-					uart_transmit_string("[15~", UART_WAIT);
-					break;
-
-				case F6:
-					uart_transmit_string("[17~", UART_WAIT);
-					break;
-
-				case F7:
-					uart_transmit_string("[18~", UART_WAIT);
-					break;
-
-				case F8:
-					uart_transmit_string("[19~", UART_WAIT);
-					break;
-
-				case F9:
-					uart_transmit_string("[20~", UART_WAIT);
-					break;
-
-				case F10:
-					uart_transmit_string("[21~", UART_WAIT);
-					break;
-
-				case F11:
-					uart_transmit_string("[22~", UART_WAIT);
-					break;
-
-				case F12:
-					uart_transmit_string("[23~", UART_WAIT);
-					break;
-
-					// Everything else can be looked up in the ASCII table.
-				default:
-					c = keyboard_find(scan_code);
-					if(c != KEY_NOT_FOUND) {
-						uart_transmit(c, UART_WAIT);
+				case CAPS_LOCK:
+					if(keyboard_modifiers & CAPS_LOCK_FLAG) {
+						// CAPS_LOCK is on.  Turn it off.
+						keyboard_modifiers &= ~CAPS_LOCK_FLAG;
+					} else {
+						// CAPS_LOCK is off.  Turn it on.
+						keyboard_modifiers |= CAPS_LOCK_FLAG;
 					}
+					break;
+
+				case NUM_LOCK:
+					if(keyboard_modifiers & NUM_LOCK_FLAG) {
+						// NUM_LOCK is on.  Turn it off.
+						keyboard_modifiers &= ~NUM_LOCK_FLAG;
+					} else {
+						// NUM_LOCK is off.  Turn it on.
+						keyboard_modifiers |= NUM_LOCK_FLAG;
+					}
+					break;
+
+				default:
+					// Everything else can be looked up in a table.
+					//
+					// We will try several tables in turn, until
+					// we find the scan_code, or run out of
+					// possibilities.
+					keyboard_find_scan(scan_code);
 					break;
 			}
 			break;
@@ -456,46 +600,6 @@ keyboard_decode(uint8_t scan_code)
 					keyboard_state = KB_EXTENSION_E0_GOING_UP;
 					return;
 
-				case INSERT & 0xff:
-					uart_transmit_string("[2~", UART_WAIT);
-					break;
-
-				case HOME & 0xff:
-					uart_transmit_string("[H", UART_WAIT);
-					break;
-
-				case PG_UP & 0xff:
-					uart_transmit_string("[5~", UART_WAIT);
-					break;
-
-				case DELETE & 0xff:
-					uart_transmit(0x7f, UART_WAIT);
-					break;
-
-				case END & 0xff:
-					uart_transmit_string("OF", UART_WAIT);
-					break;
-
-				case PG_DOWN & 0xff:
-					uart_transmit_string("[6~", UART_WAIT);
-					break;
-
-				case U_ARROW & 0xff:
-					uart_transmit_string("OA", UART_WAIT);
-					break;
-
-				case D_ARROW & 0xff:
-					uart_transmit_string("OB", UART_WAIT);
-					break;
-
-				case R_ARROW & 0xff:
-					uart_transmit_string("OC", UART_WAIT);
-					break;
-
-				case L_ARROW & 0xff:
-					uart_transmit_string("OD", UART_WAIT);
-					break;
-
 				case R_CTRL & 0xff:
 					keyboard_modifiers |= CONTROL_FLAG;
 					break;
@@ -505,6 +609,11 @@ keyboard_decode(uint8_t scan_code)
 					break;
 
 				default:
+					// Everything else can be looked up in the E0 table.
+					keyboard_search_string(
+							scan_code,
+							string_table_e0,
+							STRING_ELEMENTS_E0);
 					break;
 			}
 			keyboard_state = KB_NORMAL;
@@ -512,6 +621,23 @@ keyboard_decode(uint8_t scan_code)
 
 		case KB_EXTENSION_E1:
 			switch(scan_code) {
+				// There is not much here - we are really just trying
+				// to detect a BREAK key.
+				//
+				// This one is hard...  The complete scan_code sequence
+				// for the BREAK key is:
+				//
+				// 0xE1 0x14 0x77 0xE1 0xF0 0x14 0xF0 0x77
+				//
+				// where the first three scan_codes are: extension code
+				// 0xE1, then L_CTRL and NUM_LOCK.  The last five
+				// scan_codes are extension code 0xE1, followed by
+				// KEY_UP for the L_CTRL and NUM_LOCK.
+				//
+				// I've aliased L_CTRL to BREAK_1, and NUM_LOCK to
+				// BREAK_2.  Perhaps that makes things a bit more
+				// readable.
+
 				case KEY_UP: // starting key-up sequence
 					keyboard_state = KB_EXTENSION_E1_GOING_UP;
 					return;
@@ -521,14 +647,11 @@ keyboard_decode(uint8_t scan_code)
 					// KB_EXTENSION_E1_GOT_BREAK_1 state, where
 					// we expect to get the BREAK_2 code.
 					//
-					// The complete scan_code sequence for the BREAK key is:
-					//
-					// 0xE1 0x14 0x77 0xE1 0xF0 0x14 0xF0 0x77
-					//
 					// Note that all 8 scan_codes are sent when the BREAK
-					// key is pressed.  This is different from every other
-					// key, where the KEY_UP part comes when the key is
-					// released.
+					// key is initially pressed.  This is different from
+					// every other key, where the KEY_UP part comes when
+					// the key is released.  There is no way to detect when
+					// the BREAK key is released.
 					keyboard_state = KB_EXTENSION_E1_GOT_BREAK_1;
 					return;
 
@@ -559,9 +682,13 @@ keyboard_decode(uint8_t scan_code)
 			switch(scan_code) {
 				case BREAK_1:
 					// We've gotten the KEY_UP of the BREAK_1 scan_code.
-					// We have to go back to the KB_EXTENSION_E1 state,
+					// We prefer to go back to the KB_EXTENSION_E1 state,
 					// because we are still expecting a KEY_UP of the
 					// BREAK_2 scan_code, and we won't get another 0xE1.
+					//
+					// We could just go back to KB_NORMAL, since it would
+					// discard the remaining KEY_UP, but this is slightly
+					// cleaner.
 					keyboard_state = KB_EXTENSION_E1;
 					return;
 
