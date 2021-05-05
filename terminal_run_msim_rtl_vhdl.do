@@ -24,6 +24,11 @@ add wave /testbench/term/oEdb
 add wave /testbench/term/ASn
 add wave /testbench/term/eRWn
 add wave /testbench/term/cpuByteEnables
+add wave /testbench/term/cpuClock
+add wave /testbench/term/enPhi1
+add wave /testbench/term/enPhi2
+add wave /testbench/term/cpu/busControl/busPhase
+add wave /testbench/term/cpu/tState
 add wave /testbench/term/cpu/excUnit/regs68L
 add wave /testbench/term/cpu/excUnit/regs68H
 

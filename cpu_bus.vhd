@@ -100,9 +100,26 @@ begin
 
 					if(cpuASn = '0' and cpuByteEnables /= "00") then
 						busFSM <= busActive_state;
-						-- We are faster than the CPU, so we ack the cycle
-						-- immediately.  I might even nail the dtack to 0.
-						-- We'll see...
+						-- When reading, the CPU asserts the byte enables upon
+						-- entering busPhase S2, at the same time it asserts
+						-- ASn.  We will assert DTACKn on the next rising edge of
+						-- cpuClock, which corresponds to the start of busPhase S3.
+					       	-- Therefore, the CPU will see DTACKn during busPhase S4,
+						-- and no wait states will be inserted.
+						--
+						-- However, when writing, the CPU doesn't assert the
+						-- byte enables until busPhase S4.  Again, the CPU wants
+						-- to see DTACKn before leaving busPhase S4.  We are
+						-- synchronous, meaning that we cannot assert DTACKn
+						-- until the next rising cpuClock edge.  Thus, the CPU will
+						-- insert one wait state before entering busPhase S5.
+						-- This amounts to a 20% performance loss on writes.
+						--
+						-- I tried running this SM on the falling edge, but we
+						-- fail timing.  It looks like I'd have to drop the CPU
+						-- clock frequency by a lot more than 20%, which would cost
+						-- more than we'd gain.  So we are better off staying with
+					       	-- the extra wait state.
 						cpuDTACKn <= '0';
 
 						-- Address bus is (23 downto 1), so all addresse
