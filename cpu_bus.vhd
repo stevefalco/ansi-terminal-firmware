@@ -229,7 +229,9 @@ begin
 	-- The peripheral interrupt lines are active-high,
 	-- but the CPU interrupt lines are active-low.
 	--
-	-- Map the UART to IRQ 3 and the KB to IRQ 2.
+	-- Map the UART to IRQ 3 and the KB to IRQ 2.  We
+	-- give priority to the UART, because it needs much
+	-- higher bandwidth than the keyboard.
 	cpu_int_process: process(all)
 	begin
 		if(cpuUartInt = '1') then

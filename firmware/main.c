@@ -39,6 +39,16 @@ main()
 	screen_initialize(1);
 	keyboard_initialize();
 
+#if 0
+	{
+		uint32_t sr;
+
+		// Read and display the status register.
+		asm(" mov.w %%sr, %0\n\t" : "=r" (sr));
+		dump("sr =", sr);
+	}
+#endif
+
 	// Enable interrupts.
 	asm(" andi.w #~0x0700, %sr");
 
