@@ -22,6 +22,7 @@
 
 #include "keyboard.h"
 #include "uart.h"
+#include "spl.h"
 #include "debug.h"
 
 // Keyboard registers
@@ -69,8 +70,9 @@ keyboard_initialize()
 
 // keyboard_test_interrupt - see if the keyboard has posted an interrupt
 //
-// This runs from the interrupt service routine with interrupts disabled,
-// so we want to be quick.
+// This runs from the interrupt service routine, so we want to be quick.
+// Note that we run at level 2, so we might be interrupted by the UART ISR,
+// which runs at level 3.
 void
 keyboard_test_interrupt()
 {
@@ -768,7 +770,9 @@ keyboard_handler()
 	// warning.
 	uint8_t scan_code = 0;
 
-	asm(" ori.w #0x0700, %sr");	// Mask interrupts
+	// We need mutual exclusion with our interrupt service routine.  It runs
+	// at level 2, so mask out interrupts at level 2 and below.
+	SPL2;
 
 	// See if there is anything waiting to be processed.
 	if(keyboard_rb_count != 0) {
@@ -788,7 +792,8 @@ keyboard_handler()
 		keyboard_rb_output = (keyboard_rb_output + 1) & (keyboard_depth - 1);
 	}
 
-	asm(" andi.w #~0x0700, %sr");	// Unmask interrupts
+	// Allow all interrupts.
+	SPL0;
 
 	// We want to do the decode outside of the interrupt mask, because this process
 	// can be slow, especially if we have to wait for the uart when sending a

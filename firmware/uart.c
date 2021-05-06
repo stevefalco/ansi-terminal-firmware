@@ -26,6 +26,7 @@
 // flow control, although it can be turned on in his VHDL if needed.
 
 #include "uart.h"
+#include "spl.h"
 #include "debug.h"
 
 // UART registers
@@ -236,7 +237,9 @@ uart_initialize()
 
 // uart_store_char - store a character in the receive buffer
 //
-// This runs from the interrupt service routine with interrupts disabled.
+// This runs from the interrupt service routine at level 3.  Currently,
+// there are no higher priority interrupts, so we should always run to
+// completion.
 static void
 uart_store_char()
 {
@@ -286,7 +289,9 @@ uart_store_char()
 
 // uart_test_interrupt - see if the uart has posted an interrupt
 //
-// This runs from the interrupt service routine with interrupts disabled.
+// This runs from the interrupt service routine at level 3.  Currently,
+// there are no higher priority interrupts, so we should always run to
+// completion.
 void
 uart_test_interrupt()
 {
@@ -322,9 +327,10 @@ uart_transmit(unsigned char c, int wait)
 		return 0;
 	}
 
-	// We are willing to wait for the fifo to be empty, because
-	// we never queue more than one character, so the fifo should
-	// go empty very quickly.
+	// We are usually willing to wait for the fifo to be empty,
+	// because we never queue more than one character, so the
+	// fifo should go empty very quickly.  But if we are called
+	// during an interrupt, then we won't wait.
 	//
 	// uart_LSR_THRE_v = 1 means "fifo empty"
 	// uart_LSR_THRE_v = 0 means "fifo not empty"
@@ -366,7 +372,9 @@ uart_receive()
 	// Assume nothing is available.
 	int rv = -1;
 
-	asm(" ori.w #0x0700, %sr");	// Mask interrupts
+	// We need mutual exclusion with our interrupt service routine.  It runs
+	// at level 3, so mask out interrupts at level 3 and below.
+	SPL3;
 
 	if(uart_rb_count) {
 		// Something available.
@@ -379,7 +387,8 @@ uart_receive()
 		uart_rb_output = (uart_rb_output + 1) & (uart_depth - 1);
 	}
 
-	asm(" andi.w #~0x0700, %sr");	// Unmask interrupts
+	// Allow all interrupts.
+	SPL0;
 
 	// If there is nothing available, make sure we haven't blocked the sender.
 	if(rv == -1) {

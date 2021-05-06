@@ -179,7 +179,8 @@ _level3:
 	// Return from exception.
 	rte
 
-// We shouldn't get any of these interrupts, but if we do, we will simply restart.
+// We shouldn't get any of these interrupts, but if we do, we will simply
+// restart.
 _bus_error:
 _address_error:
 _illegal_instruction:
