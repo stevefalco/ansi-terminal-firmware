@@ -51,14 +51,23 @@ architecture a of testbench is
 			UART_RX			: in std_logic;
 			UART_TX			: out std_logic;
 			UART_RTS		: out std_logic;
-			UART_CTS		: in std_logic
+			UART_CTS		: in std_logic;
+
+			DBG_UART_RX		: in std_logic;
+			DBG_UART_TX		: out std_logic;
+			DBG_UART_RTS		: out std_logic;
+			DBG_UART_CTS		: in std_logic;
+
+			LEDS			: out std_logic_vector(7 downto 0)
 		    );
 	end component;
 
 	signal CLK12M				: std_logic;
 
-	signal loopback				: std_logic;
+	signal loopback1			: std_logic;
 	signal loopback2			: std_logic;
+	signal loopback3			: std_logic;
+	signal loopback4			: std_logic;
 
 	signal dipSwitches			: std_logic_vector(7 downto 0);
 
@@ -71,10 +80,15 @@ begin
 	(
 		CLK12M => CLK12M,
 
-		UART_RX => loopback,
-		UART_TX => loopback,
+		UART_RX => loopback1,
+		UART_TX => loopback1,
 		UART_RTS => loopback2,
 		UART_CTS => loopback2,
+
+		DBG_UART_RX => loopback3,
+		DBG_UART_TX => loopback3,
+		DBG_UART_RTS => loopback4,
+		DBG_UART_CTS => loopback4,
 
 		KBD_CLK => kbdClock,
 		KBD_DATA => kbdData,
