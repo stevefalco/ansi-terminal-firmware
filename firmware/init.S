@@ -97,7 +97,6 @@ initBssDone:
 
 _spurious:
 _level1:
-_level3:
 _level4:
 _level5:
 _level6:
@@ -105,15 +104,26 @@ _level7:
 	// We shouldn't get any of these interrupts, but if we do, restart.
 	bra.s	_start
 
-// UART RX and KB RX interrupts.
+// KB RX interrupt.
 _level2:
 	// Save all registers on the stack.
 	movem.l	%d0-%d7/%a0-%a6, -(%sp)
 
-	// See if the keyboard has anything for us.
+	// Handle the keyboard interrupt.
 	jsr	keyboard_test_interrupt
 
-	// See if the UART has anything for us.
+	// Restore all registers from the stack.
+	movem.l	(%sp)+, %d0-%d7/%a0-%a6
+
+	// Return from exception.
+	rte
+
+// UART RX interrupt.
+_level3:
+	// Save all registers on the stack.
+	movem.l	%d0-%d7/%a0-%a6, -(%sp)
+
+	// Handle the UART interrupt.
 	jsr	uart_test_interrupt
 
 	// Restore all registers from the stack.
@@ -121,3 +131,4 @@ _level2:
 
 	// Return from exception.
 	rte
+

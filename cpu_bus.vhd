@@ -194,8 +194,8 @@ begin
 									-- of the address bus.
 									--
 									-- We will use the autovector area,
-									-- so we map level 0 to 0x18, level 1
-									-- to 0x19, etc.
+									-- so we map level 1 to vector 0x19,
+									-- level 2 to vector 0x1a, etc.
 									cpuDataIn(7 downto 0) <= "00011" & cpuAddr(3 downto 1);
 
 								when others =>
@@ -226,17 +226,18 @@ begin
 		end if;
 	end process;
 
-	-- We could use multiple interrupt levels, but that is unnecessary.  Instead,
-	-- we just let the CPU poll both devices.
-	-- 
-	-- The peripheral interrupt lines are active-high, but the CPU interrupts are
-	-- active-low.  We use "101" which means "interrupt 2".
+	-- The peripheral interrupt lines are active-high,
+	-- but the CPU interrupt lines are active-low.
+	--
+	-- Map the UART to IRQ 3 and the KB to IRQ 2.
 	cpu_int_process: process(all)
 	begin
-		if(cpuUartInt = '1' or cpuKbInt = '1') then
-			cpuInt_n <= "101";
+		if(cpuUartInt = '1') then
+			cpuInt_n <= "100"; -- Interrupt 3
+		elsif(cpuKbInt = '1') then
+			cpuInt_n <= "101"; -- Interrupt 2
 		else
-			cpuInt_n <= "111";
+			cpuInt_n <= "111"; -- No interrupt
 		end if;
 	end process;
 
