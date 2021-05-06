@@ -35,7 +35,6 @@ entity cpu_bus is
 		cpuDataIn	: out std_logic_vector (15 downto 0);
 		cpuRWn		: in std_logic;
 		cpuInt_n	: out std_logic_vector (2 downto 0);
-		cpuVPAn		: out std_logic;
 		cpuDTACKn	: out std_logic;
 		cpuASn		: in std_logic;
 
@@ -98,107 +97,113 @@ begin
 					cpuDataIn <= (others => '0');
 					cpuDTACKn <= '1';
 
-					if(cpuASn = '0' and cpuAddr(23 downto 4) /= "11111111111111111111") then
-						-- We can always operate with zero wait states,
-						-- so we assert DTACKn as soon as we recognize
-						-- ASn.  There is no need to wait for the byte
-						-- enables regarding DTACKn.  This saves us a
-						-- wait state on writes.
-						--
-						-- The test on cpuAddr prevents us from asserting
-						-- DTACKn for interrupt acknowledge cycles.  Instead,
-						-- we use VPAn, because that lets us use autovectoring.
+					if(cpuASn = '0') then
+						-- We can always operate with zero wait states, so
+					       	-- we assert DTACKn as soon as we recognize ASn.
+					       	-- There is no need to wait for the byte enables.
+					       	-- This saves us a wait state on writes.
 						cpuDTACKn <= '0';
-					end if;
 
-					if(cpuASn = '0' and cpuByteEnables /= "00") then
-						-- We must wait for the byte enables here, so as
-						-- not to inadvertently write to a wrong byte.
-						--
-						-- We don't need wait states, so we always jump to
-						-- the active state for one cycle, then return to
-						-- idle.
-						busFSM <= busActive_state;
+						if(cpuByteEnables /= "00") then
+							-- We must wait for the byte enables here, so as
+							-- not to inadvertently write to a wrong byte.
+							--
+							-- We don't need wait states, so we always jump to
+							-- the active state for one cycle, then return to
+							-- idle.
+							busFSM <= busActive_state;
 
-						-- Address bus is (23 downto 1), so all addresse
-						-- constants here are divided by 2.
-						--
-						-- I could spread things out more, since I have
-						-- plenty of address bits, but the FPGA doesn't
-						-- have much internal memory left, so it wouldn't
-						-- really be useful.
-						case to_integer(unsigned(cpuAddr)) is
+							-- Address bus is (23 downto 1), so all addresse
+							-- constants here are divided by 2.
+							--
+							-- I could spread things out more, since I have
+							-- plenty of address bits, but the FPGA doesn't
+							-- have much internal memory left, so it wouldn't
+							-- really be useful.
+							case to_integer(unsigned(cpuAddr)) is
 
-							when 16#000000# to 16#001FFF# =>
-								-- CPU ROM @ 0x0000 to 0x3fff
-								-- 8192 16-bit words
-								if(cpuRWn = '1') then
-									cpuDataIn <= cpuRomQ;
-								end if;
+								when 16#000000# to 16#001FFF# =>
+									-- CPU ROM @ 0x0000 to 0x3fff
+									-- 8192 16-bit words
+									if(cpuRWn = '1') then
+										cpuDataIn <= cpuRomQ;
+									end if;
 
-							when 16#002000# to 16#003FFF# =>
-								-- CPU RAM @ 0x4000 to 0x7fff
-								-- 8192 16-bit words
-								if(cpuRWn = '1') then
-									cpuDataIn <= cpuRamQ;
-								elsif(cpuRWn = '0') then
-									cpuRamWren <= '1';
-								end if;
+								when 16#002000# to 16#003FFF# =>
+									-- CPU RAM @ 0x4000 to 0x7fff
+									-- 8192 16-bit words
+									if(cpuRWn = '1') then
+										cpuDataIn <= cpuRamQ;
+									elsif(cpuRWn = '0') then
+										cpuRamWren <= '1';
+									end if;
 
-							when 16#004000# to 16#00477F# =>
-								-- Video RAM @ 0x8000 to 0x8eff
-								-- 1920 16-bit words
-								if(cpuRWn = '1') then
-									cpuDataIn <= videoRamQ;
-								elsif(cpuRWn = '0') then
-									videoRamWren <= '1';
-								end if;
+								when 16#004000# to 16#00477F# =>
+									-- Video RAM @ 0x8000 to 0x8eff
+									-- 1920 16-bit words
+									if(cpuRWn = '1') then
+										cpuDataIn <= videoRamQ;
+									elsif(cpuRWn = '0') then
+										videoRamWren <= '1';
+									end if;
 
-							when 16#006000# to 16#006007# =>
-								-- UART @ 0xc000 to 0xc00f
-								-- 8 bytes, even addresses only
-								if(cpuRWn = '1') then
-									cpuUartCS <= '1';
-									cpuUartWR <= '0';
-									cpuDataIn(15 downto 8) <= cpuUartQ;
-								elsif(cpuRWn = '0') then
-									cpuUartCS <= '1';
-									cpuUartWR <= '1';
-								end if;
+								when 16#006000# to 16#006007# =>
+									-- UART @ 0xc000 to 0xc00f
+									-- 8 bytes, even addresses only
+									if(cpuRWn = '1') then
+										cpuUartCS <= '1';
+										cpuUartWR <= '0';
+										cpuDataIn(15 downto 8) <= cpuUartQ;
+									elsif(cpuRWn = '0') then
+										cpuUartCS <= '1';
+										cpuUartWR <= '1';
+									end if;
 
-							when 16#006010# =>
-								-- DIP Switches @ 0xc020
-								-- 1 byte
-								if(cpuRWn = '1') then
-									cpuDataIn(15 downto 8) <= cpuDipQ;
-								end if;
+								when 16#006010# =>
+									-- DIP Switches @ 0xc020
+									-- 1 byte
+									if(cpuRWn = '1') then
+										cpuDataIn(15 downto 8) <= cpuDipQ;
+									end if;
 
-							when 16#006020# to 16#006027# =>
-								-- Keyboard @ 0xc040 to 0xc04f
-								-- 8 bytes, even addresses only
-								if(cpuRWn = '1') then
-									cpuKbCS <= '1';
-									cpuDataIn(15 downto 8) <= cpuKbQ;
-								end if;
+								when 16#006020# to 16#006027# =>
+									-- Keyboard @ 0xc040 to 0xc04f
+									-- 8 bytes, even addresses only
+									if(cpuRWn = '1') then
+										cpuKbCS <= '1';
+										cpuDataIn(15 downto 8) <= cpuKbQ;
+									end if;
 
-							when 16#006030# =>
-								-- Control Register Bits @ 0xc060
-								-- 1 byte
-								if(cpuRWn = '0') then
-									cpuControlWR <= '1';
-								end if;
+								when 16#006030# =>
+									-- Control Register Bits @ 0xc060
+									-- 1 byte
+									if(cpuRWn = '0') then
+										cpuControlWR <= '1';
+									end if;
 
-							when 16#006040# =>
-								-- LED Register Bits @0xc080
-								-- 1 byte
-								if(cpuRWn = '0') then
-									cpuLEDsWR <= '1';
-								end if;
+								when 16#006040# =>
+									-- LED Register Bits @0xc080
+									-- 1 byte
+									if(cpuRWn = '0') then
+										cpuLEDsWR <= '1';
+									end if;
 
-							when others =>
-								null;
-						end case;
-					end if;
+								when 16#7ffff8# to 16#7fffff# =>
+									-- Interrupt acknowledge cycle, where
+									-- the interrupt level is in bits 3:1
+									-- of the address bus.
+									--
+									-- We will use the autovector area,
+									-- so we map level 0 to 0x18, level 1
+									-- to 0x19, etc.
+									cpuDataIn(7 downto 0) <= "00011" & cpuAddr(3 downto 1);
+
+								when others =>
+									null;
+							end case;
+						end if; -- cpuByteEnables
+
+					end if; -- cpuASn
 
 				when busActive_state =>
 					cpuRamWren <= '0';
@@ -226,18 +231,12 @@ begin
 	-- 
 	-- The peripheral interrupt lines are active-high, but the CPU interrupts are
 	-- active-low.  We use "101" which means "interrupt 2".
-	--
-	-- The CPU normally expects peripherals to respond to an Interrupt Acknowledge
-	-- (IACK) cycle.  However, if we assert cpuVPAn, then the CPU ignores the IACK
-	-- and instead "autovectors".  That is sufficient for our purposes.
 	cpu_int_process: process(all)
 	begin
 		if(cpuUartInt = '1' or cpuKbInt = '1') then
 			cpuInt_n <= "101";
-			cpuVPAn <= '0';
 		else
 			cpuInt_n <= "111";
-			cpuVPAn <= '1';
 		end if;
 	end process;
 
