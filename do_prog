@@ -6,6 +6,9 @@ usage() {
 	echo "-d device (default is $U)" 1>&2
 	echo "-f file (default is $FILE)" 1>&2
 	echo "-h (this help message)" 1>&2
+	echo "" 1>&2
+	echo "Current devices are AR2E0RHX (board in a box)" 1>&2
+	echo "and AR2E0QD2 (development board)" 1>&2
 }
 
 # U="AR2E0RHX" # Board in box

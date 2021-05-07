@@ -48,7 +48,9 @@
 // allowed.
 //
 // We add a clobber for the condition codes, since they are contained in the
-// %sr register.
+// %sr register.  We add a clobber for memory, to be sure that the data within
+// the protected region is actually flushed to memory, and is not sitting in
+// a register.
 //
 // Note that we could be interrupted between the first and second move
 // instructions.  That is ok, because the interrupt routine will save and
@@ -58,7 +60,7 @@ _spl(uint16_t s)
 {
 	int sr;
 
-	asm volatile (" mov.w %%sr,%0; mov.w %1,%%sr" : "=&d" (sr) : "di" (s) : "cc");
+	asm volatile (" mov.w %%sr,%0; mov.w %1,%%sr" : "=&d" (sr) : "di" (s) : "cc", "memory");
 
 	return sr;
 }
@@ -69,11 +71,13 @@ _spl(uint16_t s)
 // register", and the "i" means an "immediate integer operand" is allowed.
 //
 // We add a clobber for the condition codes, since they are contained in the
-// %sr register.
+// %sr register.  We add a clobber for memory, to be sure that the data within
+// the protected region is actually flushed to memory, and is not sitting in
+// a register.
 static inline void
 splx(uint16_t s)
 {
-	asm volatile (" mov.w %0,%%sr" :: "di" (s) : "cc");
+	asm volatile (" mov.w %0,%%sr" :: "di" (s) : "cc", "memory");
 }
 
 #endif // _SPL_H_
