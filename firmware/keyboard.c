@@ -455,7 +455,8 @@ keyboard_find_scan(uint8_t scan_code)
 	int limit;
 	SCAN_TABLE *p;
 
-	// We first deal with the most common keys: alphabetic, numeric, control.
+	// We first deal with the most common keys: alphabetic, numeric,
+	// control.
 	//
 	// First, figure out which table to search, based on the modifiers.
 	switch(keyboard_modifiers & (SHIFT_FLAG | CONTROL_FLAG | CAPS_LOCK_FLAG)) {
@@ -540,15 +541,18 @@ keyboard_decode(uint8_t scan_code)
 	switch(keyboard_state) {
 		case KB_NORMAL:
 			switch(scan_code) {
-				case EXTENSION_E0: // starting extended 0xE0 sequence
+				case EXTENSION_E0:
+					// starting extended 0xE0 sequence
 					keyboard_state = KB_EXTENSION_E0;
 					return;
 
-				case EXTENSION_E1: // starting extended 0xE1 sequence
+				case EXTENSION_E1:
+					// starting extended 0xE1 sequence
 					keyboard_state = KB_EXTENSION_E1;
 					return;
 
-				case KEY_UP: // starting key-up sequence
+				case KEY_UP:
+					// starting key-up sequence
 					keyboard_state = KB_NORMAL_GOING_UP;
 					return;
 
@@ -567,30 +571,35 @@ keyboard_decode(uint8_t scan_code)
 
 				case CAPS_LOCK:
 					if(keyboard_modifiers & CAPS_LOCK_FLAG) {
-						// CAPS_LOCK is on.  Turn it off.
+						// CAPS_LOCK is on.  Turn it
+						// off.
 						keyboard_modifiers &= ~CAPS_LOCK_FLAG;
 					} else {
-						// CAPS_LOCK is off.  Turn it on.
+						// CAPS_LOCK is off.  Turn it
+						// on.
 						keyboard_modifiers |= CAPS_LOCK_FLAG;
 					}
 					break;
 
 				case NUM_LOCK:
 					if(keyboard_modifiers & NUM_LOCK_FLAG) {
-						// NUM_LOCK is on.  Turn it off.
+						// NUM_LOCK is on.  Turn it
+						// off.
 						keyboard_modifiers &= ~NUM_LOCK_FLAG;
 					} else {
-						// NUM_LOCK is off.  Turn it on.
+						// NUM_LOCK is off.  Turn it
+						// on.
 						keyboard_modifiers |= NUM_LOCK_FLAG;
 					}
 					break;
 
 				default:
-					// Everything else can be looked up in a table.
+					// Everything else can be looked up in
+					// a table.
 					//
-					// We will try several tables in turn, until
-					// we find the scan_code, or run out of
-					// possibilities.
+					// We will try several tables in turn,
+					// until we find the scan_code, or run
+					// out of possibilities.
 					keyboard_find_scan(scan_code);
 					break;
 			}
@@ -611,7 +620,8 @@ keyboard_decode(uint8_t scan_code)
 					break;
 
 				default:
-					// Everything else can be looked up in the E0 table.
+					// Everything else can be looked up in
+					// the E0 table.
 					keyboard_search_string(
 							scan_code,
 							string_table_e0,
@@ -623,42 +633,47 @@ keyboard_decode(uint8_t scan_code)
 
 		case KB_EXTENSION_E1:
 			switch(scan_code) {
-				// There is not much here - we are really just trying
-				// to detect a BREAK key.
+				// There is not much here - we are really just
+				// trying to detect a BREAK key.
 				//
-				// This one is hard...  The complete scan_code sequence
-				// for the BREAK key is:
+				// This one is hard...  The complete scan_code
+				// sequence for the BREAK key is:
 				//
 				// 0xE1 0x14 0x77 0xE1 0xF0 0x14 0xF0 0x77
 				//
-				// where the first three scan_codes are: extension code
-				// 0xE1, then L_CTRL and NUM_LOCK.  The last five
-				// scan_codes are extension code 0xE1, followed by
-				// KEY_UP for the L_CTRL and NUM_LOCK.
+				// where the first three scan_codes are:
+				// extension code 0xE1, then L_CTRL and
+				// NUM_LOCK.  The last five scan_codes are
+				// extension code 0xE1, followed by KEY_UP for
+				// the L_CTRL and NUM_LOCK.
 				//
-				// I've aliased L_CTRL to BREAK_1, and NUM_LOCK to
-				// BREAK_2.  Perhaps that makes things a bit more
-				// readable.
+				// I've aliased L_CTRL to BREAK_1, and NUM_LOCK
+				// to BREAK_2.  Perhaps that makes things a bit
+				// more readable.
 
 				case KEY_UP: // starting key-up sequence
 					keyboard_state = KB_EXTENSION_E1_GOING_UP;
 					return;
 
 				case BREAK_1:
-					// So far, we've seen 0xE1 0x14.  Move to the
-					// KB_EXTENSION_E1_GOT_BREAK_1 state, where
-					// we expect to get the BREAK_2 code.
+					// So far, we've seen 0xE1 0x14.  Move
+					// to the KB_EXTENSION_E1_GOT_BREAK_1
+					// state, where we expect to get the
+					// BREAK_2 code.
 					//
-					// Note that all 8 scan_codes are sent when the BREAK
-					// key is initially pressed.  This is different from
-					// every other key, where the KEY_UP part comes when
-					// the key is released.  There is no way to detect when
-					// the BREAK key is released.
+					// Note that all 8 scan_codes are sent
+					// when the BREAK key is initially
+					// pressed.  This is different from
+					// every other key, where the KEY_UP
+					// part comes when the key is released.
+					// There is no way to detect when the
+					// BREAK key is released.
 					keyboard_state = KB_EXTENSION_E1_GOT_BREAK_1;
 					return;
 
 				default:
-					// If we get anything else, this sequence is bad.
+					// If we get anything else, this
+					// sequence is bad.
 					break;
 			}
 			keyboard_state = KB_NORMAL;
@@ -667,10 +682,12 @@ keyboard_decode(uint8_t scan_code)
 		case KB_EXTENSION_E1_GOT_BREAK_1:
 			switch(scan_code) {
 				case BREAK_2:
-					// We've got the BREAK_2 code.  Start sending BREAK.
+					// We've got the BREAK_2 code.  Start
+					// sending BREAK.
 					//
-					// Note that BREAK is 100 ms long, so a timer is used
-					// to stop sending BREAK.
+					// Note that BREAK is 100 ms long, so
+					// a timer is used to stop sending
+					// BREAK.
 					uart_start_break();
 					break;
 
@@ -683,22 +700,27 @@ keyboard_decode(uint8_t scan_code)
 		case KB_EXTENSION_E1_GOING_UP:
 			switch(scan_code) {
 				case BREAK_1:
-					// We've gotten the KEY_UP of the BREAK_1 scan_code.
-					// We prefer to go back to the KB_EXTENSION_E1 state,
-					// because we are still expecting a KEY_UP of the
-					// BREAK_2 scan_code, and we won't get another 0xE1.
+					// We've gotten the KEY_UP of the
+					// BREAK_1 scan_code.  We prefer to go
+					// back to the KB_EXTENSION_E1 state,
+					// because we are still expecting a
+					// KEY_UP of the BREAK_2 scan_code, and
+					// we won't get another 0xE1.
 					//
-					// We could just go back to KB_NORMAL, since it would
-					// discard the remaining KEY_UP, but this is slightly
+					// We could just go back to KB_NORMAL,
+					// since it would discard the remaining
+					// KEY_UP, but this is slightly
 					// cleaner.
 					keyboard_state = KB_EXTENSION_E1;
 					return;
 
 				case BREAK_2:
-					// We've gotten the KEY_UP of the BREAK_2 scan code.
+					// We've gotten the KEY_UP of the
+					// BREAK_2 scan code.
 					//
-					// This is the final scan_code of the sequence.  There
-					// is nothing further to do.
+					// This is the final scan_code of the
+					// sequence.  There is nothing further
+					// to do.
 					break;
 
 				default:
@@ -762,17 +784,19 @@ keyboard_decode(uint8_t scan_code)
 int
 keyboard_handler()
 {
+	uint16_t sr;
+
 	// Assume nothing available.
 	int rv = 0;
 
-	// I shouldn't need to initialize scan_code here, because rv != 0 protects
-	// the call to keyboard_decode().  But gcc gives an "uninitialized variable"
-	// warning.
+	// I shouldn't need to initialize scan_code here, because rv != 0
+	// protects the call to keyboard_decode().  But gcc gives an
+	// "uninitialized variable" warning.
 	uint8_t scan_code = 0;
 
-	// We need mutual exclusion with our interrupt service routine.  It runs
-	// at level 2, so mask out interrupts at level 2 and below.
-	SPL2;
+	// We need mutual exclusion with our interrupt service routine.
+	// It runs at level 2, so mask out interrupts at level 2 and below.
+	sr = spl2();
 
 	// See if there is anything waiting to be processed.
 	if(keyboard_rb_count != 0) {
@@ -792,12 +816,13 @@ keyboard_handler()
 		keyboard_rb_output = (keyboard_rb_output + 1) & (keyboard_depth - 1);
 	}
 
-	// Allow all interrupts.
-	SPL0;
+	// Go back to the previous interrupt level (should be 0, because we
+	// don't do preemption).
+	splx(sr);
 
-	// We want to do the decode outside of the interrupt mask, because this process
-	// can be slow, especially if we have to wait for the uart when sending a
-	// keystroke.
+	// We want to do the decode outside of the interrupt mask, because
+	// this process can be slow, especially if we have to wait for the
+	// uart when sending a keystroke.
 	if(rv != 0) {
 		// Decode it.
 		keyboard_decode(scan_code);

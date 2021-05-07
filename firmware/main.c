@@ -44,13 +44,13 @@ main()
 		uint32_t sr;
 
 		// Read and display the status register.
-		asm(" mov.w %%sr, %0\n\t" : "=r" (sr));
+		asm volatile (" mov.w %%sr, %0\n\t" : "=r" (sr));
 		dump("sr =", sr);
 	}
 #endif
 
 	// Enable interrupts.
-	asm(" andi.w #~0x0700, %sr");
+	asm volatile (" andi.w #~0x0700, %sr");
 
 	while(1) {
 		// Get any waiting uart characters and process them.

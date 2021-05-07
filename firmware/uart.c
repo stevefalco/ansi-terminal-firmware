@@ -259,17 +259,19 @@ uart_store_char()
 		if(uart_flow_state == 0) {
 			// Start a pause.
 			if(uart_flow == HW_FLOW) {
-				// Using hardware flow control - clear RTS.
+				// Using hardware flow control - clear RTS and
+				// remember that we are paused.
 				uart_MCR &= ~uart_MCR_RTS_v;
-				uart_flow_state = 1; // Remember that we are paused.
+				uart_flow_state = 1;
 			} else {
 				// Using software flow control - send XOFF.
 				// Don't wait - we are in an ISR.
 				if(uart_transmit(XOFF, UART_NO_WAIT)) {
-					// If the send was successful, remember that
-					// we are paused.  Otherwise, leave the flow
-					// state at 0 so we try to pause again when
-					// the next character is received.
+					// If the send was successful, remember
+					// that we are paused.  Otherwise,
+					// leave the flow state at 0 so we try
+					// to pause again when the next
+					// character is received.
 					uart_flow_state = 1;
 				}
 			}
@@ -369,12 +371,14 @@ uart_transmit_string(char *pString, int wait)
 int
 uart_receive()
 {
+	uint16_t sr;
+
 	// Assume nothing is available.
 	int rv = -1;
 
-	// We need mutual exclusion with our interrupt service routine.  It runs
-	// at level 3, so mask out interrupts at level 3 and below.
-	SPL3;
+	// We need mutual exclusion with our interrupt service routine.
+	// It runs at level 3, so mask out interrupts at level 3 and below.
+	sr = spl3();
 
 	if(uart_rb_count) {
 		// Something available.
@@ -387,10 +391,12 @@ uart_receive()
 		uart_rb_output = (uart_rb_output + 1) & (uart_depth - 1);
 	}
 
-	// Allow all interrupts.
-	SPL0;
+	// Go back to the previous interrupt level (should be 0, because we
+	// don't do preemption).
+	splx(sr);
 
-	// If there is nothing available, make sure we haven't blocked the sender.
+	// If there is nothing available, make sure we haven't blocked the
+	// sender.
 	if(rv == -1) {
 		if(uart_flow_state) {
 			// Flow is currently blocked, and our buffer is empty.
@@ -407,12 +413,12 @@ uart_receive()
 				// We are outside the interrupt mask, so we can
 				// wait for the uart.
 				if(uart_transmit(XON, UART_WAIT)) {
-					// If the send was successful, remember that
-					// we are now unblocked.
+					// If the send was successful, remember
+					// that we are now unblocked.
 					//
-					// Otherwise, leave the flow state at 0 so
-					// we try to unblock again the next time
-					// we are called.
+					// Otherwise, leave the flow state at
+					// 0 so we try to unblock again the
+					// next time we are called.
 					uart_flow_state = 0;
 				}
 			}
