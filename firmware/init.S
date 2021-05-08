@@ -117,6 +117,11 @@ _start:
 	//
 	// The initial values come at the end of the rodata section and
 	// also have a 4-byte alignment.
+	//
+	// NOTE: The dbf instruction considers the data register to be
+	// 16-bits wide, so we can have at most 256k bytes of initialized
+	// data.  Since we have less memory than that, it is not a problem.
+	//
 	mov.l	#_erodata, %a0		// Initial values for data section
 	mov.l	#_sdata, %a1		// Start of data section
 	mov.l	#_edata, %d0		// End of data section
@@ -134,6 +139,15 @@ initDataDone:
 	// Our linker control file specifies 4-byte alignment of the
 	// _sbss and _ebss variables, so we know the number of bytes
 	// to copy is a multiple of 4.
+	//
+	// NOTE: The dbf instruction considers the data register to be
+	// 16-bits wide, so we can have at most 256k bytes of bss.
+	// Since we have less memory than that, it is not a problem.
+	//
+	// NOTE: We use a mov.l to clear memory, because it is faster than
+	// a clr.l instruction; on the 68000, clr reads from memory before
+	// clearing it.
+	//
 	mov.l	#_sbss, %a0		// Start of BSS
 	mov.l	#_ebss, %d0		// End of BSS
 	sub.l	%a0, %d0		// How many bytes to zero
